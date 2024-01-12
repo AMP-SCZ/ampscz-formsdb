@@ -23,6 +23,7 @@ import logging
 from datetime import datetime
 from glob import glob
 from typing import Any, Dict, Tuple, List
+import re
 
 import numpy as np
 import pandas as pd
@@ -82,12 +83,15 @@ def generate_all_forms(
                 value = int(value)
                 # Handle: MongoDB can only handle up to 8-byte int
                 if value > 2147483647 or value < -2147483648:
-                    if (
-                        variable.endswith("id")
-                        or variable.endswith("barcode")
-                        or variable.endswith("box")
-                        or variable.endswith("id_2")
-                    ):
+                    skip_cast_pattern = r"barcode$|box|_id$|\d+id$|_id\d."
+                    # if (
+                    #     variable.endswith("barcode")
+                    #     or "_box" in variable
+                    #     or "_id" in variable
+                    #     # endswith "X_id" where X is a number
+                    #     or (variable.endswith("_id") and variable[-4].isdigit())
+                    # ):
+                    if re.search(skip_cast_pattern, variable):
                         # logger.warning(
                         #     f"Value {value} for [{form_name}]:{variable} is too large for MongoDB"
                         # )
@@ -175,6 +179,7 @@ def import_forms_by_network(
     )
 
     skip_buffer: List[str] = []
+    processed_buffer: List[str] = []
 
     def _empty_buffer(skip_buffer) -> List[str]:
         if len(skip_buffer) > 0:
@@ -194,7 +199,7 @@ def import_forms_by_network(
             progress.update(
                 subject_process,
                 advance=1,
-                description=f"Processing subject ({subject_id})...",
+                description=f"Processing JSON for subject ({subject_id})...",
             )
             source_m_date = utils.get_file_mtime(Path(subject))
             source_hash = hash.compute_hash(Path(subject))
@@ -206,6 +211,7 @@ def import_forms_by_network(
                 continue
             else:
                 skip_buffer = _empty_buffer(skip_buffer)
+                processed_buffer.append(subject_id)
 
             with open(subject, "r") as f:
                 json_data = json.load(f)
@@ -245,6 +251,10 @@ def import_forms_by_network(
                 raise e
 
         _empty_buffer(skip_buffer)
+
+    logger.info(f"Processed {len(processed_buffer)} subjects")
+    if len(processed_buffer) > 0:
+        logger.info(f"Processed subjects: {', '.join(processed_buffer)}")
 
 
 if __name__ == "__main__":

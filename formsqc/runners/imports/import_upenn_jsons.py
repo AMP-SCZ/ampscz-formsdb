@@ -199,7 +199,7 @@ def import_forms_by_network(
             progress.update(
                 subject_process,
                 advance=1,
-                description=f"Processing subject ({subject_id})...",
+                description=f"Processing UPENN JSON for subject ({subject_id})...",
             )
             source_m_date = utils.get_file_mtime(Path(subject))
 
@@ -268,7 +268,7 @@ if __name__ == "__main__":
     data_params = utils.config(config_file, "data")
     data_root = Path(config_params["data_root"])
 
-    force_import = True
+    force_import = False
     logger.info(f"Force import: {force_import}")
 
     for network in constants.networks:
