@@ -77,7 +77,7 @@ def construct_output_filename(
 def get_output_dir(config_file: Path) -> Path:
     output_params = utils.config(config_file, "outputs")
 
-    output_dir = Path(output_params["cognitive_outputs_root"])
+    output_dir = Path(output_params["cognitive_summary_outputs_root"])
     return output_dir
 
 

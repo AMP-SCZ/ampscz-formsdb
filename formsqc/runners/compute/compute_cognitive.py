@@ -84,7 +84,7 @@ def get_upenn_event_date(
     SELECT form_data ->> 'session_date' as session_date
     FROM upenn_forms
     WHERE subject_id = '{subject_id}' AND
-        event_name = '{event_name}' AND
+        event_name LIKE '%%{event_name}%%' AND
         form_data ? 'session_date';
     """
 

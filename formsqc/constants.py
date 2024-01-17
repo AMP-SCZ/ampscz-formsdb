@@ -1,6 +1,8 @@
 from typing import List
 
 networks: List[str] = ["Pronet", "Prescient"]
+# networks: List[str] = ["Prescient"]
+# networks: List[str] = ["Pronet"]
 
 visit_order: List[str] = [
     "screening",
@@ -28,4 +30,11 @@ upenn_visit_order: List[str] = [
     "month_12",
     "month_18",
     "month_24",
+]
+
+dp_dash_required_cols = [
+    # "reftime",
+    "day",
+    # "timeofday",
+    "weekday",
 ]

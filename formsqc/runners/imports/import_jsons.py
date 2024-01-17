@@ -172,6 +172,7 @@ def import_forms_by_network(
     subjects_glob = glob(
         f"{data_root}/{network}/PHOENIX/PROTECTED/*/raw/*/surveys/*.{network}.json"
     )
+    subjects_glob = sorted(subjects_glob, reverse=True)
     logger.info(f"Found {len(subjects_glob)} subjects for {network}")
 
     data_dictionry_df = pd.read_csv(

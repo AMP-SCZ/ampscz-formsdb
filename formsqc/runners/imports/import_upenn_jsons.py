@@ -74,6 +74,30 @@ def get_visit_date(all_forms_df: pd.DataFrame, visit_name: str) -> Optional[date
     return None
 
 
+def get_event_name_cognitive(
+    all_forms_df: pd.DataFrame, date: datetime
+) -> Optional[str]:
+    penncnb_dfs = all_forms_df[all_forms_df["form_name"].str.contains("penncnb")]
+
+    for idx, row in penncnb_dfs.iterrows():
+        form_data_r: Dict[str, Any] = row["form_data"]
+        form_variables = form_data_r.keys()
+
+        if "chrpenn_interview_date" not in form_variables:
+            logger.warning(
+                f"chrpenn_interview_date not found in form variables for {row['event_name']}"
+            )
+            raise ValueError("chrpenn_interview_date not found in form variables")
+
+        date_str = form_data_r["chrpenn_interview_date"]
+        date_dt = datetime.strptime(date_str, "%Y-%m-%dT%H:%M:%S")
+
+        if date_dt.date() == date.date():
+            return row["event_name"]
+
+    return None
+
+
 def compute_visit_date_map(
     all_forms_df: pd.DataFrame, visits: List[str]
 ) -> Dict[str, datetime]:
@@ -127,6 +151,8 @@ def generate_upenn_form(
         session_date = row["session_date"]
         session_id = row["session_battery"]
 
+        session_date_dt = datetime.strptime(session_date, "%Y-%m-%d")
+
         if "NOSPLLT" in session_id:
             session_id = "NOSPLLT"
         else:
@@ -134,17 +160,39 @@ def generate_upenn_form(
 
         subject_id = row["session_subid"]
 
-        visit_date_map = compute_visit_date_map(
-            all_forms_df=all_forms_df, visits=constants.upenn_visit_order
-        )
+        try:
+            visit = get_event_name_cognitive(
+                all_forms_df=all_forms_df, date=session_date_dt
+            )
+        except ValueError:
+            logger.warning(f"Falling back to visit date map for {subject_id}")
+            visit_date_map = compute_visit_date_map(
+                all_forms_df=all_forms_df, visits=constants.upenn_visit_order
+            )
 
-        visit = get_closest_visit(
-            visit_date_map=visit_date_map, date=pd.to_datetime(session_date)
-        )
+            visit = get_closest_visit(
+                visit_date_map=visit_date_map, date=pd.to_datetime(session_date)
+            )
 
         if visit is None:
             logger.warning(f"Could not find visit for {subject_id} ({session_id})")
-            visit = "uncategorized"
+            logger.warning(f"Falling back to visit date map for {subject_id}")
+
+            visit_date_map = compute_visit_date_map(
+                all_forms_df=all_forms_df, visits=constants.upenn_visit_order
+            )
+
+            visit = get_closest_visit(
+                visit_date_map=visit_date_map, date=pd.to_datetime(session_date)
+            )
+
+            if visit is None:
+                logger.warning(
+                    f"Could not find visit for {subject_id}. Falling back to uncategorized"
+                )
+                visit = "uncategorized"
+            else:
+                visit = f"uncategorized ({visit})"
 
         if visit not in form_data:
             form_data[visit] = {}
@@ -268,7 +316,7 @@ if __name__ == "__main__":
     data_params = utils.config(config_file, "data")
     data_root = Path(config_params["data_root"])
 
-    force_import = False
+    force_import = True
     logger.info(f"Force import: {force_import}")
 
     for network in constants.networks:

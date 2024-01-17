@@ -307,6 +307,16 @@ def str_to_typed(input: str) -> Union[float, int, datetime | str]:
     return value
 
 
+def get_days_since_consent(
+    config_file: Path, subject_id: str, event_date: datetime
+) -> int:
+    consent_date = get_subject_consent_dates(
+        config_file=config_file, subject_id=subject_id
+    )
+
+    return (event_date - consent_date).days + 1
+
+
 # def check_if_subject_form_data_exists(config_file: Path, subject: str) -> bool:
 #     mongodb = db.get_mongo_db(config_file)
 #     subject_form_data = mongodb["forms"]

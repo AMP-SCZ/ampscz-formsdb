@@ -25,6 +25,7 @@ from rich.logging import RichHandler
 
 from formsqc.helpers import db, utils
 from formsqc.models import upenn_forms as upenn_forms_model
+from formsqc import data
 
 MODULE_NAME = "formsqc_upenn_psql_importer"
 
@@ -80,7 +81,14 @@ def export_forms(config_file: Path):
 
     logger.info(f"Total forms: {f_count}")
 
+    logger.info("Constructing SQL queries...")
     for form in forms_data:
+        if not data.check_if_subject_exists(
+            config_file=config_file, subject_id=form.subject_id
+        ):
+            logger.warning(f"Subject {form.subject_id} already exists. Skipping...")
+            continue
+
         sql_query = (
             f"""DELETE FROM upenn_forms WHERE subject_id = '{form.subject_id}';"""
         )
