@@ -25,6 +25,7 @@ import pandas as pd
 from rich.logging import RichHandler
 
 from formsqc.helpers import db, utils
+from formsqc import data
 
 MODULE_NAME = "formsqc_compute_cognitive"
 
@@ -98,7 +99,7 @@ def get_upenn_event_date(
 
 
 def get_days_since_consent(config_file: Path, subject_id: str, event_name: str) -> int:
-    consent_date = utils.get_subject_consent_dates(
+    consent_date = data.get_subject_consent_dates(
         config_file=config_file, subject_id=subject_id
     )
     event_date = get_upenn_event_date(
@@ -229,7 +230,7 @@ def export_data(config_file: Path) -> None:
                     )
 
                 sql_queries.extend(queries)
-            except utils.NoSubjectConsentDateException:
+            except data.NoSubjectConsentDateException:
                 logger.warning(
                     f"No consent date found for subject {subject_id}, skipping..."
                 )

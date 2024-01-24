@@ -25,7 +25,7 @@ import pandas as pd
 import numpy as np
 
 from formsqc.helpers import db, utils
-from formsqc import constants
+from formsqc import constants, data
 
 MODULE_NAME = "formsqc_compute_converted"
 
@@ -113,7 +113,7 @@ def compute_converted(
 
             progress.update(task, advance=1, description=f"Processing {subject_id}...")
 
-            df = utils.get_all_subject_forms(
+            df = data.get_all_subject_forms(
                 config_file=config_file, subject_id=subject_id
             )
             converted = check_if_converted(df=df, visit_order=visit_order, debug=debug)

@@ -196,6 +196,7 @@ if __name__ == "__main__":
 
     output_dir = get_output_dir(config_file=config_file)
     logger.info(f"Writing output to {output_dir}...")
+    output_dir.mkdir(parents=True, exist_ok=True)
 
     logger.warning("Clearing existing data...")
     cli.clear_directory(output_dir)

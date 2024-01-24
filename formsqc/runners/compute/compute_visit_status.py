@@ -26,7 +26,7 @@ from rich.table import Table
 import pandas as pd
 
 from formsqc.helpers import db, utils
-from formsqc import constants
+from formsqc import constants, data
 
 MODULE_NAME = "formsqc_compute_visit_status"
 
@@ -211,7 +211,7 @@ def compute_recent_visit(config_file: Path, debug: bool = False) -> pd.DataFrame
 
             progress.update(task, advance=1, description=f"Processing {subject_id}...")
 
-            df = utils.get_all_subject_forms(
+            df = data.get_all_subject_forms(
                 config_file=config_file, subject_id=subject_id
             )
             visit_status = compute_recent_visit_rpms(

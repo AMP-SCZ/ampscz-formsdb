@@ -24,7 +24,7 @@ import numpy as np
 import pandas as pd
 from rich.logging import RichHandler
 
-from formsqc import constants
+from formsqc import constants, data
 from formsqc.helpers import db, utils
 
 MODULE_NAME = "formsqc_compute_removed"
@@ -123,7 +123,7 @@ def compute_removed(
 
             progress.update(task, advance=1, description=f"Processing {subject_id}...")
 
-            df = utils.get_all_subject_forms(
+            df = data.get_all_subject_forms(
                 config_file=config_file, subject_id=subject_id
             )
             removed_r = check_if_removed(df, visit_order, debug=debug)

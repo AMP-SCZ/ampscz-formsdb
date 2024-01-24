@@ -33,8 +33,8 @@ upenn_visit_order: List[str] = [
 ]
 
 dp_dash_required_cols = [
-    # "reftime",
+    "reftime",
     "day",
-    # "timeofday",
+    "timeofday",
     "weekday",
 ]

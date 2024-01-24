@@ -25,7 +25,7 @@ import pandas as pd
 from rich.logging import RichHandler
 
 from formsqc.helpers import cli, db, utils, dpdash
-from formsqc import constants
+from formsqc import constants, data
 
 MODULE_NAME = "formsqc_cognitive_combined_exporter"
 
@@ -264,7 +264,7 @@ def generate_csv(
             interview_dates = combined_df["chrpenn_interview_date"].tolist()
             for idx, interview_date in enumerate(interview_dates):
                 event_date = datetime.strptime(interview_date, "%Y-%m-%dT%H:%M:%S")
-                days_from_consent = utils.get_days_since_consent(
+                days_from_consent = data.get_days_since_consent(
                     config_file=config_file,
                     subject_id=subject_id,
                     event_date=event_date,
@@ -276,7 +276,7 @@ def generate_csv(
                 entry_dates = combined_df["chrpenn_entry_date"].tolist()
                 for idx, entry_date in enumerate(entry_dates):
                     event_date = datetime.strptime(entry_date, "%Y-%m-%dT%H:%M:%S")
-                    days_from_consent = utils.get_days_since_consent(
+                    days_from_consent = data.get_days_since_consent(
                         config_file=config_file,
                         subject_id=subject_id,
                         event_date=event_date,
@@ -286,7 +286,7 @@ def generate_csv(
                 warn(f"No interview date found for {subject_id}.")
                 # Use an ascending day number
                 combined_df["day"] = range(1, combined_df.shape[0] + 1)
-        except utils.NoSubjectConsentDateException:
+        except data.NoSubjectConsentDateException:
             logger.warning(f"No consent date found for {subject_id}. Skipping...")
             return
 
