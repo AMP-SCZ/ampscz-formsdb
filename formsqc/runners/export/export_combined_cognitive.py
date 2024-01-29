@@ -138,18 +138,6 @@ def map_event_names(verbose: List[str]) -> Dict[str, str]:  # type: ignore
     return event_name_map
 
 
-def get_week_day(datetime: datetime) -> int:
-    # Return the day of the week as an integer, where Saturday is 1 and Friday is 7.
-    iso_weekday = datetime.isoweekday()
-
-    if iso_weekday > 5:
-        weekday = iso_weekday - 5
-    else:
-        weekday = iso_weekday + 2
-
-    return weekday
-
-
 def get_site_id(subject_id: str) -> Optional[str]:
     query = f"""
     SELECT site_id FROM subjects
@@ -246,11 +234,11 @@ def generate_csv(
         # Add col 'weekday'
         try:
             interview_date = pd.to_datetime(combined_df["chrpenn_interview_date"])
-            combined_df["weekday"] = interview_date.apply(get_week_day)
+            combined_df["weekday"] = interview_date.apply(dpdash.get_week_day)
         except KeyError:
             try:
                 interview_date = pd.to_datetime(combined_df["chrpenn_entry_date"])
-                combined_df["weekday"] = interview_date.apply(get_week_day)
+                combined_df["weekday"] = interview_date.apply(dpdash.get_week_day)
             except KeyError:
                 warn(f"No interview date found for {subject_id}.")
                 combined_df["weekday"] = pd.NA

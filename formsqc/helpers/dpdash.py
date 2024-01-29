@@ -40,6 +40,26 @@ def get_time_range(consent_date: datetime, event_date: datetime) -> str:
     return time_range
 
 
+def get_week_day(datetime: datetime) -> int:
+    """
+    Get the day of the week as an integer, where Saturday is 1 and Friday is 7.
+
+    Args:
+        datetime (datetime): The datetime object for which to determine the day of the week.
+
+    Returns:
+        int: The day of the week as an integer.
+    """
+    iso_weekday = datetime.isoweekday()
+
+    if iso_weekday > 5:
+        weekday = iso_weekday - 5
+    else:
+        weekday = iso_weekday + 2
+
+    return weekday
+
+
 def get_dpdash_timepoint(consent_date: datetime, event_date: datetime) -> str:
     """
     Generates a DPDash compliant timepoint string in the format dayXXX, where

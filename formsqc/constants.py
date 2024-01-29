@@ -38,3 +38,14 @@ dp_dash_required_cols = [
     "timeofday",
     "weekday",
 ]
+
+upenn_tests: List[str] = [
+    "mpract",  # Motor Praxis Test
+    "spcptn90",  # Short Penn Continuous Performance Test
+    "er40_d",  # Penn Emotion Recognition Task
+    "sfnb2",  # Short Fractal N-back
+    "digsym",  # Digit Symbol Test
+    "svolt",  # Short Visual Object Learning and Memory
+    "sctap",  # Short Computerized Finger Tapping Test
+    "spllt",  # Short Penn List Learning Test
+]

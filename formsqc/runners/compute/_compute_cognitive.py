@@ -78,37 +78,6 @@ def init_db(config_file: Path) -> None:
     db.execute_queries(config_file, [drop_table_query, create_table_query])
 
 
-def get_upenn_event_date(
-    config_file: Path, subject_id: str, event_name: str
-) -> datetime:
-    query = f"""
-    SELECT form_data ->> 'session_date' as session_date
-    FROM upenn_forms
-    WHERE subject_id = '{subject_id}' AND
-        event_name LIKE '%%{event_name}%%' AND
-        form_data ? 'session_date';
-    """
-
-    date = db.fetch_record(config_file=config_file, query=query)
-
-    if date is None:
-        raise Exception("No event date found in the database.")
-    date = datetime.strptime(date, "%Y-%m-%dT%H:%M:%S")
-
-    return date
-
-
-def get_days_since_consent(config_file: Path, subject_id: str, event_name: str) -> int:
-    consent_date = data.get_subject_consent_dates(
-        config_file=config_file, subject_id=subject_id
-    )
-    event_date = get_upenn_event_date(
-        config_file=config_file, subject_id=subject_id, event_name=event_name
-    )
-
-    return (event_date - consent_date).days + 1
-
-
 def fetch_required_variables(
     config_file: Path, subject_id: str, required_variables: List[str]
 ) -> pd.DataFrame:
@@ -160,11 +129,11 @@ def construct_queries(
         event_name: str = str(index)
         vals["event_name"] = event_name
 
-        vals["day"] = get_days_since_consent(
+        vals["day"] = data.get_upenn_days_since_consent(
             config_file=config_file, subject_id=subject_id, event_name=event_name
         )
 
-        event_day = get_upenn_event_date(
+        event_day = data.get_upenn_event_date(
             config_file=config_file, subject_id=subject_id, event_name=event_name
         )
         vals["weekday"] = get_week_day(event_day)

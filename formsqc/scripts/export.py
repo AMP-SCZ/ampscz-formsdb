@@ -21,9 +21,9 @@ import logging
 
 from rich.logging import RichHandler
 
-from formsqc.helpers import utils
+from formsqc.helpers import utils, cli
 
-MODULE_NAME = "formsqc_compute"
+MODULE_NAME = "formsqc_exporter"
 
 console = utils.get_console()
 
@@ -47,17 +47,19 @@ if __name__ == "__main__":
         config_file=config_file, module_name=MODULE_NAME, logger=logger
     )
 
-    targets = Path(__file__).parent.glob("compute_*.py")
+    repo_root = cli.get_repo_root()
+    target_dir = repo_root / "formsqc" / "runners" / "export"
+    targets = target_dir.glob("export_*.py")
     targets = sorted(targets)
 
     targets = [target for target in targets if target not in [Path(__file__)]]
 
-    logger.info(f"Founds {len(list(targets))} compute scripts", extra={"markup": True})
+    logger.info(f"Founds {len(list(targets))} export scripts", extra={"markup": True})
     logger.info("Modules found:", extra={"markup": True})
     for target in targets:
         logger.info(f"  - {target.name}", extra={"markup": True})
 
-    logger.info("[green]Running compute scripts", extra={"markup": True})
+    logger.info("[green]Running export scripts", extra={"markup": True})
 
     for target in targets:
         if target == Path(__file__):

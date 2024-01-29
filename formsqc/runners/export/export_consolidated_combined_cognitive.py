@@ -63,7 +63,7 @@ def construct_output_filename(
     elif len(event_types) > 1:
         raise ValueError(f"More than one event type found: {event_types}")
     else:
-        raise ValueError("No event type found.")
+        event_type = "UNKNOWN"
 
     optional_tags.append(event_type)
 

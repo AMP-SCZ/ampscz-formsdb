@@ -40,7 +40,7 @@ logging.basicConfig(**logargs)
 
 async def import_jsons() -> None:
     logger.info("Importing JSONs...")
-    cmd = ["../runners/imports/import_jsons.py"]
+    cmd = [f"{root}/formsqc/runners/imports/import_jsons.py"]
 
     proc = await asyncio.create_subprocess_exec(*cmd)
 
@@ -57,7 +57,7 @@ async def import_jsons() -> None:
 
 async def export_jsons() -> None:
     logger.info("Exporting JSONs...")
-    cmd = ["../runners/imports/export_mongo_to_psql.py"]
+    cmd = [f"{root}/formsqc/runners/imports/export_mongo_to_psql.py"]
 
     proc = await asyncio.create_subprocess_exec(*cmd)
 
@@ -82,7 +82,7 @@ async def import_export_jsons() -> None:
 
 async def import_upenn_json() -> None:
     logger.info("Importing UPenn JSON...")
-    cmd = ["../runners/imports/import_upenn_jsons.py"]
+    cmd = [f"{root}/formsqc/runners/imports/import_upenn_jsons.py"]
 
     proc = await asyncio.create_subprocess_exec(*cmd)
 
@@ -98,7 +98,7 @@ async def import_upenn_json() -> None:
 
 async def export_upenn_json() -> None:
     logger.info("Exporting UPenn JSON...")
-    cmd = ["../runners/imports/export_upenn_mongo_to_psql.py"]
+    cmd = [f"{root}/formsqc/runners/imports/export_upenn_mongo_to_psql.py"]
 
     proc = await asyncio.create_subprocess_exec(*cmd)
 

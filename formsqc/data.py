@@ -1,9 +1,11 @@
 from pathlib import Path
 from datetime import datetime
+from typing import List
 
 import pandas as pd
 
 from formsqc.helpers import db
+from formsqc import constants
 
 
 def get_network(config_file: Path, site: str) -> str:
@@ -92,3 +94,60 @@ def get_days_since_consent(
     )
 
     return (event_date - consent_date).days + 1
+
+
+def get_upenn_event_date(
+    config_file: Path, subject_id: str, event_name: str
+) -> datetime:
+    query = f"""
+    SELECT form_data ->> 'session_date' as session_date
+    FROM upenn_forms
+    WHERE subject_id = '{subject_id}' AND
+        event_name LIKE '%%{event_name}%%' AND
+        form_data ? 'session_date';
+    """
+
+    date = db.fetch_record(config_file=config_file, query=query)
+
+    if date is None:
+        raise Exception("No event date found in the database.")
+    date = datetime.strptime(date, "%Y-%m-%dT%H:%M:%S")
+
+    return date
+
+
+def get_upenn_days_since_consent(
+    config_file: Path, subject_id: str, event_name: str
+) -> int:
+    consent_date = get_subject_consent_dates(
+        config_file=config_file, subject_id=subject_id
+    )
+    event_date = get_upenn_event_date(
+        config_file=config_file, subject_id=subject_id, event_name=event_name
+    )
+
+    return (event_date - consent_date).days + 1
+
+
+def make_df_dpdash_ready(df: pd.DataFrame, subject_id: str) -> pd.DataFrame:
+    dp_dash_required_cols = constants.dp_dash_required_cols + ["subject_id"]
+
+    for col in dp_dash_required_cols:
+        if col not in df.columns:
+            df[col] = ""
+
+    cols: List[str] = df.columns.tolist()
+    cols = [col for col in cols if col not in dp_dash_required_cols]
+
+    df = df[dp_dash_required_cols + cols]
+    df["subject_id"] = subject_id
+
+    # Check if [day] is filled in, else fill it in with 1 to n
+    # replace empty strings with NA
+    df.replace("", pd.NA, inplace=True)
+    if df["day"].isnull().values.any():  # type: ignore
+        df["day"] = df["day"].ffill()
+        df["day"] = df["day"].bfill()
+        df["day"] = df["day"].fillna(1)
+
+    return df

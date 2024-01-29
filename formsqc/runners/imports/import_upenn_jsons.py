@@ -28,7 +28,7 @@ import pandas as pd
 from rich.logging import RichHandler
 
 from formsqc.helpers import db, utils
-from formsqc import constants
+from formsqc import constants, data
 
 MODULE_NAME = "formsqc_upenn_json_importer"
 
@@ -276,7 +276,7 @@ def import_forms_by_network(
             )
             sub_data_all.dropna(axis=1, how="all", inplace=True)
 
-            all_forms_df = utils.get_all_subject_forms(
+            all_forms_df = data.get_all_subject_forms(
                 config_file=config_file, subject_id=subject_id
             )
 
@@ -316,7 +316,7 @@ if __name__ == "__main__":
     data_params = utils.config(config_file, "data")
     data_root = Path(config_params["data_root"])
 
-    force_import = True
+    force_import = False
     logger.info(f"Force import: {force_import}")
 
     for network in constants.networks:
