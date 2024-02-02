@@ -128,7 +128,7 @@ def get_visit_system_status(
         values = [item for item in values if not pd.isna(item)]
 
         if len(values) == 0:
-            value = "Not Administered"
+            value = "Not Available"
         else:
             value = values[0]
 

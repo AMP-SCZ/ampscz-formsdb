@@ -18,14 +18,14 @@ except ValueError:
     pass
 
 import logging
-from typing import List, Dict
+from typing import Dict
 from glob import glob
 
 import pandas as pd
 from rich.logging import RichHandler
 
 from formsqc.helpers import cli, utils, dpdash
-from formsqc import data
+from formsqc import data, constants
 
 MODULE_NAME = "formsqc_cognitive_combined_consolidate"
 
@@ -43,13 +43,9 @@ logging.basicConfig(**logargs)
 
 def construct_output_filename(
     network: str,
+    event_name: str,
     df: pd.DataFrame,
 ) -> str:
-    # start_day = int(df["day"].min()) if not df.empty else 1
-    end_day = int(df["day"].max()) if not df.empty else 1
-
-    optional_tags: List[str] = ["combined"]
-
     try:
         event_types = df["event_type"].unique()
     except KeyError:
@@ -65,18 +61,8 @@ def construct_output_filename(
     else:
         event_type = "UNKNOWN"
 
-    optional_tags.append(event_type)
-
-    dpdash_name = dpdash.get_dpdash_name(
-        study="AMPSCZ",
-        subject=network,
-        data_type="forms",
-        category="cognition",
-        optional_tag=optional_tags,
-        time_range=f"day1to{end_day}",
-    )
-
-    filename = f"{dpdash_name}.csv"
+    custom_name = f"combined_cognition_{event_type}-{network}-{event_name}-day1to1"
+    filename = f"{custom_name}.csv"
 
     return filename
 
@@ -92,9 +78,7 @@ def get_data_dir(config_file: Path) -> Path:
 def get_output_dir(config_file: Path) -> Path:
     output_params = utils.config(config_file, "outputs")
 
-    output_dir = Path(output_params["cognitive_combined_outputs_root"])
-    output_dir = output_dir / "consolidated"
-
+    output_dir = Path(output_params["cognitive_consolidated_combined_outputs_root"])
     output_dir.mkdir(parents=True, exist_ok=True)
 
     return output_dir
@@ -143,16 +127,22 @@ def consolidate_data(config_file: Path, data_dir: Path, output_dir: Path) -> Non
                     ]
                 )
 
+    visits = constants.upenn_visit_order
+
     for network in network_data:
         for event_type in network_data[network]:
-            df = network_data[network][event_type]
+            for visit in visits:
+                df = network_data[network][event_type]
+                df = df[df["event_name"].str.contains(visit)]
 
-            if df.empty:
-                continue
+                if df.empty:
+                    continue
 
-            filename = construct_output_filename(network=network, df=df)
-            logger.info(f"Writing {filename}...")
-            df.to_csv(output_dir / filename, index=False)
+                filename = construct_output_filename(
+                    network=network, event_name=visit, df=df
+                )
+                logger.info(f"Writing {filename}...")
+                df.to_csv(output_dir / filename, index=False)
 
 
 if __name__ == "__main__":
@@ -173,7 +163,7 @@ if __name__ == "__main__":
     logger.info(f"Writing output to {output_dir}...")
 
     logger.warning("Clearing existing data...")
-    cli.clear_directory(output_dir)
+    cli.clear_directory(output_dir, pattern="combined_cognition_*-day1to1.csv")
 
     logger.info("Consolidating data...")
     consolidate_data(

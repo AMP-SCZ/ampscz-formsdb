@@ -167,7 +167,7 @@ def upset_form_data(
 
 
 def import_forms_by_network(
-    network: str, data_root: Path, data_dictionary: Path
+    config_file: Path, network: str, data_root: Path, data_dictionary: Path
 ) -> None:
     subjects_glob = glob(
         f"{data_root}/{network}/PHOENIX/PROTECTED/*/raw/*/surveys/*.{network}.json"
@@ -277,6 +277,11 @@ if __name__ == "__main__":
 
     for network in constants.networks:
         logger.info(f"Importing {network} data...")
-        import_forms_by_network(network, data_root, data_dictionary_f)
+        import_forms_by_network(
+            config_file=config_file,
+            network=network,
+            data_root=data_root,
+            data_dictionary=data_dictionary_f,
+        )
 
     logger.info("Done!")

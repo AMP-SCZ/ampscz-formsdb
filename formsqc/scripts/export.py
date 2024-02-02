@@ -66,4 +66,4 @@ if __name__ == "__main__":
             continue
 
         console.print(f"Running {target.name}")
-        exec(open(target).read())
+        exec(open(target, encoding='utf-8').read())

@@ -175,7 +175,7 @@ def get_dpdash_name(
 
 
 def parse_dpdash_name(
-    name: str, maxsplit: int = -1
+    name: str, maxsplit: int = 3
 ) -> Dict[str, Union[str, List[str], None]]:
     """
     Parses a string in the format of a dpdash file name and returns a dictionary with the parsed values.

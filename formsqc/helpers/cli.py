@@ -4,7 +4,9 @@ import logging
 from typing import Optional
 
 
-def clear_directory(directory: Path, logger: Optional[logging.Logger] = None) -> None:
+def clear_directory(
+    directory: Path, logger: Optional[logging.Logger] = None, pattern: str = "*"
+):
     """
     Clears the contents of a directory.
 
@@ -16,12 +18,17 @@ def clear_directory(directory: Path, logger: Optional[logging.Logger] = None) ->
     if logger is None:
         logger = logging.getLogger(__name__)
 
-    for file in directory.iterdir():
+    files_deleted = 0
+
+    for file in directory.glob(pattern):
         if file.is_dir():
-            logging.warning(f"Removing directory {file}")
+            logger.warning(f"Removing directory {file}")
             clear_directory(file)
         else:
+            files_deleted += 1
             file.unlink()
+
+    logger.info(f"Deleted {files_deleted} files from {directory}")
 
 
 def get_repo_root() -> Path:

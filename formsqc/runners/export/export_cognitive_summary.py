@@ -18,12 +18,14 @@ except ValueError:
     pass
 
 import logging
+from pathlib import Path
+from typing import Dict, List, Optional, Union, Set
 
 import pandas as pd
 from rich.logging import RichHandler
 
 from formsqc.helpers import cli, db, dpdash, utils
-from formsqc import data
+from formsqc import data, constants
 
 MODULE_NAME = "formsqc_cognitive_exporter"
 
@@ -71,7 +73,7 @@ def generate_upenn_data_summary_filename(
     filename = dpdash.get_dpdash_name(
         study=subject_id[:2],
         subject=subject_id,
-        data_type="forms",
+        data_type="form",
         category="cognitive",
         optional_tag=["data", "summary"],
         time_range=f"day1to{max_days}",
@@ -89,7 +91,7 @@ def generate_upenn_data_availability_filename(
     filename = dpdash.get_dpdash_name(
         study=subject_id[:2],
         subject=subject_id,
-        data_type="forms",
+        data_type="form",
         category="cognitive",
         optional_tag=["data", "availability"],
         time_range=f"day1to{max_days}",
@@ -174,6 +176,68 @@ def export_data(
             )
 
 
+def generate_blank_availability_df(subject_id: str) -> pd.DataFrame:
+    upenn_visits = constants.upenn_visit_order
+    required_cols = [f"data_availability_{visit}" for visit in upenn_visits]
+    required_cols.append("data_availability_summary")
+
+    data_dict: Dict[str, Union[List[bool], List[Optional[str]]]] = {
+        col: [False] for col in required_cols
+    }
+    data_dict["data_availability_summary"] = ["None"]
+
+    df = pd.DataFrame(data_dict)
+
+    df = data.make_df_dpdash_ready(df=df, subject_id=subject_id)
+
+    return df
+
+
+def export_blank_availability_data(
+    config_file: Path, availability_output_dir: Path
+) -> None:
+    subject_query = """
+        SELECT id FROM subjects ORDER BY id ASC;
+    """
+
+    blank_file_count = 0
+
+    subject_id_df = db.execute_sql(config_file=config_file, query=subject_query)
+    subject_ids: List[str] = subject_id_df["id"].tolist()
+
+    pattern = "*-form_cognitive_data_summary-day*.csv"
+    matching_summary_files_g = availability_output_dir.glob(pattern)
+
+    matching_summary_files = list(matching_summary_files_g)
+
+    subjects: Set[str] = set()
+    blank_subjects: Set[str] = set()
+
+    for matching_summary_file in matching_summary_files:
+        dp_dash_dict = dpdash.parse_dpdash_name(matching_summary_file.name, maxsplit=3)
+        subject_id = dp_dash_dict["subject"]
+        subjects.add(subject_id)  # type: ignore
+
+    with utils.get_progress_bar() as progress:
+        task = progress.add_task("Processing...", total=len(subject_ids))
+        for subject_id in subject_ids:
+            progress.update(task, advance=1, description=f"Checking {subject_id}...")
+            if subject_id not in subjects:
+                availability_df = generate_blank_availability_df(subject_id=subject_id)
+                availability_filename = generate_upenn_data_availability_filename(
+                    subject_id=subject_id,
+                    df=availability_df,
+                )
+
+                filepath = availability_output_dir / f"{availability_filename}.csv"
+                blank_file_count += 1
+                blank_subjects.add(subject_id)
+                availability_df.to_csv(filepath, index=False)
+
+    logger.info(f"Exported {blank_file_count} blank availability files.")
+    logger.info(f"Blank subjects: {blank_subjects}")
+
+
 if __name__ == "__main__":
     console.rule(f"[bold red]{MODULE_NAME}")
 
@@ -195,14 +259,21 @@ if __name__ == "__main__":
     summary_output_dir.mkdir(parents=True, exist_ok=True)
 
     logger.warning("Clearing existing data...")
-    cli.clear_directory(availability_output_dir)
-    cli.clear_directory(summary_output_dir)
+    cli.clear_directory(
+        availability_output_dir, pattern="*cognitive_data_availability*.csv"
+    )
+    cli.clear_directory(summary_output_dir, pattern="*cognitive_data_summary*.csv")
 
     logger.info("Exporting data...")
     export_data(
         config_file=config_file,
         availability_output_dir=availability_output_dir,
         summary_output_dir=summary_output_dir,
+    )
+
+    logger.info("Exporting blank availability data...")
+    export_blank_availability_data(
+        config_file=config_file, availability_output_dir=availability_output_dir
     )
 
     logger.info("Done.")

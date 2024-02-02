@@ -68,3 +68,16 @@ $REPO_ROOT/formsqc/scripts/export.py >/dev/null
 
 echo $SEPARATOR
 echo "Done at $(date)"
+
+echo $SEPARATOR
+
+echo "$(date) - Killing MongoDB"
+pkill -U $(whoami) mongod
+
+echo "$(date) - Waiting for MongoDB to stop..."
+while pgrep -u $(whoami) mongod >/dev/null; do sleep 1; done
+
+echo "$(date) - Killing PostgreSQL"
+pg_ctl -D $REPO_ROOT/data/postgresql -l $REPO_ROOT/data/postgresql/logfile -o "-p 5433" stop
+
+echo "$(date) - Done"

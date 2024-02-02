@@ -77,7 +77,7 @@ def construct_output_filename(
     dpdash_name = dpdash.get_dpdash_name(
         study=site_id,
         subject=subject_id,
-        data_type="forms",
+        data_type="form",
         category="cognition",
         optional_tag=optional_tags,
         time_range=f"day1to{end_day}",
@@ -321,7 +321,7 @@ if __name__ == "__main__":
     logger.info(f"Writing output to {output_dir}...")
 
     logger.warning("Clearing existing data...")
-    cli.clear_directory(output_dir)
+    cli.clear_directory(output_dir, pattern="*-form_cognition_combined_*-day*.csv")
 
     logger.info("Exporting data...")
     export_data(config_file=config_file, output_dir=output_dir)
