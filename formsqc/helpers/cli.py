@@ -26,7 +26,10 @@ def clear_directory(
             clear_directory(file)
         else:
             files_deleted += 1
-            file.unlink()
+            try:
+                file.unlink()
+            except FileNotFoundError:
+                logger.warning(f"File {file} not found. Skipping.")
 
     logger.info(f"Deleted {files_deleted} files from {directory}")
 

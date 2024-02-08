@@ -5,11 +5,11 @@ from pathlib import Path
 
 file = Path(__file__).resolve()
 parent = file.parent
-root = None
+ROOT = None
 for parent in file.parents:
     if parent.name == "ampscz-formsqc":
-        root = parent
-sys.path.append(str(root))
+        ROOT = parent
+sys.path.append(str(ROOT))
 
 # remove current directory from path
 try:
@@ -39,9 +39,17 @@ logargs = {
 }
 logging.basicConfig(**logargs)
 
-required_variables: List[str] = constants.upenn_tests
-# Append "_system_status" to each variable
-required_variables = [f"{variable}_system_status" for variable in required_variables]
+required_variables: List[str] = []
+
+required_system_status_variables: List[str] = [
+    f"{test}_system_status" for test in constants.upenn_tests
+]
+required_manual_status_variables: List[str] = [
+    f"{test}_status" for test in constants.upenn_tests
+]
+
+required_variables.extend(required_system_status_variables)
+required_variables.extend(required_manual_status_variables)
 
 
 def construct_init_queries(required_variables: List[str]) -> List[str]:
@@ -137,6 +145,39 @@ def get_visit_system_status(
     return system_status
 
 
+def get_visit_status(
+    visit_data: pd.DataFrame,
+    tests: List[str],
+) -> Dict[str, Any]:
+    status_dict: Dict[str, str] = {}
+
+    # gets columns that contain 'system_status'
+    all_cols: List[str] = visit_data.columns.to_list()
+    status_cols: List[str] = [col for col in all_cols if "status" in col]
+
+    # Skip 'system_status' columns
+    status_cols = [col for col in status_cols if "system_status" not in col]
+
+    for test in tests:
+        test_cols: List[str] = [col for col in status_cols if test in col]
+        values = visit_data[test_cols].values.tolist()
+
+        # list of lists to list
+        values = [item for sublist in values for item in sublist]
+
+        # remove nan values
+        values = [item for item in values if not pd.isna(item)]
+
+        if len(values) == 0:
+            value = "Not Available"
+        else:
+            value = values[0]
+
+        status_dict[test] = value
+
+    return status_dict
+
+
 def get_visits_system_status(
     upenn_form: pd.DataFrame,
     visits: List[str],
@@ -152,6 +193,27 @@ def get_visits_system_status(
             visit_system_status = None
         else:
             visit_system_status = get_visit_system_status(visit_data, tests)
+
+        visits_system_status[visit] = visit_system_status
+
+    return visits_system_status
+
+
+def get_visits_status(
+    upenn_form: pd.DataFrame,
+    visits: List[str],
+    tests: List[str],
+) -> Dict[str, Optional[Dict[str, str]]]:
+    visits_system_status: Dict[str, Optional[Dict[str, str]]] = {}
+
+    for visit in visits:
+        visit_data = upenn_form[upenn_form["event_name"].str.contains(visit)]
+        visit_data = visit_data.dropna(axis=1, how="all")
+
+        if visit_data.empty:
+            visit_system_status = None
+        else:
+            visit_system_status = get_visit_status(visit_data, tests)
 
         visits_system_status[visit] = visit_system_status
 
@@ -176,10 +238,14 @@ def generate_upenn_data_availability(system_status: Dict[str, Any]) -> pd.DataFr
     return pd.DataFrame(data_availability, index=[0])
 
 
-def genertate_upenn_data_summary(
-    config_file: Path, subject_id: str, system_status: Dict[str, Any]
+def generate_upenn_data_summary(
+    config_file: Path,
+    subject_id: str,
+    system_status: Dict[str, Any],
+    manual_status: Dict[str, Any],
 ) -> pd.DataFrame:
-    master_df = pd.DataFrame()
+    master_system_status_df = pd.DataFrame()
+    master_status_df = pd.DataFrame()
 
     for event_name, status in system_status.items():
         if status is None:
@@ -199,8 +265,24 @@ def genertate_upenn_data_summary(
             config_file=config_file, subject_id=subject_id, event_name=event_name
         )
         df["weekday"] = dpdash.get_week_day(event_day)
-        master_df = pd.concat([master_df, df])
+        master_system_status_df = pd.concat([master_system_status_df, df])
 
+    for event_name, status in manual_status.items():
+        if status is None:
+            continue
+
+        df = pd.DataFrame(status, index=[event_name])
+
+        # Append "_status" to each column name
+        df = df.add_suffix("_status")
+
+        df["event_name"] = event_name
+
+        master_status_df = pd.concat([master_status_df, df])
+    try:
+        master_df = pd.merge(master_system_status_df, master_status_df, on="event_name")
+    except KeyError as e:
+        raise e
     master_df = master_df.reset_index(drop=True)
 
     # Sort columns alphabetically
@@ -213,7 +295,7 @@ def genertate_upenn_data_summary(
         cols = ["event_name"] + cols
         master_df = master_df[cols]
     except ValueError as e:
-        logger.warning(f"{subject_id} - {e}")
+        print(e)
 
     return master_df
 
@@ -267,10 +349,18 @@ def construct_queries(config_file: Path, subject_id: str) -> List[str]:
         upenn_form=upenn_form, visits=visits, tests=tests
     )
 
+    manual_status = get_visits_status(upenn_form=upenn_form, visits=visits, tests=tests)
+
     df_availability = generate_upenn_data_availability(system_status)
-    df_summary = genertate_upenn_data_summary(
-        config_file=config_file, subject_id=subject_id, system_status=system_status
-    )
+    try:
+        df_summary = generate_upenn_data_summary(
+            config_file=config_file,
+            subject_id=subject_id,
+            system_status=system_status,
+            manual_status=manual_status,
+        )
+    except KeyError:
+        return []
 
     sql_queries.extend(
         availability_df_to_sql(df=df_availability, subject_id=subject_id)

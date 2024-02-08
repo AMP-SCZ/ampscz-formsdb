@@ -5,11 +5,11 @@ from pathlib import Path
 
 file = Path(__file__).resolve()
 parent = file.parent
-root = None
+ROOT = None
 for parent in file.parents:
     if parent.name == "ampscz-formsqc":
-        root = parent
-sys.path.append(str(root))
+        ROOT = parent
+sys.path.append(str(ROOT))
 
 # remove current directory from path
 try:
@@ -83,7 +83,7 @@ def generate_all_forms(
                 value = int(value)
                 # Handle: MongoDB can only handle up to 8-byte int
                 if value > 2147483647 or value < -2147483648:
-                    skip_cast_pattern = r"barcode$|box|_id$|\d+id$|_id\d."
+                    skip_cast_pattern = r"barcode$|box|_id$|\d+id$|_id\d.|id_\d$"
                     # if (
                     #     variable.endswith("barcode")
                     #     or "_box" in variable
@@ -172,7 +172,7 @@ def import_forms_by_network(
     subjects_glob = glob(
         f"{data_root}/{network}/PHOENIX/PROTECTED/*/raw/*/surveys/*.{network}.json"
     )
-    subjects_glob = sorted(subjects_glob, reverse=True)
+    subjects_glob = sorted(subjects_glob, reverse=False)
     logger.info(f"Found {len(subjects_glob)} subjects for {network}")
 
     data_dictionry_df = pd.read_csv(
@@ -246,7 +246,7 @@ def import_forms_by_network(
             except Exception as e:
                 logger.error(f"Error: {e}")
                 logger.error(f"Subject: {subject_id}")
-                with open(f"{subject_id}_DEBUG.json", "w") as f:
+                with open(f"{subject_id}_DEBUG.json", "w", encoding="utf-8") as f:
                     json.dump(form_data, f, indent=4, default=str)
                 logger.error(f"Dumped subject data to {subject_id}_DEBUG.json")
                 raise e
