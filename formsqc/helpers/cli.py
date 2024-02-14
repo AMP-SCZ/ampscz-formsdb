@@ -1,6 +1,10 @@
+"""
+Module providing command line interface for the pipeline.
+"""
+
+import logging
 import subprocess
 from pathlib import Path
-import logging
 from typing import Optional
 
 

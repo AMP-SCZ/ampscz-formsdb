@@ -1,3 +1,7 @@
+"""
+Represents a REDCap / RPMS form.
+"""
+
 from datetime import datetime
 
 

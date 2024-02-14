@@ -1,1 +1,4 @@
-# helpers sub package init file
+# package level init file
+"""
+Helper functions for the pipeline.
+"""

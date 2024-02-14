@@ -1,4 +1,7 @@
 #!/usr/bin/env python
+"""
+Import JSON data into MongoDB.
+"""
 
 import sys
 from pathlib import Path
@@ -20,18 +23,19 @@ except ValueError:
 import copy
 import json
 import logging
+import re
 from datetime import datetime
 from glob import glob
-from typing import Any, Dict, Tuple, List
-import re
+from typing import Any, Dict, List, Tuple
 
 import numpy as np
 import pandas as pd
 from rich.logging import RichHandler
 from rich.progress import Progress
 
-from formsqc.helpers import db, utils, hash
 from formsqc import constants
+from formsqc.helpers import db, utils
+from formsqc.helpers import hash as hash_helper
 
 MODULE_NAME = "formsqc_json_importer"
 
@@ -50,6 +54,18 @@ logging.basicConfig(**logargs)
 def generate_all_forms(
     df_all_forms: pd.DataFrame, data_dictionry: pd.DataFrame, progress: Progress
 ) -> Dict[str, Dict[str, Dict[str, Any]]]:
+    """
+    Breaks down the dataframe into a dictionary of forms and events
+    with their respective variables and values.
+
+    Args:
+        df_all_forms (pd.DataFrame): The dataframe containing all forms data.
+        data_dictionry (pd.DataFrame): The data dictionary dataframe.
+        progress (Progress): The rich Progress object.
+
+    Returns:
+        Dict[str, Dict[str, Dict[str, Any]]]: The form data.
+    """
     form_data: Dict[str, Dict[str, Dict[str, Any]]] = {}
 
     df_cols = df_all_forms.columns.tolist()
@@ -84,18 +100,7 @@ def generate_all_forms(
                 # Handle: MongoDB can only handle up to 8-byte int
                 if value > 2147483647 or value < -2147483648:
                     skip_cast_pattern = r"barcode$|box|_id$|\d+id$|_id\d.|id_\d$"
-                    # if (
-                    #     variable.endswith("barcode")
-                    #     or "_box" in variable
-                    #     or "_id" in variable
-                    #     # endswith "X_id" where X is a number
-                    #     or (variable.endswith("_id") and variable[-4].isdigit())
-                    # ):
                     if re.search(skip_cast_pattern, variable):
-                        # logger.warning(
-                        #     f"Value {value} for [{form_name}]:{variable} is too large for MongoDB"
-                        # )
-                        # logger.warning(f"Casting {variable} to string")
                         value = str(value)
                     else:
                         logger.warning(
@@ -128,6 +133,21 @@ def generate_all_forms(
 def append_append_form_statistics(
     form_data: Dict[str, str], form_name: str, data_dictionry: pd.DataFrame
 ) -> Dict[str, Any]:
+    """
+    Append form statistics to the form data. Statistics include:
+    - Variables with data (count)
+    - Variables without data (count)
+    - Total variables (count)
+    - Percent data available (percentage)
+
+    Args:
+        form_data (Dict[str, str]): The form data.
+        form_name (str): The form name.
+        data_dictionry (pd.DataFrame): The data dictionary dataframe.
+
+    Returns:
+        Dict[str, Any]: The form data with statistics appended.
+    """
     form_dict = data_dictionry.loc[data_dictionry["Form Name"] == form_name]
     form_vars = form_dict["Variable / Field Name"].unique().tolist()
 
@@ -153,9 +173,20 @@ def append_append_form_statistics(
     return result_dict
 
 
-def upset_form_data(
+def upsert_form_data(
     config_file: Path, subject_id: str, form_data: Dict[str, Any]
 ) -> None:
+    """
+    Update or insert form data into MongoDB.
+
+    Args:
+        config_file (Path): The path to the config file.
+        subject_id (str): The subject ID.
+        form_data (Dict[str, Any]): The form data.
+
+    Returns:
+        None
+    """
     mongodb = db.get_mongo_db(config_file)
     subject_form_data = mongodb["forms"]
 
@@ -169,6 +200,18 @@ def upset_form_data(
 def import_forms_by_network(
     config_file: Path, network: str, data_root: Path, data_dictionary: Path
 ) -> None:
+    """
+    Import forms data by reading JSON files from the data root.
+
+    Args:
+        config_file (Path): The path to the config file.
+        network (str): The network name.
+        data_root (Path): The path to the data root.
+        data_dictionary (Path): The path to the data dictionary.
+
+    Returns:
+        None
+    """
     subjects_glob = glob(
         f"{data_root}/{network}/PHOENIX/PROTECTED/*/raw/*/surveys/*.{network}.json"
     )
@@ -203,7 +246,7 @@ def import_forms_by_network(
                 description=f"Processing JSON for subject ({subject_id})...",
             )
             source_m_date = utils.get_file_mtime(Path(subject))
-            source_hash = hash.compute_hash(Path(subject))
+            source_hash = hash_helper.compute_hash(Path(subject))
 
             if db.check_if_subject_form_data_exists(
                 config_file, subject_id, source_hash
@@ -214,7 +257,7 @@ def import_forms_by_network(
                 skip_buffer = _empty_buffer(skip_buffer)
                 processed_buffer.append(subject_id)
 
-            with open(subject, "r") as f:
+            with open(subject, "r", encoding="utf-8") as f:
                 json_data = json.load(f)
 
             sub_data_all = pd.DataFrame.from_dict(json_data, orient="columns")
@@ -228,8 +271,8 @@ def import_forms_by_network(
             )
 
             # Append form statistics
-            for form_name in form_data.keys():
-                for event in form_data[form_name].keys():
+            for form_name, _ in form_data.items():
+                for event, _ in form_data[form_name].items():
                     form_data[form_name][event] = append_append_form_statistics(
                         form_data[form_name][event], form_name, data_dictionry_df
                     )
@@ -238,11 +281,11 @@ def import_forms_by_network(
             form_data["_id"] = subject_id
             form_data["_date_imported"] = utils.get_curent_datetime()
             form_data["_source"] = subject
-            form_data["_source_md5"] = hash.compute_hash(Path(subject))
+            form_data["_source_md5"] = hash_helper.compute_hash(Path(subject))
             form_data["_source_mdate"] = source_m_date
 
             try:
-                upset_form_data(config_file, subject_id, form_data)
+                upsert_form_data(config_file, subject_id, form_data)
             except Exception as e:
                 logger.error(f"Error: {e}")
                 logger.error(f"Subject: {subject_id}")

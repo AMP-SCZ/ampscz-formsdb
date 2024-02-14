@@ -1,15 +1,17 @@
 #!/usr/bin/env python
-
+"""
+Imports JSON drom disk to MongoDB and then exports it to PostgreSQL.
+"""
 import sys
 from pathlib import Path
 
 file = Path(__file__).resolve()
 parent = file.parent
-root = None
+ROOT = None
 for parent in file.parents:
     if parent.name == "ampscz-formsqc":
-        root = parent
-sys.path.append(str(root))
+        ROOT = parent
+sys.path.append(str(ROOT))
 
 # remove current directory from path
 try:
@@ -39,8 +41,11 @@ logging.basicConfig(**logargs)
 
 
 async def import_jsons() -> None:
+    """
+    Imports JSONs from disk to MongoDB.
+    """
     logger.info("Importing JSONs...")
-    cmd = [f"{root}/formsqc/runners/imports/import_jsons.py"]
+    cmd = [f"{ROOT}/formsqc/runners/imports/import_jsons.py"]
 
     proc = await asyncio.create_subprocess_exec(*cmd)
 
@@ -56,8 +61,11 @@ async def import_jsons() -> None:
 
 
 async def export_jsons() -> None:
+    """
+    Exports JSONs from MongoDB to PostgreSQL.
+    """
     logger.info("Exporting JSONs...")
-    cmd = [f"{root}/formsqc/runners/imports/export_mongo_to_psql.py"]
+    cmd = [f"{ROOT}/formsqc/runners/imports/export_mongo_to_psql.py"]
 
     proc = await asyncio.create_subprocess_exec(*cmd)
 
@@ -72,6 +80,9 @@ async def export_jsons() -> None:
 
 
 async def import_export_jsons() -> None:
+    """
+    Imports and exports JSONs from disk to MongoDB and then to PostgreSQL.
+    """
     import_jsons_task = import_jsons()
 
     await import_jsons_task
@@ -81,8 +92,11 @@ async def import_export_jsons() -> None:
 
 
 async def import_upenn_json() -> None:
+    """
+    Imports UPenn JSON to MongoDB.
+    """
     logger.info("Importing UPenn JSON...")
-    cmd = [f"{root}/formsqc/runners/imports/import_upenn_jsons.py"]
+    cmd = [f"{ROOT}/formsqc/runners/imports/import_upenn_jsons.py"]
 
     proc = await asyncio.create_subprocess_exec(*cmd)
 
@@ -97,8 +111,11 @@ async def import_upenn_json() -> None:
 
 
 async def export_upenn_json() -> None:
+    """
+    Export UPenn JSON from MongoDB to PostgreSQL.
+    """
     logger.info("Exporting UPenn JSON...")
-    cmd = [f"{root}/formsqc/runners/imports/export_upenn_mongo_to_psql.py"]
+    cmd = [f"{ROOT}/formsqc/runners/imports/export_upenn_mongo_to_psql.py"]
 
     proc = await asyncio.create_subprocess_exec(*cmd)
 
@@ -113,6 +130,9 @@ async def export_upenn_json() -> None:
 
 
 async def import_export_upenn_json() -> None:
+    """
+    Imports and exports UPenn JSON from disk to MongoDB and then to PostgreSQL.
+    """
     import_upenn_json_task = import_upenn_json()
 
     await import_upenn_json_task
@@ -122,6 +142,9 @@ async def import_export_upenn_json() -> None:
 
 
 async def import_export() -> None:
+    """
+    Asynchronously imports and exports JSONs from disk to MongoDB and then to PostgreSQL.
+    """
     await asyncio.gather(import_export_jsons(), import_export_upenn_json())
 
 

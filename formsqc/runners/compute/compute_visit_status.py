@@ -1,15 +1,18 @@
 #!/usr/bin/env python
+"""
+Infers the visit status of subjects based on the most recent visit form completed.
+"""
 
 import sys
 from pathlib import Path
 
 file = Path(__file__).resolve()
 parent = file.parent
-root = None
+ROOT = None
 for parent in file.parents:
     if parent.name == "ampscz-formsqc":
-        root = parent
-sys.path.append(str(root))
+        ROOT = parent
+sys.path.append(str(ROOT))
 
 # remove current directory from path
 try:
@@ -17,16 +20,16 @@ try:
 except ValueError:
     pass
 
-from typing import Any, Dict, List, Optional
-from datetime import datetime
 import logging
+from datetime import datetime
+from typing import Any, Dict, List, Optional
 
+import pandas as pd
 from rich.logging import RichHandler
 from rich.table import Table
-import pandas as pd
 
-from formsqc.helpers import db, utils
 from formsqc import constants, data
+from formsqc.helpers import db, utils
 
 MODULE_NAME = "formsqc_compute_visit_status"
 
@@ -43,6 +46,15 @@ logging.basicConfig(**logargs)
 
 
 def get_vist_status_stats(config_file: Path) -> Dict[str, int]:
+    """
+    For each visit status, count the number of subjects with that visit status.
+
+    Args:
+        config_file (Path): Path to the config file.
+
+    Returns:
+        Dict[str, int]: A dictionary with visit status as the key and the count as the value.
+    """
     query = """
     SELECT subject_visit_status, COUNT(*) AS count
     FROM subject_visit_status
@@ -52,7 +64,7 @@ def get_vist_status_stats(config_file: Path) -> Dict[str, int]:
     df = pd.read_sql(query, engine)
 
     visit_status_stats = {}
-    for idx, row in df.iterrows():
+    for _, row in df.iterrows():
         visit_status = row["subject_visit_status"]
         count = row["count"]
         visit_status_stats[visit_status] = count
@@ -65,6 +77,17 @@ def get_vist_status_stats(config_file: Path) -> Dict[str, int]:
 def print_visit_status_stats(
     config_file: Path, compared_to_visit_status_map: Optional[Dict[str, int]] = None
 ) -> None:
+    """
+    Print the visit status stats, as a table.
+
+    Args:
+        config_file (Path): Path to the config file.
+        compared_to_visit_status_map (Optional[Dict[str, int]], optional): A dictionary with visit
+            status as the key and the count as the value. Defaults to None.
+
+    Returns:
+        None
+    """
     visit_status_stats = get_vist_status_stats(config_file)
 
     visit_order = constants.visit_order
@@ -101,6 +124,17 @@ def print_visit_status_stats(
 def compute_recent_visit_rpms(
     df: pd.DataFrame, visit_order: List[str], debug: bool = False
 ) -> str:
+    """
+    Infers the most recent visit of a subject based on the most recent form completed.
+
+    Args:
+        df (pd.DataFrame): DataFrame containing the forms data of a subject.
+        visit_order (List[str]): List of visits in the order they were conducted.
+        debug (bool, optional): Whether to print debug messages. Defaults to False.
+
+    Returns:
+        str: The most recent visit of the subject.
+    """
     most_recent_visit = "None"
 
     for visit in visit_order:
@@ -109,7 +143,7 @@ def compute_recent_visit_rpms(
         if visit_df.shape[0] == 0:
             continue
 
-        for idx, row in visit_df.iterrows():
+        for _, row in visit_df.iterrows():
             form_name = row["form_name"]
 
             if form_name == "sociodemographics":
@@ -142,6 +176,20 @@ def compute_recent_visit_rpms(
 def compute_recent_visit_redcap(
     df: pd.DataFrame, visit_order: List[str], debug: bool = False
 ) -> str:
+    """
+    Compute the most recent visit of a subject based on the most recent form completed.
+
+    Ignore forms that contain digital_biomarkers, as they are pre-filled and could
+    be misleading.
+
+    Args:
+        df (pd.DataFrame): DataFrame containing the forms data of a subject.
+        visit_order (List[str]): List of visits in the order they were conducted.
+        debug (bool, optional): Whether to print debug messages. Defaults to False.
+
+    Returns:
+        str: The most recent visit of the subject.
+    """
     most_recent_visit = "None"
 
     for visit in visit_order:
@@ -187,13 +235,23 @@ def compute_recent_visit_redcap(
 
 
 def compute_recent_visit(config_file: Path, debug: bool = False) -> pd.DataFrame:
+    """
+    Compute the most recent visit of each subject.
+
+    Args:
+        config_file (Path): Path to the config file.
+        debug (bool, optional): Whether to print debug messages. Defaults to False.
+
+    Returns:
+        pd.DataFrame: DataFrame containing the most recent visit of each subject.
+    """
     visit_status_df = pd.DataFrame(columns=["subject_id", "visit_status"])
     logger.info("Computing each subject's most recent visit...")
 
     query = "SELECT COUNT(*) FROM subjects;"
     subject_count_r = db.fetch_record(config_file=config_file, query=query)
     if subject_count_r is None:
-        raise Exception("No subjects found in the database.")
+        raise ValueError("No subjects found.")
     subject_count = int(subject_count_r)
 
     logger.info(f"Found {subject_count} subjects.")
@@ -236,6 +294,16 @@ def compute_recent_visit(config_file: Path, debug: bool = False) -> pd.DataFrame
 
 
 def commit_visit_status_to_db(config_file: Path, df: pd.DataFrame) -> None:
+    """
+    Drops the existing subject_visit_status table and commits the new visit status data.
+
+    Args:
+        config_file (Path): Path to the config file.
+        df (pd.DataFrame): DataFrame containing the visit status of each subject.
+
+    Returns:
+        None
+    """
     logger.info("Committing visit status to the database...")
 
     sql_queries = []
@@ -245,7 +313,7 @@ def commit_visit_status_to_db(config_file: Path, df: pd.DataFrame) -> None:
     """
     sql_queries.append(sql_query)
 
-    for idx, row in df.iterrows():
+    for _, row in df.iterrows():
         subject_id = row["subject_id"]
         visit_status = row["visit_status"]
         sql_query = f"""

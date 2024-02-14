@@ -1,15 +1,18 @@
 #!/usr/bin/env python
+"""
+Import UPENN forms data from JSON to MongoDB.
+"""
 
 import sys
 from pathlib import Path
 
 file = Path(__file__).resolve()
 parent = file.parent
-root = None
+ROOT = None
 for parent in file.parents:
     if parent.name == "ampscz-formsqc":
-        root = parent
-sys.path.append(str(root))
+        ROOT = parent
+sys.path.append(str(ROOT))
 
 # remove current directory from path
 try:
@@ -27,8 +30,8 @@ import numpy as np
 import pandas as pd
 from rich.logging import RichHandler
 
-from formsqc.helpers import db, utils
 from formsqc import constants, data
+from formsqc.helpers import db, utils
 
 MODULE_NAME = "formsqc_upenn_json_importer"
 
@@ -45,10 +48,20 @@ logging.basicConfig(**logargs)
 
 
 def get_visit_date(all_forms_df: pd.DataFrame, visit_name: str) -> Optional[datetime]:
+    """
+    Get the date of a visit from the forms data.
+
+    Args:
+        all_forms_df (pd.DataFrame): The forms data.
+        visit_name (str): The visit name.
+
+    Returns:
+        Optional[datetime]: The date of the visit, or None if the date is not found.
+    """
     visit_df = all_forms_df[all_forms_df["event_name"].str.contains(f"{visit_name}_")]
     visit_df = visit_df[~visit_df["form_name"].str.contains("digital_biomarkers")]
 
-    for idx, row in visit_df.iterrows():
+    for _, row in visit_df.iterrows():
         form_data_r: Dict[str, Any] = row["form_data"]
         form_variables = form_data_r.keys()
 
@@ -77,9 +90,19 @@ def get_visit_date(all_forms_df: pd.DataFrame, visit_name: str) -> Optional[date
 def get_event_name_cognitive(
     all_forms_df: pd.DataFrame, date: datetime
 ) -> Optional[str]:
+    """
+    Get the event name for a cognitive visit from the forms data.
+
+    Args:
+        all_forms_df (pd.DataFrame): The forms data.
+        date (datetime): The date of the visit.
+
+    Returns:
+        Optional[str]: The event name of the visit, or None if the event name is not found.
+    """
     penncnb_dfs = all_forms_df[all_forms_df["form_name"].str.contains("penncnb")]
 
-    for idx, row in penncnb_dfs.iterrows():
+    for _, row in penncnb_dfs.iterrows():
         form_data_r: Dict[str, Any] = row["form_data"]
         form_variables = form_data_r.keys()
 
@@ -101,6 +124,16 @@ def get_event_name_cognitive(
 def compute_visit_date_map(
     all_forms_df: pd.DataFrame, visits: List[str]
 ) -> Dict[str, datetime]:
+    """
+    Generate a map of visit names to visit dates.
+
+    Args:
+        all_forms_df (pd.DataFrame): The forms data.
+        visits (List[str]): A list of visit names.
+
+    Returns:
+        Dict[str, datetime]: A dictionary mapping visit names to visit dates.
+    """
     visit_date_map: Dict[str, datetime] = {}
 
     for visit_name in visits:
@@ -123,7 +156,8 @@ def get_closest_visit(
         date (datetime): The date to find the closest visit to.
 
     Returns:
-        Optional[str]: The closest visit name to the provided date, or None if no visit is close enough.
+        Optional[str]: The closest visit name to the provided date, or
+            None if no visit is close enough.
     """
     closest_visit: Optional[str] = None
     closest_visit_diff: Optional[int] = None
@@ -145,9 +179,22 @@ def get_closest_visit(
 def generate_upenn_form(
     df_upenn: pd.DataFrame, all_forms_df: pd.DataFrame
 ) -> Dict[str, Dict[str, Dict[str, Any]]]:
+    """
+    Break down the UPENN form data into a dictionary of visit names, session IDs, and session data.
+
+    Potential session IDs are "SPLLT" and "NOSPLLT".
+
+    Args:
+        df_upenn (pd.DataFrame): The UPENN form data.
+        all_forms_df (pd.DataFrame): The forms data.
+
+    Returns:
+        Dict[str, Dict[str, Dict[str, Any]]]: A dictionary of visit names, session IDs,
+            and session data.
+    """
     form_data: Dict[str, Dict[str, Any]] = {}
 
-    for idx, row in df_upenn.iterrows():
+    for _, row in df_upenn.iterrows():
         session_date = row["session_date"]
         session_id = row["session_battery"]
 
@@ -210,24 +257,41 @@ def generate_upenn_form(
     return form_data
 
 
-def upset_form_data(
+def upsert_form_data(
     config_file: Path, subject_id: str, form_data: Dict[str, Any]
 ) -> None:
+    """
+    Update or insert form data into the MongoDB's 'upenn' collection.
+
+    Args:
+        config_file (Path): The path to the configuration file.
+        subject_id (str): The subject ID.
+        form_data (Dict[str, Any]): The form data.
+
+    Returns:
+        None
+    """
     mongodb = db.get_mongo_db(config_file)
     subject_form_data = mongodb["upenn"]
 
     subject_form_data.replace_one({"_id": subject_id}, form_data, upsert=True)
 
-    # subject_form_data.update_one(
-    #     {"_id": subject_id},
-    #     {"$set": form_data},
-    #     upsert=True,
-    # )
-
 
 def import_forms_by_network(
     config_file: Path, network: str, data_root: Path, force_import: bool = False
 ) -> None:
+    """
+    Import UPENN forms data for a network.
+
+    Args:
+        config_file (Path): The path to the configuration file.
+        network (str): The network name.
+        data_root (Path): The root path of the data.
+        force_import (bool): Whether to force import the data.
+
+    Returns:
+        None
+    """
     subjects_glob = glob(
         f"{data_root}/{network}/PHOENIX/PROTECTED/*/raw/*/surveys/*.UPENN.json"
     )
@@ -267,7 +331,7 @@ def import_forms_by_network(
                     )
                     skip_buffer = []
 
-            with open(subject, "r") as f:
+            with open(subject, "r", encoding="utf-8") as f:
                 json_data = json.load(f)
 
             sub_data_all = pd.DataFrame.from_dict(json_data, orient="columns")
@@ -291,12 +355,12 @@ def import_forms_by_network(
             form_data["_source_mdate"] = source_m_date
 
             try:
-                upset_form_data(config_file, subject_id, form_data)
+                upsert_form_data(config_file, subject_id, form_data)
             except Exception as e:
                 logger.error(f"Error: {e}")
                 logger.error(f"Subject: {subject_id}")
                 f_name = f"{subject_id}_UPENN_DEBUG.json"
-                with open(f_name, "w") as f:
+                with open(f_name, "w", encoding="utf-8") as f:
                     json.dump(form_data, f, indent=4, default=str)
                 logger.error(f"Dumped subject data to {f_name}")
                 raise e
@@ -316,15 +380,15 @@ if __name__ == "__main__":
     data_params = utils.config(config_file, "data")
     data_root = Path(config_params["data_root"])
 
-    force_import = False
-    logger.info(f"Force import: {force_import}")
+    FORCE_IMPORT = False
+    logger.info(f"Force import: {FORCE_IMPORT}")
 
     for network in constants.networks:
         import_forms_by_network(
             config_file=config_file,
             network=network,
             data_root=data_root,
-            force_import=force_import,
+            force_import=FORCE_IMPORT,
         )
 
     logger.info("Done!")

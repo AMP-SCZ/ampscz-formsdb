@@ -1,15 +1,18 @@
 #!/usr/bin/env python
+"""
+Export forms data from MongoDB to PostgreSQL.
+"""
 
 import sys
 from pathlib import Path
 
 file = Path(__file__).resolve()
 parent = file.parent
-root = None
+ROOT = None
 for parent in file.parents:
     if parent.name == "ampscz-formsqc":
-        root = parent
-sys.path.append(str(root))
+        ROOT = parent
+sys.path.append(str(ROOT))
 
 # remove current directory from path
 try:
@@ -17,9 +20,9 @@ try:
 except ValueError:
     pass
 
-from typing import Any, Dict, List, Set
-from datetime import datetime
 import logging
+from datetime import datetime
+from typing import Any, Dict, List, Set
 
 from rich.logging import RichHandler
 
@@ -40,30 +43,29 @@ logargs = {
 logging.basicConfig(**logargs)
 
 
-# def export_subjects(config_file: Path):
-#     mongodb = db.get_mongo_db(config_file)
-#     subjects = mongodb["subjects"]
-
-#     sql_queries = []
-
-#     for subject in subjects.find():
-#         subject_id = subject["_id"]
-#         site_id = subject["site"]
-#         sql_queries.append(
-#             f"INSERT INTO subjects (id, site_id) VALUES ('{subject_id}', '{site_id}') ON CONFLICT DO NOTHING;"
-#         )
-
-#     db.execute_queries(config_file, sql_queries, show_commands=False)
-
-
 def export_subject(subject_id: str) -> str:
+    """
+    Insert a subject into the subjects table.
+
+    Args:
+        subject_id (str): The subject id.
+
+    Returns:
+        str: The SQL query.
+    """
     site_id = subject_id[:2]
-    sql_query = f"INSERT INTO subjects (id, site_id) VALUES ('{subject_id}', '{site_id}') ON CONFLICT DO NOTHING;"
+    sql_query = f"""
+    INSERT INTO subjects (id, site_id)
+    VALUES ('{subject_id}', '{site_id}') ON CONFLICT DO NOTHING;
+    """
 
     return sql_query
 
 
 def export_forms(config_file: Path):
+    """
+    Export forms data from MongoDB to PostgreSQL.
+    """
     mongodb = db.get_mongo_db(config_file)
     forms = mongodb["forms"]
 
@@ -79,17 +81,17 @@ def export_forms(config_file: Path):
         sql_queries.append(export_subject(subject_id))
 
         for key, value in form_dict.items():
-            if type(value) is dict:
+            if isinstance(value, dict):
                 form_name = key
                 form_data_across_events = value
 
                 for event, value in form_data_across_events.items():
-                    if type(value) is dict:
+                    if isinstance(value, dict):
                         event_form_data = value
                         form_metadata = event_form_data.pop("metadata")
 
                         for key, value in event_form_data.items():
-                            if type(value) is datetime:
+                            if isinstance(value, datetime):
                                 # convert datetime to isoformat
                                 event_form_data[key] = value.isoformat()
 

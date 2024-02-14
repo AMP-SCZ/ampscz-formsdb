@@ -1,15 +1,18 @@
 #!/usr/bin/env python
+"""
+Runs all export scripts in the formsqc/runners/export directory.
+"""
 
 import sys
 from pathlib import Path
 
 file = Path(__file__).resolve()
 parent = file.parent
-root = None
+ROOT = None
 for parent in file.parents:
     if parent.name == "ampscz-formsqc":
-        root = parent
-sys.path.append(str(root))
+        ROOT = parent
+sys.path.append(str(ROOT))
 
 # remove current directory from path
 try:
@@ -66,4 +69,4 @@ if __name__ == "__main__":
             continue
 
         console.print(f"Running {target.name}")
-        exec(open(target, encoding='utf-8').read())
+        exec(open(target, encoding="utf-8").read())

@@ -1,3 +1,7 @@
+"""
+This module contains constants for the AMPSCZ project.
+"""
+
 from typing import List
 
 networks: List[str] = ["Pronet", "Prescient"]

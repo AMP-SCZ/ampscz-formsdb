@@ -1,19 +1,23 @@
+"""
+Helper functions for the pipeline
+"""
+
 import logging
 from datetime import datetime
 from pathlib import Path
 from typing import Union
 
+import pandas as pd
 from rich.console import Console
 from rich.progress import (
-    Progress,
     BarColumn,
+    MofNCompleteColumn,
+    Progress,
+    TaskProgressColumn,
     TextColumn,
     TimeElapsedColumn,
-    TaskProgressColumn,
-    MofNCompleteColumn,
     TimeRemainingColumn,
 )
-import pandas as pd
 
 from formsqc.helpers import cli
 from formsqc.helpers.config import config
@@ -223,7 +227,7 @@ def get_subject_json(subject: str, network: str, data_root: Path) -> Path:
     )
 
 
-def str_to_typed(input: str) -> Union[float, int, datetime | str]:
+def str_to_typed(value: str) -> Union[float, int, datetime | str]:
     """
     Converts a string to a typed value.
 
@@ -236,22 +240,21 @@ def str_to_typed(input: str) -> Union[float, int, datetime | str]:
     Raises:
         ValueError: If the input string cannot be converted to any of the supported types.
     """
-    value = input
     if value.isdigit() or (value.startswith("-") and value[1:].isdigit()):
-        value = int(value)
+        value = int(value)  # type: ignore
         # Handle: MongoDB can only handle up to 8-byte int
-        if value > 2147483647 or value < -2147483648:
-            value = float(value)
+        if value > 2147483647 or value < -2147483648:  # type: ignore
+            value = float(value)  # type: ignore
     elif value.replace(".", "", 1).isdigit() or (
         value.startswith("-") and value[1:].replace(".", "", 1).isdigit()
     ):
-        value = float(value)
+        value = float(value)  # type: ignore
     # Check if matches date format
     elif is_date(value):
-        value = datetime.strptime(value, "%Y-%m-%d")
+        value = datetime.strptime(value, "%Y-%m-%d")  # type: ignore
     elif is_time(value):
-        value = datetime.strptime(value, "%H:%M")
+        value = datetime.strptime(value, "%H:%M")  # type: ignore
     elif is_datetime(value):
-        value = datetime.strptime(value, "%Y-%m-%d %H:%M")
+        value = datetime.strptime(value, "%Y-%m-%d %H:%M")  # type: ignore
 
     return value

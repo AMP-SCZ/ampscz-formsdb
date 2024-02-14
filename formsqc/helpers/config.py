@@ -1,3 +1,7 @@
+"""
+Helper functions for reading configuration files.
+"""
+
 from configparser import ConfigParser
 from pathlib import Path
 from typing import Dict
@@ -15,7 +19,7 @@ def config(path: Path, section: str) -> Dict[str, str]:
         dict: A dictionary of parameters for the given section.
 
     Raises:
-        Exception: If the specified section is not found in the configuration file.
+        ValueError: If the section is not found in the configuration file.
     """
     parser = ConfigParser()
     parser.read(path)
@@ -26,8 +30,6 @@ def config(path: Path, section: str) -> Dict[str, str]:
         for param in params:
             conf[param[0]] = param[1]
     else:
-        raise Exception(
-            "Section {0} not found in the {1} file".format(section, path)
-        )
+        raise ValueError(f"Section {section} not found in the {path} file")
 
     return conf

@@ -1,17 +1,21 @@
-from pathlib import Path
-from datetime import datetime
-from typing import Optional
-import json
+"""
+Helper functions for interacting with a PostgreSQL database.
+"""
 
-import psycopg2
-from rich.console import Console
+import json
+from datetime import datetime
+from pathlib import Path
+from typing import Optional
+
 import pandas as pd
-import sqlalchemy
+import psycopg2
 import pymongo
 import pymongo.database as database
+import sqlalchemy
+from rich.console import Console
 
-from formsqc.helpers.config import config
 from formsqc.helpers import utils
+from formsqc.helpers.config import config
 
 
 def get_mongo_db(config_file: Path) -> database.Database:
@@ -35,6 +39,21 @@ def get_mongo_db(config_file: Path) -> database.Database:
 def check_if_subject_form_data_exists(
     config_file: Path, subject_id: str, source_hash: str
 ):
+    """
+    Checks if a subject's form data exists in the MongoDB database and
+    is up-to-date.
+
+    A file is considered up-to-date if the hash of the source file
+    matches the hash stored in the database.
+
+    Args:
+        config_file (Path): The path to the configuration file.
+        subject_id (str): The subject ID.
+        source_hash (str): The hash of the source file.
+
+    Returns:
+        bool: True if the subject's form data exists and is up-to-date, False otherwise.
+    """
     mongodb = get_mongo_db(config_file)
     subject_form_data = mongodb["forms"]
 
@@ -53,6 +72,14 @@ def check_if_subject_form_data_exists(
 def check_if_subject_upenn_data_exists(
     config_file: Path, subject_id: str, source_m_date: datetime
 ):
+    """
+    Checks if a subject's UPenn data exists in the MongoDB database.
+
+    Args:
+        config_file (Path): The path to the configuration file.
+        subject_id (str): The subject ID.
+        source_m_date (datetime): The source modification date.
+    """
     mongodb = get_mongo_db(config_file)
     subject_form_data = mongodb["upenn"]
 
@@ -83,7 +110,8 @@ def handle_null(query: str) -> str:
 
 def handle_nan(query: str) -> str:
     """
-    Replaces all occurrences of the string 'nan' with the SQL NULL keyword in the given query.
+    Replaces all occurrences of the string 'nan' with the SQL
+    NULL keyword in the given query.
 
     Args:
         query (str): The SQL query to modify.
@@ -120,7 +148,7 @@ def sanitize_json(json_dict: dict) -> str:
         str: The sanitized JSON object.
     """
     for key, value in json_dict.items():
-        if type(value) is str:
+        if isinstance(value, str):
             json_dict[key] = santize_string(value)
     return json.dumps(json_dict)
 
@@ -136,11 +164,15 @@ def execute_queries(
     Executes a list of SQL queries on a PostgreSQL database.
 
     Args:
-        config_file_path (str): The path to the configuration file containing the connection parameters.
+        config_file_path (str): The path to the configuration file containing
+            the connection parameters.
         queries (list): A list of SQL queries to execute.
-        show_commands (bool, optional): Whether to display the executed SQL queries. Defaults to True.
-        show_progress (bool, optional): Whether to display a progress bar. Defaults to False.
-        silent (bool, optional): Whether to suppress output. Defaults to False.
+        show_commands (bool, optional): Whether to display the executed SQL queries.
+            Defaults to True.
+        show_progress (bool, optional): Whether to display a progress bar.
+            Defaults to False.
+        silent (bool, optional): Whether to suppress output.
+            Defaults to False.
 
     Returns:
         list: A list of tuples containing the results of the executed queries.
@@ -234,10 +266,12 @@ def get_db_connection(config_file: Path) -> sqlalchemy.engine.base.Engine:
 
 def execute_sql(config_file: Path, query: str) -> pd.DataFrame:
     """
-    Executes a SQL query on a PostgreSQL database and returns the result as a pandas DataFrame.
+    Executes a SQL query on a PostgreSQL database and returns the result as a
+    pandas DataFrame.
 
     Args:
-        config_file_path (str): The path to the configuration file containing the PostgreSQL database credentials.
+        config_file_path (str): The path to the configuration file containing the
+            PostgreSQL database credentials.
         query (str): The SQL query to execute.
 
     Returns:

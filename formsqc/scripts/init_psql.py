@@ -1,15 +1,18 @@
 #!/usr/bin/env python
+"""
+Initializes the PostgreSQL database.
+"""
 
 import sys
 from pathlib import Path
 
 file = Path(__file__).resolve()
 parent = file.parent
-root = None
+ROOT = None
 for parent in file.parents:
     if parent.name == "ampscz-formsqc":
-        root = parent
-sys.path.append(str(root))
+        ROOT = parent
+sys.path.append(str(ROOT))
 
 # remove current directory from path
 try:
@@ -27,6 +30,15 @@ console = utils.get_console()
 
 
 def create_tables(config_file: Path) -> None:
+    """
+    Creates the tables in the PostgreSQL database.
+
+    Args:
+        config_file (str): The path to the configuration file containing the connection parameters.
+
+    Returns:
+        None
+    """
     create_queries = [
         """
         CREATE TABLE network (
@@ -115,8 +127,12 @@ def populate_sites(sites_json: Path, config_file: Path) -> None:
     """
 
     class Site:
-        def __init__(self, id, name, country, network_id):
-            self.id = id
+        """
+        Represents a site.
+        """
+
+        def __init__(self, site_id, name, country, network_id):
+            self.id = site_id
             self.name = name
             self.country = country
             self.network_id = network_id
@@ -124,7 +140,7 @@ def populate_sites(sites_json: Path, config_file: Path) -> None:
             if self.country == "":
                 self.country = "NULL"
 
-    with open(sites_json) as f:
+    with open(sites_json, encoding="utf-8") as f:
         sites = json.load(f)
 
     networks: Set[str] = set()
@@ -132,7 +148,7 @@ def populate_sites(sites_json: Path, config_file: Path) -> None:
 
     for site in sites:
         site_obj = Site(
-            id=db.santize_string(site["id"]),
+            site_id=db.santize_string(site["id"]),
             name=db.santize_string(site["name"]),
             country=db.santize_string(site["country"]),
             network_id=db.santize_string(site["network"]),

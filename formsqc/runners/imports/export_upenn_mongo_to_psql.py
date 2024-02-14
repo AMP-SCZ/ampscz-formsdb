@@ -1,15 +1,18 @@
 #!/usr/bin/env python
+"""
+Export UPENN forms data from MongoDB to PostgreSQL.
+"""
 
 import sys
 from pathlib import Path
 
 file = Path(__file__).resolve()
 parent = file.parent
-root = None
+ROOT = None
 for parent in file.parents:
     if parent.name == "ampscz-formsqc":
-        root = parent
-sys.path.append(str(root))
+        ROOT = parent
+sys.path.append(str(ROOT))
 
 # remove current directory from path
 try:
@@ -17,15 +20,15 @@ try:
 except ValueError:
     pass
 
-from typing import Any, Dict, List
-from datetime import datetime
 import logging
+from datetime import datetime
+from typing import Any, Dict, List
 
 from rich.logging import RichHandler
 
+from formsqc import data
 from formsqc.helpers import db, utils
 from formsqc.models import upenn_forms as upenn_forms_model
-from formsqc import data
 
 MODULE_NAME = "formsqc_upenn_psql_importer"
 
@@ -42,6 +45,15 @@ logging.basicConfig(**logargs)
 
 
 def export_forms(config_file: Path):
+    """
+    Export UPENN forms data from MongoDB to PostgreSQL.
+
+    Args:
+        config_file (Path): Path to the config file.
+
+    Returns:
+        None
+    """
     mongodb = db.get_mongo_db(config_file)
     forms = mongodb["upenn"]
 
@@ -55,16 +67,16 @@ def export_forms(config_file: Path):
         source_m_date = form_dict["_source_mdate"]
 
         for key, value in form_dict.items():
-            if type(value) is dict:
+            if isinstance(value, dict):
                 event_name = key
                 event_form_data = value
 
                 for event_type, value in event_form_data.items():
-                    if type(value) is dict:
+                    if isinstance(value, dict):
                         event_type_form_data = value
 
                         for key, value in event_type_form_data.items():
-                            if type(value) is datetime:
+                            if isinstance(value, datetime):
                                 # convert datetime to isoformat
                                 event_type_form_data[key] = value.isoformat()
 

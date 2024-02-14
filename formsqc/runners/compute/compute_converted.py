@@ -1,15 +1,18 @@
 #!/usr/bin/env python
+"""
+Updates the subject_converted table in the database with the converted status of subjects.
+"""
 
 import sys
 from pathlib import Path
 
 file = Path(__file__).resolve()
 parent = file.parent
-root = None
+ROOT = None
 for parent in file.parents:
     if parent.name == "ampscz-formsqc":
-        root = parent
-sys.path.append(str(root))
+        ROOT = parent
+sys.path.append(str(ROOT))
 
 # remove current directory from path
 try:
@@ -20,12 +23,12 @@ except ValueError:
 import logging
 from typing import Any, Dict, List, Optional
 
-from rich.logging import RichHandler
-import pandas as pd
 import numpy as np
+import pandas as pd
+from rich.logging import RichHandler
 
-from formsqc.helpers import db, utils
 from formsqc import constants, data
+from formsqc.helpers import db, utils
 
 MODULE_NAME = "formsqc_compute_converted"
 
@@ -42,10 +45,19 @@ logging.basicConfig(**logargs)
 
 
 def count_converted(config_file: Path) -> int:
+    """
+    Count the number of subjects that have been converted.
+
+    Args:
+        config_file (Path): Path to the config file.
+
+    Returns:
+        int: Number of subjects that have been converted.
+    """
     query = "SELECT COUNT(*) FROM subject_converted WHERE subject_converted = 'True';"
     converted_count_r = db.fetch_record(config_file=config_file, query=query)
     if converted_count_r is None:
-        raise Exception("No converted status found in the database.")
+        raise ValueError("No converted subjects found in the database.")
     converted_count = int(converted_count_r)
 
     return converted_count
@@ -54,6 +66,17 @@ def count_converted(config_file: Path) -> int:
 def check_if_converted(
     df: pd.DataFrame, visit_order: List[str], debug: bool = False
 ) -> Optional[str]:
+    """
+    Check if a subject has been converted.
+
+    Args:
+        df (pd.DataFrame): DataFrame containing the forms data.
+        visit_order (List[str]): List of visit names in the order they were collected.
+        debug (bool, optional): Whether to print debug messages. Defaults to False.
+
+    Returns:
+        Optional[str]: The visit at which the subject converted, if any.
+    """
     psychs_df = df[df["form_name"].str.contains("psychs_p9ac32_fu")]
 
     if psychs_df.shape[0] == 0:
@@ -87,6 +110,17 @@ def check_if_converted(
 def compute_converted(
     config_file: Path, visit_order: List[str], debug: bool = False
 ) -> pd.DataFrame:
+    """
+    Check if subjects have been converted.
+
+    Args:
+        config_file (Path): Path to the config file.
+        visit_order (List[str]): List of visit names in the order they were collected.
+        debug (bool, optional): Whether to print debug messages. Defaults to False.
+
+    Returns:
+        pd.DataFrame: DataFrame containing the converted status of subjects.
+    """
     visit_status_df = pd.DataFrame(
         columns=["subject_id", "converted", "converted_visit"]
     )
@@ -95,7 +129,7 @@ def compute_converted(
     query = "SELECT COUNT(*) FROM subjects;"
     subject_count_r = db.fetch_record(config_file=config_file, query=query)
     if subject_count_r is None:
-        raise Exception("No subjects found in the database.")
+        raise ValueError("No subjects found in the database.")
     subject_count = int(subject_count_r)
 
     logger.info(f"Found {subject_count} subjects.")
@@ -143,6 +177,18 @@ def compute_converted(
 
 
 def commit_converted_status_to_db(config_file: Path, df: pd.DataFrame) -> None:
+    """
+    Write the converted status of subjects to the database.
+
+    Removes existing data and commits new data.
+
+    Args:
+        config_file (Path): Path to the config file.
+        df (pd.DataFrame): DataFrame containing the converted status of subjects.
+
+    Returns:
+        None
+    """
     logger.info("Committing converted status to the database...")
 
     sql_queries: List[str] = []
@@ -152,7 +198,7 @@ def commit_converted_status_to_db(config_file: Path, df: pd.DataFrame) -> None:
     """
     sql_queries.append(sql_query)
 
-    for idx, row in df.iterrows():
+    for _, row in df.iterrows():
         subject_id = row["subject_id"]
         converted = row["converted"]
         converted_visit = row["converted_visit"]
@@ -184,8 +230,8 @@ if __name__ == "__main__":
     )
     logger.info(f"Using config file: {config_file}")
 
-    converted_count = count_converted(config_file=config_file)
-    logger.info(f"Found {converted_count} converted subjects.")
+    CONVERTED_COUNT = count_converted(config_file=config_file)
+    logger.info(f"Found {CONVERTED_COUNT} converted subjects.")
 
     converted_status_df = compute_converted(
         config_file, visit_order=constants.visit_order, debug=False
@@ -193,8 +239,10 @@ if __name__ == "__main__":
 
     commit_converted_status_to_db(config_file, converted_status_df)
 
-    new_converted_count = count_converted(config_file=config_file)
-    logger.info(f"Found {new_converted_count} converted subjects after update.")
-    logger.info(f"Added {new_converted_count - converted_count} converted subjects.")
+    UPDATED_CONVERTED_COUNT = count_converted(config_file=config_file)
+    logger.info(f"Found {UPDATED_CONVERTED_COUNT} converted subjects after update.")
+    logger.info(
+        f"Added {UPDATED_CONVERTED_COUNT - CONVERTED_COUNT} converted subjects."
+    )
 
     logger.info("Done!")

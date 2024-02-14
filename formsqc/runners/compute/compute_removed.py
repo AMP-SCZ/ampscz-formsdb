@@ -1,15 +1,18 @@
 #!/usr/bin/env python
+"""
+Updates the subject_removed table in the database with the removed status of subjects.
+"""
 
 import sys
 from pathlib import Path
 
 file = Path(__file__).resolve()
 parent = file.parent
-root = None
+ROOT = None
 for parent in file.parents:
     if parent.name == "ampscz-formsqc":
-        root = parent
-sys.path.append(str(root))
+        ROOT = parent
+sys.path.append(str(ROOT))
 
 # remove current directory from path
 try:
@@ -42,10 +45,19 @@ logging.basicConfig(**logargs)
 
 
 def count_removed(config_file: Path) -> int:
+    """
+    Count the number of subjects that have been removed.
+
+    Args:
+        config_file (Path): Path to the config file.
+
+    Returns:
+        int: Number of subjects that have been removed.
+    """
     query = "SELECT COUNT(*) FROM subject_removed WHERE subject_removed = 'True';"
     removed_count_r = db.fetch_record(config_file=config_file, query=query)
     if removed_count_r is None:
-        raise Exception("No removed status found in the database.")
+        raise ValueError("No removed subjects found in the database.")
     removed_count = int(removed_count_r)
 
     return removed_count
@@ -54,6 +66,17 @@ def count_removed(config_file: Path) -> int:
 def check_if_removed(
     df: pd.DataFrame, visit_order: List[str], debug: bool = False
 ) -> Optional[Tuple[str, str]]:
+    """
+    Check if a subject has been removed.
+
+    Args:
+        df (pd.DataFrame): DataFrame containing the subject's forms.
+        visit_order (List[str]): List of visits in the order they were conducted.
+        debug (bool, optional): Whether to print debug messages. Defaults to False.
+
+    Returns:
+        Optional[Tuple[str, str]]: If the subject was removed, returns the event and reason.
+    """
     missing_df = df[df["form_name"].str.contains("missing_data")]
 
     if missing_df.shape[0] == 0:
@@ -97,6 +120,17 @@ def check_if_removed(
 def compute_removed(
     config_file: Path, visit_order: List[str], debug: bool = False
 ) -> pd.DataFrame:
+    """
+    For each subject, compute if they have been removed.
+
+    Args:
+        config_file (Path): Path to the config file.
+        visit_order (List[str]): List of visits in the order they were conducted.
+        debug (bool, optional): Whether to print debug messages. Defaults to False.
+
+    Returns:
+        pd.DataFrame: DataFrame containing the removed status of each subject.
+    """
     removed_df = pd.DataFrame(
         columns=["subject_id", "removed", "removed_event", "removed_reason"]
     )
@@ -105,7 +139,7 @@ def compute_removed(
     query = "SELECT COUNT(*) FROM subjects;"
     subject_count_r = db.fetch_record(config_file=config_file, query=query)
     if subject_count_r is None:
-        raise Exception("No subjects found in the database.")
+        raise ValueError("No subjects found in the database.")
     subject_count = int(subject_count_r)
 
     logger.info(f"Found {subject_count} subjects.")
@@ -155,6 +189,16 @@ def compute_removed(
 
 
 def commit_removed_status_to_db(config_file: Path, df: pd.DataFrame) -> None:
+    """
+    Drop old subject_removed data and commit new data to the database.
+
+    Args:
+        config_file (Path): Path to the config file.
+        df (pd.DataFrame): DataFrame containing the removed status of each subject.
+
+    Returns:
+        None
+    """
     logger.info("Committing removed status to the database...")
 
     sql_queries: List[str] = []
@@ -164,7 +208,7 @@ def commit_removed_status_to_db(config_file: Path, df: pd.DataFrame) -> None:
     """
     sql_queries.append(sql_query)
 
-    for idx, row in df.iterrows():
+    for _, row in df.iterrows():
         subject_id = row["subject_id"]
         removed = row["removed"]
         removed_event = row["removed_event"]
@@ -199,17 +243,17 @@ if __name__ == "__main__":
     )
     logger.info(f"Using config file: {config_file}")
 
-    removed_count = count_removed(config_file=config_file)
-    logger.info(f"Found {removed_count} subjects with removed status.")
+    REMOVED_COUNT = count_removed(config_file=config_file)
+    logger.info(f"Found {REMOVED_COUNT} subjects with removed status.")
 
     converted_status_df = compute_removed(
         config_file, visit_order=constants.visit_order, debug=False
     )
 
     commit_removed_status_to_db(config_file, converted_status_df)
-    new_removed_count = count_removed(config_file=config_file)
+    UPDATED_REMOVED_COUNT = count_removed(config_file=config_file)
 
-    logger.info(f"Found {new_removed_count} subjects with removed status.")
-    logger.info(f"Added {new_removed_count - removed_count} subjects.")
+    logger.info(f"Found {UPDATED_REMOVED_COUNT} subjects with removed status.")
+    logger.info(f"Added {UPDATED_REMOVED_COUNT - REMOVED_COUNT} subjects.")
 
     logger.info("Done!")

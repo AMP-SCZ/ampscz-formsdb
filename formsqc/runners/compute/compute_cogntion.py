@@ -1,4 +1,8 @@
 #!/usr/bin/env python
+"""
+Fetches and consolidates various cognitive test's status and system status data
+into a single dataframe and exports it to the database.
+"""
 
 import sys
 from pathlib import Path
@@ -23,8 +27,8 @@ from typing import Any, Dict, List, Optional, Union
 import pandas as pd
 from rich.logging import RichHandler
 
-from formsqc.helpers import db, utils, dpdash
 from formsqc import constants, data
+from formsqc.helpers import db, dpdash, utils
 
 MODULE_NAME = "formsqc_compute_cognitive"
 
@@ -53,6 +57,16 @@ required_variables.extend(required_manual_status_variables)
 
 
 def construct_init_queries(required_variables: List[str]) -> List[str]:
+    """
+    Constructs queries to drop and create the cognitive_summary and
+    cognitive_data_availability tables.
+
+    Args:
+        required_variables (List[str]): List of required variables.
+
+    Returns:
+        List[str]: List of SQL queries.
+    """
     drop_summary_table_query = """
         DROP TABLE IF EXISTS cognitive_summary;
     """
@@ -88,6 +102,17 @@ def construct_init_queries(required_variables: List[str]) -> List[str]:
 
 
 def init_db(config_file: Path, required_variables: List[str]) -> None:
+    """
+    Initializes the database by dropping and creating the cognitive_summary and
+    cognitive_data_availability tables.
+
+    Args:
+        config_file (Path): The path to the configuration file.
+        required_variables (List[str]): List of required variables.
+
+    Returns:
+        None
+    """
     init_queries = construct_init_queries(required_variables)
 
     db.execute_queries(
@@ -97,6 +122,16 @@ def init_db(config_file: Path, required_variables: List[str]) -> None:
 
 
 def get_upenn_redcap_data(config_file: Path, subject_id: str) -> pd.DataFrame:
+    """
+    Fetches the UPenn form data for a subject from the database.
+
+    Args:
+        config_file (Path): The path to the configuration file.
+        subject_id (str): The subject ID.
+
+    Returns:
+        pd.DataFrame: The UPenn form data.
+    """
     query = f"""
     SELECT subject_id, event_name, event_type, form_data FROM upenn_forms
         WHERE subject_id = '{subject_id}';
@@ -119,6 +154,16 @@ def get_visit_system_status(
     visit_data: pd.DataFrame,
     tests: List[str],
 ) -> Dict[str, Any]:
+    """
+    Get the system status for each test for a visit.
+
+    Args:
+        visit_data (pd.DataFrame): The visit's data.
+        tests (List[str]): The list of tests.
+
+    Returns:
+        Dict[str, Any]: The system status for each test.
+    """
     system_status: Dict[str, str] = {}
 
     # gets columns that contain 'system_status'
@@ -149,6 +194,16 @@ def get_visit_status(
     visit_data: pd.DataFrame,
     tests: List[str],
 ) -> Dict[str, Any]:
+    """
+    Get the status for each test for a visit.
+
+    Args:
+        visit_data (pd.DataFrame): The visit's data.
+        tests (List[str]): The list of tests.
+
+    Returns:
+        Dict[str, Any]: The status for each test.
+    """
     status_dict: Dict[str, str] = {}
 
     # gets columns that contain 'system_status'
@@ -183,6 +238,17 @@ def get_visits_system_status(
     visits: List[str],
     tests: List[str],
 ) -> Dict[str, Optional[Dict[str, str]]]:
+    """
+    Get the system status for each visit.
+
+    Args:
+        upenn_form (pd.DataFrame): The UPenn form data.
+        visits (List[str]): The list of visits.
+        tests (List[str]): The list of tests.
+
+    Returns:
+        Dict[str, Optional[Dict[str, str]]]: The system status for each visit.
+    """
     visits_system_status: Dict[str, Optional[Dict[str, str]]] = {}
 
     for visit in visits:
@@ -204,6 +270,17 @@ def get_visits_status(
     visits: List[str],
     tests: List[str],
 ) -> Dict[str, Optional[Dict[str, str]]]:
+    """
+    Get the status for each visit.
+
+    Args:
+        upenn_form (pd.DataFrame): The UPenn form data.
+        visits (List[str]): The list of visits.
+        tests (List[str]): The list of tests.
+
+    Returns:
+        Dict[str, Optional[Dict[str, str]]]: The status for each visit.
+    """
     visits_system_status: Dict[str, Optional[Dict[str, str]]] = {}
 
     for visit in visits:
@@ -221,6 +298,19 @@ def get_visits_status(
 
 
 def generate_upenn_data_availability(system_status: Dict[str, Any]) -> pd.DataFrame:
+    """
+    Generates a dataframe of the data availability for each visit.
+
+    data_availability_{visit} is True if data is available for the visit, False otherwise.
+    data_availability_summary is a concatenated string of all visits with available data.
+        e.g. "Visit 1, Visit 2, Visit 3"
+
+    Args:
+        system_status (Dict[str, Any]): The system status for each visit.
+
+    Returns:
+        pd.DataFrame: The data availability for each visit.
+    """
     visits = system_status.keys()
     data_availability: Dict[str, Union[bool, str]] = {}
 
@@ -244,6 +334,18 @@ def generate_upenn_data_summary(
     system_status: Dict[str, Any],
     manual_status: Dict[str, Any],
 ) -> pd.DataFrame:
+    """
+    Generates a dataframe of the data summary for each visit.
+
+    Args:
+        config_file (Path): The path to the configuration file.
+        subject_id (str): The subject ID.
+        system_status (Dict[str, Any]): The system status for each visit.
+        manual_status (Dict[str, Any]): The manual status for each visit.
+
+    Returns:
+        pd.DataFrame: The data summary for each visit.
+    """
     master_system_status_df = pd.DataFrame()
     master_status_df = pd.DataFrame()
 
@@ -301,6 +403,16 @@ def generate_upenn_data_summary(
 
 
 def availability_df_to_sql(df: pd.DataFrame, subject_id: str) -> List[str]:
+    """
+    Constructs SQL queries to insert the data availability dataframe into the database.
+
+    Args:
+        df (pd.DataFrame): The data availability dataframe.
+        subject_id (str): The subject ID.
+
+    Returns:
+        List[str]: List of SQL queries.
+    """
     # df = make_df_dpdash_ready(df=df, subject_id=subject_id)
     sql_queries: List[str] = []
 
@@ -318,6 +430,16 @@ def availability_df_to_sql(df: pd.DataFrame, subject_id: str) -> List[str]:
 
 
 def summary_df_to_sql(df: pd.DataFrame, subject_id: str) -> List[str]:
+    """
+    Constructs SQL queries to insert the data summary dataframe into the database.
+
+    Args:
+        df (pd.DataFrame): The data summary dataframe.
+        subject_id (str): The subject ID.
+
+    Returns:
+        List[str]: List of SQL queries.
+    """
     df = data.make_df_dpdash_ready(df=df, subject_id=subject_id)
     sql_queries: List[str] = []
 
@@ -340,6 +462,16 @@ def summary_df_to_sql(df: pd.DataFrame, subject_id: str) -> List[str]:
 
 
 def construct_queries(config_file: Path, subject_id: str) -> List[str]:
+    """
+    Constructs SQL queries to insert the data availability and summary dataframes into the database.
+
+    Args:
+        config_file (Path): The path to the configuration file.
+        subject_id (str): The subject ID.
+
+    Returns:
+        List[str]: List of SQL queries.
+    """
     sql_queries: List[str] = []
     upenn_form = get_upenn_redcap_data(config_file=config_file, subject_id=subject_id)
     visits = constants.upenn_visit_order
@@ -371,6 +503,19 @@ def construct_queries(config_file: Path, subject_id: str) -> List[str]:
 
 
 def process_data(config_file: Path) -> None:
+    """
+    Processes the data by fetching the data for each subject and constructing
+    the SQL queries to insert the data into the database.
+
+    Generates the data availability and summary dataframes and inserts them into
+    the database.
+
+    Args:
+        config_file (Path): The path to the configuration file.
+
+    Returns:
+        None
+    """
     subject_query = """
         SELECT DISTINCT subject_id FROM upenn_forms;
     """
