@@ -30,7 +30,7 @@ from rich.logging import RichHandler
 from formsqc import constants, data
 from formsqc.helpers import db, dpdash, utils
 
-MODULE_NAME = "formsqc_compute_cognitive"
+MODULE_NAME = "formsqc.runners.compute.compute_cognition"
 
 console = utils.get_console()
 

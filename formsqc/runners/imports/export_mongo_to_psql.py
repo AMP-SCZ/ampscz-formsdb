@@ -29,7 +29,7 @@ from rich.logging import RichHandler
 from formsqc.helpers import db, utils
 from formsqc.models import forms as forms_model
 
-MODULE_NAME = "formsqc_psql_importer"
+MODULE_NAME = "formsqc.runners.imports.export_mongo_to_psql"
 
 console = utils.get_console()
 

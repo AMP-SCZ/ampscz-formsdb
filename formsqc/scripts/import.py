@@ -26,7 +26,7 @@ from rich.logging import RichHandler
 
 from formsqc.helpers import utils
 
-MODULE_NAME = "formsqc_importer"
+MODULE_NAME = "formsqc.scripts.import"
 
 console = utils.get_console()
 

@@ -37,7 +37,7 @@ from formsqc import constants
 from formsqc.helpers import db, utils
 from formsqc.helpers import hash as hash_helper
 
-MODULE_NAME = "formsqc_json_importer"
+MODULE_NAME = "formsqc.runners.imports.import_jsons"
 
 console = utils.get_console()
 

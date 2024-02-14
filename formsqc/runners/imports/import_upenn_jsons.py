@@ -33,7 +33,7 @@ from rich.logging import RichHandler
 from formsqc import constants, data
 from formsqc.helpers import db, utils
 
-MODULE_NAME = "formsqc_upenn_json_importer"
+MODULE_NAME = "formsqc.runners.imports.import_upenn_jsons"
 
 console = utils.get_console()
 

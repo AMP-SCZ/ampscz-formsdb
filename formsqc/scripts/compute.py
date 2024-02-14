@@ -26,7 +26,7 @@ from rich.logging import RichHandler
 
 from formsqc.helpers import utils, cli
 
-MODULE_NAME = "formsqc_compute"
+MODULE_NAME = "formsqc.scripts.compute"
 
 console = utils.get_console()
 

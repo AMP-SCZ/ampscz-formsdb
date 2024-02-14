@@ -1,4 +1,11 @@
 #!/usr/bin/env python
+"""
+Export the consolidated combined cognitive data.
+
+Consolidates the combined cognitive data and exports it to the outputs directory.
+
+Generates 1 CSV file per network, event type, and visit.
+"""
 
 import sys
 from pathlib import Path
@@ -18,16 +25,16 @@ except ValueError:
     pass
 
 import logging
-from typing import Dict
 from glob import glob
+from typing import Dict
 
 import pandas as pd
 from rich.logging import RichHandler
 
-from formsqc.helpers import cli, utils, dpdash
-from formsqc import data, constants
+from formsqc import constants, data
+from formsqc.helpers import cli, dpdash, utils
 
-MODULE_NAME = "formsqc_cognitive_combined_consolidate"
+MODULE_NAME = "formsqc.runners.export.export_consolidated_combined_cognitive"
 
 console = utils.get_console()
 
@@ -46,6 +53,19 @@ def construct_output_filename(
     event_name: str,
     df: pd.DataFrame,
 ) -> str:
+    """
+    Construct the output filename.
+
+    Template: combined_cognition_{event_type}-{network}-{event_name}-day1to1.csv
+
+    Args:
+        network (str): Network name.
+        event_name (str): Event name.
+        df (pd.DataFrame): Dataframe.
+
+    Returns:
+        str: Output filename.
+    """
     try:
         event_types = df["event_type"].unique()
     except KeyError:
@@ -68,6 +88,15 @@ def construct_output_filename(
 
 
 def get_data_dir(config_file: Path) -> Path:
+    """
+    Get the data directory from the config file.
+
+    Args:
+        config_file (Path): Path to the config file.
+
+    Returns:
+        Path: Path to the data directory.
+    """
     output_params = utils.config(config_file, "outputs")
 
     output_dir = Path(output_params["cognitive_combined_outputs_root"])
@@ -76,6 +105,15 @@ def get_data_dir(config_file: Path) -> Path:
 
 
 def get_output_dir(config_file: Path) -> Path:
+    """
+    Get the output directory from the config file.
+
+    Args:
+        config_file (Path): Path to the config file.
+
+    Returns:
+        Path: Path to the output directory.
+    """
     output_params = utils.config(config_file, "outputs")
 
     output_dir = Path(output_params["cognitive_consolidated_combined_outputs_root"])
@@ -85,6 +123,15 @@ def get_output_dir(config_file: Path) -> Path:
 
 
 def consolidate_data(config_file: Path, data_dir: Path, output_dir: Path) -> None:
+    """
+    Consolidate the combined cognitive data.
+
+    Args:
+        config_file (Path): Path to the config file.
+
+    Returns:
+        None
+    """
     combined_cognitive_files = glob(str(data_dir / "*.csv"))
 
     network_data: Dict[str, Dict[str, pd.DataFrame]] = {}
@@ -98,7 +145,9 @@ def consolidate_data(config_file: Path, data_dir: Path, output_dir: Path) -> Non
             file_path = Path(combined_cognitive_file)
             dp_dash_dict = dpdash.parse_dpdash_name(file_path.name, maxsplit=3)
 
-            network = data.get_network(config_file=config_file, site=dp_dash_dict["study"])  # type: ignore
+            network = data.get_network(
+                config_file=config_file, site=dp_dash_dict["study"]  # type: ignore
+            )
             if network not in network_data:
                 logger.debug(f"Adding network {network}...")
                 network_data[network] = {}
@@ -129,8 +178,8 @@ def consolidate_data(config_file: Path, data_dir: Path, output_dir: Path) -> Non
 
     visits = constants.upenn_visit_order
 
-    for network in network_data:
-        for event_type in network_data[network]:
+    for network, _ in network_data.items():
+        for event_type, _ in network_data[network].items():
             for visit in visits:
                 df = network_data[network][event_type]
                 df = df[df["event_name"].str.contains(visit)]

@@ -31,7 +31,7 @@ from rich.table import Table
 from formsqc import constants, data
 from formsqc.helpers import db, utils
 
-MODULE_NAME = "formsqc_compute_visit_status"
+MODULE_NAME = "formsqc.runners.compute.compute_visit_status"
 
 console = utils.get_console()
 

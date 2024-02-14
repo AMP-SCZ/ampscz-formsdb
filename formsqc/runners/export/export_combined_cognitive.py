@@ -1,4 +1,10 @@
 #!/usr/bin/env python
+"""
+Exports combined cognitive data to CSV files.
+
+Combines penncnb (REDCap form from AMPSCZ project) and upenn_form (UPENN's REDCap Project)
+data for each subject and exports to CSV.
+"""
 
 import sys
 from pathlib import Path
@@ -18,16 +24,16 @@ except ValueError:
     pass
 
 import logging
-from typing import List, Dict, Optional, Set
 from datetime import datetime
+from typing import Dict, List, Optional, Set
 
 import pandas as pd
 from rich.logging import RichHandler
 
-from formsqc.helpers import cli, db, utils, dpdash
 from formsqc import constants, data
+from formsqc.helpers import cli, db, dpdash, utils
 
-MODULE_NAME = "formsqc_cognitive_combined_exporter"
+MODULE_NAME = "formsqc.runners.export.export_combined_cognitive"
 
 console = utils.get_console()
 
@@ -48,7 +54,10 @@ warnings_cache: Set[str] = set()
 
 
 def warn(msg: str) -> None:
-    global warnings_cache
+    """
+    Sends a warning message to the logger and caches the message
+    to prevent duplicate warnings.
+    """
 
     if msg not in warnings_cache:
         logger.warning(msg)
@@ -59,6 +68,9 @@ def construct_output_filename(
     subject_id: str,
     df: pd.DataFrame,
 ) -> str:
+    """
+    Constructs the output filename for the combined cognitive data.
+    """
     site_id = subject_id[:2]
 
     # start_day = int(df["day"].min()) if not df.empty else 1
@@ -89,6 +101,9 @@ def construct_output_filename(
 
 
 def get_output_dir(config_file: Path) -> Path:
+    """
+    Get the output directory for the combined cognitive data.
+    """
     output_params = utils.config(config_file, "outputs")
 
     output_dir = Path(output_params["cognitive_combined_outputs_root"])
@@ -96,6 +111,16 @@ def get_output_dir(config_file: Path) -> Path:
 
 
 def get_penncnb_redcap_form(config_file: Path, subject_id: str) -> pd.DataFrame:
+    """
+    Fetches the penncnb REDCap form for the given subject from the database.
+
+    Args:
+        config_file (Path): Path to the config file.
+        subject_id (str): Subject ID.
+
+    Returns:
+        pd.DataFrame: DataFrame containing the penncnb form data.
+    """
     query = f"""
     SELECT subject_id, event_name, form_data FROM forms
         WHERE subject_id = '{subject_id}' AND
@@ -108,6 +133,16 @@ def get_penncnb_redcap_form(config_file: Path, subject_id: str) -> pd.DataFrame:
 
 
 def get_upenn_redcap_data(config_file: Path, subject_id: str) -> pd.DataFrame:
+    """
+    Fetches the upenn REDCap form for the given subject from the database.
+
+    Args:
+        config_file (Path): Path to the config file.
+        subject_id (str): Subject ID.
+
+    Returns:
+        pd.DataFrame: DataFrame containing the upenn form data.
+    """
     query = f"""
     SELECT subject_id, event_name, event_type, form_data FROM upenn_forms
         WHERE subject_id = '{subject_id}';
@@ -119,12 +154,38 @@ def get_upenn_redcap_data(config_file: Path, subject_id: str) -> pd.DataFrame:
 
 
 def explode_formdata(df: pd.DataFrame) -> pd.DataFrame:
-    df = pd.concat([df.drop("form_data", axis=1), pd.json_normalize(df["form_data"])], axis=1)  # type: ignore
+    """
+    Explodes the form_data column into separate columns.
+
+    form_data column contains a JSON object.
+
+    Args:
+        df (pd.DataFrame): DataFrame containing the form data.
+
+    Returns:
+        pd.DataFrame: DataFrame with the form_data column exploded.
+    """
+    df = pd.concat(
+        [df.drop("form_data", axis=1), pd.json_normalize(df["form_data"])],  # type: ignore
+        axis=1,
+    )
 
     return df
 
 
 def map_event_names(verbose: List[str]) -> Dict[str, str]:  # type: ignore
+    """
+    Maps verbose event names to the event names used in the database.
+
+    Example:
+    "baseline" -> "baseline_visit_1_arm_1"
+
+    Args:
+        verbose (List[str]): List of verbose event names.
+
+    Returns:
+        Dict[str, str]: Dictionary mapping verbose event names to event names.
+    """
     visit_orders = constants.upenn_visit_order
 
     def _function(verbose: List[str], event_names: List[str]):
@@ -138,25 +199,22 @@ def map_event_names(verbose: List[str]) -> Dict[str, str]:  # type: ignore
     return event_name_map
 
 
-def get_site_id(subject_id: str) -> Optional[str]:
-    query = f"""
-    SELECT site_id FROM subjects
-        WHERE id = '{subject_id}';
-    """
-
-    site_id = db.fetch_record(config_file=config_file, query=query)
-
-    return site_id
-
-
 def generate_csv(
     config_file: Path,
     subject_id: str,
     output_dir: Path,
 ) -> None:
-    global no_upenn_data
-    global no_penncnb_data
-    global no_data
+    """
+    Generates a CSV file containing the combined cognitive data for the given subject.
+
+    Args:
+        config_file (Path): Path to the config file.
+        subject_id (str): Subject ID.
+        output_dir (Path): Path to the output directory.
+
+    Returns:
+        None
+    """
 
     penncnb_form = get_penncnb_redcap_form(
         config_file=config_file, subject_id=subject_id
@@ -211,27 +269,6 @@ def generate_csv(
                 how="inner",
             )
 
-        # try:
-        #     combined_df = pd.merge(
-        #         penncnb_form,
-        #         event_type_df,
-        #         on=["subject_id", "event_name"],
-        #         how="inner",
-        #     )
-        # except (ValueError, KeyError):
-        #     # either penncnb_form or event_type_df is empty
-        #     # Use available df
-        #     if penncnb_form.empty and not event_type_df.empty:
-        #         combined_df = event_type_df
-        #         no_penncnb_data.add(subject_id)
-        #     elif event_type_df.empty and not penncnb_form.empty:
-        #         combined_df = penncnb_form
-        #         no_upenn_data.add(subject_id)
-        #     else:
-        #         no_data.add(subject_id)
-        #         return
-
-        # Add col 'weekday'
         try:
             interview_date = pd.to_datetime(combined_df["chrpenn_interview_date"])
             combined_df["weekday"] = interview_date.apply(dpdash.get_week_day)
@@ -245,6 +282,26 @@ def generate_csv(
 
         # Add col 'site_id'
         subject_id_l = combined_df["subject_id"]
+
+        def get_site_id(subject_id: str) -> Optional[str]:
+            """
+            Get the site ID for the given subject.
+
+            Args:
+                subject_id (str): Subject ID.
+
+            Returns:
+                Optional[str]: Site ID.
+            """
+            query = f"""
+            SELECT site_id FROM subjects
+                WHERE id = '{subject_id}';
+            """
+
+            site_id = db.fetch_record(config_file=config_file, query=query)
+
+            return site_id
+
         combined_df["site_id"] = subject_id_l.apply(get_site_id)
 
         # Add col 'day'
@@ -285,6 +342,16 @@ def generate_csv(
 
 
 def export_data(config_file: Path, output_dir: Path) -> None:
+    """
+    Export combined cognitive data to CSV files.
+
+    Args:
+        config_file (Path): Path to the config file.
+        output_dir (Path): Path to the output directory.
+
+    Returns:
+        None
+    """
     subject_query = """
         SELECT id FROM subjects ORDER BY id ASC;
     """

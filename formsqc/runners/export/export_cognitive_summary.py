@@ -1,4 +1,7 @@
 #!/usr/bin/env python
+"""
+Export the cognitive data availability and summary for all subjects.
+"""
 
 import sys
 from pathlib import Path
@@ -18,15 +21,15 @@ except ValueError:
     pass
 
 import logging
-from typing import Dict, List, Optional, Union, Set
+from typing import Dict, List, Optional, Set, Union
 
 import pandas as pd
 from rich.logging import RichHandler
 
+from formsqc import constants, data
 from formsqc.helpers import cli, db, dpdash, utils
-from formsqc import data, constants
 
-MODULE_NAME = "formsqc_cognitive_exporter"
+MODULE_NAME = "formsqc.runners.export.export_cognitive_summary"
 
 console = utils.get_console()
 
@@ -41,6 +44,16 @@ logging.basicConfig(**logargs)
 
 
 def fetch_avaiability_data(config_file: Path, subject_id: str) -> pd.DataFrame:
+    """
+    Fetch the cognitive data availability for a subject.
+
+    Args:
+        config_file (Path): Path to the config file.
+        subject_id (str): Subject ID.
+
+    Returns:
+        pd.DataFrame: DataFrame containing the cognitive data availability for the subject.
+    """
     query = f"""
         SELECT * FROM cognitive_data_availability
         WHERE subject_id='{subject_id}'
@@ -52,6 +65,16 @@ def fetch_avaiability_data(config_file: Path, subject_id: str) -> pd.DataFrame:
 
 
 def fetch_summary_data(config_file: Path, subject_id: str) -> pd.DataFrame:
+    """
+    Fetch the cognitive summary data for a subject.
+
+    Args:
+        config_file (Path): Path to the config file.
+        subject_id (str): Subject ID.
+
+    Returns:
+        pd.DataFrame: DataFrame containing the cognitive summary data for the subject.
+    """
     query = f"""
         SELECT * FROM cognitive_summary
         WHERE subject_id='{subject_id}'
@@ -67,6 +90,16 @@ def generate_upenn_data_summary_filename(
     subject_id: str,
     df: pd.DataFrame,
 ) -> str:
+    """
+    Generate DP Dash compliant the filename for the UPenn data summary.
+
+    Args:
+        subject_id (str): Subject ID.
+        df (pd.DataFrame): DataFrame containing the summary data.
+
+    Returns:
+        str: Filename for the UPenn data summary.
+    """
     max_days = df["day"].max()
 
     filename = dpdash.get_dpdash_name(
@@ -85,6 +118,16 @@ def generate_upenn_data_availability_filename(
     subject_id: str,
     df: pd.DataFrame,
 ) -> str:
+    """
+    Generate DP Dash compliant the filename for the UPenn data availability.
+
+    Args:
+        subject_id (str): Subject ID.
+        df (pd.DataFrame): DataFrame containing the availability data.
+
+    Returns:
+        str: Filename for the UPenn data availability.
+    """
     max_days = df["day"].max()
 
     filename = dpdash.get_dpdash_name(
@@ -100,6 +143,9 @@ def generate_upenn_data_availability_filename(
 
 
 def get_availability_output_dir(config_file: Path) -> Path:
+    """
+    Get the output directory for the cognitive data availability from the config file.
+    """
     output_params = utils.config(config_file, "outputs")
 
     output_dir = Path(output_params["cognitive_availability_outputs_root"])
@@ -107,6 +153,9 @@ def get_availability_output_dir(config_file: Path) -> Path:
 
 
 def get_summary_output_dir(config_file: Path) -> Path:
+    """
+    Get the output directory for the cognitive data summary from the config file.
+    """
     output_params = utils.config(config_file, "outputs")
 
     output_dir = Path(output_params["cognitive_summary_outputs_root"])
@@ -119,6 +168,20 @@ def generate_csvs(
     availability_output_dir: Path,
     summary_output_dir: Path,
 ) -> None:
+    """
+    Generate the CSVs for the cognitive data availability and summary.
+
+    Args:
+        config_file (Path): Path to the config file.
+        subject_id (str): Subject ID.
+        availability_output_dir (Path): Path to the output directory for
+            cognitive data availability.
+        summary_output_dir (Path): Path to the output directory for
+            cognitive data summary.
+
+    Returns:
+        None
+    """
     availability_df = fetch_avaiability_data(
         config_file=config_file, subject_id=subject_id
     )
@@ -151,6 +214,19 @@ def generate_csvs(
 def export_data(
     config_file: Path, availability_output_dir: Path, summary_output_dir: Path
 ) -> None:
+    """
+    Export the cognitive data availability and summary for all subjects.
+
+    Args:
+        config_file (Path): Path to the config file.
+        availability_output_dir (Path): Path to the output directory for
+            cognitive data availability.
+        summary_output_dir (Path): Path to the output directory for
+            cognitive data summary.
+
+    Returns:
+        None
+    """
     subject_query = """
         SELECT DISTINCT subject_id FROM upenn_forms ORDER BY subject_id ASC;
     """
@@ -176,6 +252,15 @@ def export_data(
 
 
 def generate_blank_availability_df(subject_id: str) -> pd.DataFrame:
+    """
+    Generate a blank DataFrame for the cognitive data availability for a subject.
+
+    Args:
+        subject_id (str): Subject ID.
+
+    Returns:
+        pd.DataFrame: Blank DataFrame for the cognitive data availability for a subject.
+    """
     upenn_visits = constants.upenn_visit_order
     required_cols = [f"data_availability_{visit}" for visit in upenn_visits]
     required_cols.append("data_availability_summary")
@@ -195,6 +280,17 @@ def generate_blank_availability_df(subject_id: str) -> pd.DataFrame:
 def export_blank_availability_data(
     config_file: Path, availability_output_dir: Path
 ) -> None:
+    """
+    Export blank cognitive data availability for subjects that do not have any data.
+
+    Args:
+        config_file (Path): Path to the config file.
+        availability_output_dir (Path): Path to the output directory for
+            cognitive data availability.
+
+    Returns:
+        None
+    """
     subject_query = """
         SELECT id FROM subjects ORDER BY id ASC;
     """

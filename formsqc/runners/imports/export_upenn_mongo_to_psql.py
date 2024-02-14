@@ -30,7 +30,7 @@ from formsqc import data
 from formsqc.helpers import db, utils
 from formsqc.models import upenn_forms as upenn_forms_model
 
-MODULE_NAME = "formsqc_upenn_psql_importer"
+MODULE_NAME = "formsqc.runners.imports.export_upenn_mongo_to_psql"
 
 console = utils.get_console()
 

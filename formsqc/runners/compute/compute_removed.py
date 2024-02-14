@@ -30,7 +30,7 @@ from rich.logging import RichHandler
 from formsqc import constants, data
 from formsqc.helpers import db, utils
 
-MODULE_NAME = "formsqc_compute_removed"
+MODULE_NAME = "formsqc.runners.compute.compute_removed"
 
 console = utils.get_console()
 
