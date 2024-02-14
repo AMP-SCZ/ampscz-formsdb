@@ -19,8 +19,8 @@ from rich.progress import (
     TimeRemainingColumn,
 )
 
-from formsqc.helpers import cli
-from formsqc.helpers.config import config
+from formsdb.helpers import cli
+from formsdb.helpers.config import config
 
 _console = Console(color_system="standard")
 

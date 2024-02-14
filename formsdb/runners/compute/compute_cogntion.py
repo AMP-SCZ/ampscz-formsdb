@@ -11,7 +11,7 @@ file = Path(__file__).resolve()
 parent = file.parent
 ROOT = None
 for parent in file.parents:
-    if parent.name == "ampscz-formsqc":
+    if parent.name == "ampscz-formsdb":
         ROOT = parent
 sys.path.append(str(ROOT))
 
@@ -27,10 +27,10 @@ from typing import Any, Dict, List, Optional, Union
 import pandas as pd
 from rich.logging import RichHandler
 
-from formsqc import constants, data
-from formsqc.helpers import db, dpdash, utils
+from formsdb import constants, data
+from formsdb.helpers import db, dpdash, utils
 
-MODULE_NAME = "formsqc.runners.compute.compute_cognition"
+MODULE_NAME = "formsdb.runners.compute.compute_cognition"
 
 console = utils.get_console()
 

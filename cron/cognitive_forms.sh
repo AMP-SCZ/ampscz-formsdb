@@ -4,7 +4,7 @@ source ~/.bash_profile
 
 export SEPARATOR="========================================================================================================================"
 
-export REPO_ROOT=/PHShome/dm1447/dev/ampscz-formsqc
+export REPO_ROOT=/PHShome/dm1447/dev/ampscz-formsdb
 cd $REPO_ROOT
 
 LOG_FILE=$REPO_ROOT/data/logs/crons/cron-$(date +%Y%m%d%H%M%S).log
@@ -56,19 +56,19 @@ fi
 
 echo $SEPARATOR
 echo "Running import.py at $(date)"
-$REPO_ROOT/formsqc/scripts/import.py >/dev/null
+$REPO_ROOT/formsdb/scripts/import.py >/dev/null
 
 echo $SEPARATOR
 echo "Running compute.py at $(date)"
-$REPO_ROOT/formsqc/scripts/compute.py >/dev/null
+$REPO_ROOT/formsdb/scripts/compute.py >/dev/null
 
 echo $SEPARATOR
 echo "Running export.py at $(date)"
-$REPO_ROOT/formsqc/scripts/export.py >/dev/null
+$REPO_ROOT/formsdb/scripts/export.py >/dev/null
 
 echo $SEPARATOR
 echo "Running DPDash Merger at $(date)"
-$REPO_ROOT/formsqc/runners/dpdash/merge_metrics.py >/dev/null
+$REPO_ROOT/formsdb/runners/dpdash/merge_metrics.py >/dev/null
 
 echo $SEPARATOR
 echo "Done at $(date)"

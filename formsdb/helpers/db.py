@@ -14,8 +14,8 @@ import pymongo.database as database
 import sqlalchemy
 from rich.console import Console
 
-from formsqc.helpers import utils
-from formsqc.helpers.config import config
+from formsdb.helpers import utils
+from formsdb.helpers.config import config
 
 
 def get_mongo_db(config_file: Path) -> database.Database:

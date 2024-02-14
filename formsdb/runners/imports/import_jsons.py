@@ -10,7 +10,7 @@ file = Path(__file__).resolve()
 parent = file.parent
 ROOT = None
 for parent in file.parents:
-    if parent.name == "ampscz-formsqc":
+    if parent.name == "ampscz-formsdb":
         ROOT = parent
 sys.path.append(str(ROOT))
 
@@ -33,11 +33,11 @@ import pandas as pd
 from rich.logging import RichHandler
 from rich.progress import Progress
 
-from formsqc import constants
-from formsqc.helpers import db, utils
-from formsqc.helpers import hash as hash_helper
+from formsdb import constants
+from formsdb.helpers import db, utils
+from formsdb.helpers import hash as hash_helper
 
-MODULE_NAME = "formsqc.runners.imports.import_jsons"
+MODULE_NAME = "formsdb.runners.imports.import_jsons"
 
 console = utils.get_console()
 

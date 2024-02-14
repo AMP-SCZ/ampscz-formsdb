@@ -8,8 +8,8 @@ from typing import List
 
 import pandas as pd
 
-from formsqc.helpers import db
-from formsqc import constants
+from formsdb.helpers import db
+from formsdb import constants
 
 
 def get_network(config_file: Path, site: str) -> str:

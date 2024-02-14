@@ -9,7 +9,7 @@ file = Path(__file__).resolve()
 parent = file.parent
 ROOT = None
 for parent in file.parents:
-    if parent.name == "ampscz-formsqc":
+    if parent.name == "ampscz-formsdb":
         ROOT = parent
 sys.path.append(str(ROOT))
 
@@ -24,9 +24,9 @@ import logging
 
 from rich.logging import RichHandler
 
-from formsqc.helpers import utils
+from formsdb.helpers import utils
 
-MODULE_NAME = "formsqc.scripts.import"
+MODULE_NAME = "formsdb.scripts.import"
 
 console = utils.get_console()
 
@@ -45,7 +45,7 @@ async def import_jsons() -> None:
     Imports JSONs from disk to MongoDB.
     """
     logger.info("Importing JSONs...")
-    cmd = [f"{ROOT}/formsqc/runners/imports/import_jsons.py"]
+    cmd = [f"{ROOT}/formsdb/runners/imports/import_jsons.py"]
 
     proc = await asyncio.create_subprocess_exec(*cmd)
 
@@ -65,7 +65,7 @@ async def export_jsons() -> None:
     Exports JSONs from MongoDB to PostgreSQL.
     """
     logger.info("Exporting JSONs...")
-    cmd = [f"{ROOT}/formsqc/runners/imports/export_mongo_to_psql.py"]
+    cmd = [f"{ROOT}/formsdb/runners/imports/export_mongo_to_psql.py"]
 
     proc = await asyncio.create_subprocess_exec(*cmd)
 
@@ -96,7 +96,7 @@ async def import_upenn_json() -> None:
     Imports UPenn JSON to MongoDB.
     """
     logger.info("Importing UPenn JSON...")
-    cmd = [f"{ROOT}/formsqc/runners/imports/import_upenn_jsons.py"]
+    cmd = [f"{ROOT}/formsdb/runners/imports/import_upenn_jsons.py"]
 
     proc = await asyncio.create_subprocess_exec(*cmd)
 
@@ -115,7 +115,7 @@ async def export_upenn_json() -> None:
     Export UPenn JSON from MongoDB to PostgreSQL.
     """
     logger.info("Exporting UPenn JSON...")
-    cmd = [f"{ROOT}/formsqc/runners/imports/export_upenn_mongo_to_psql.py"]
+    cmd = [f"{ROOT}/formsdb/runners/imports/export_upenn_mongo_to_psql.py"]
 
     proc = await asyncio.create_subprocess_exec(*cmd)
 

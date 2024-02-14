@@ -1,4 +1,4 @@
-# Forms QC
+# FormsDB
 
 This repository does ETL (Extract, Transform, Load) on the forms data from REDCap and UPENN JSONs. The data is then loaded into a MongoDB and PostgreSQL database. The data can then be used to compute derived metrics.
 

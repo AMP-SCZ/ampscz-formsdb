@@ -10,7 +10,7 @@ file = Path(__file__).resolve()
 parent = file.parent
 ROOT = None
 for parent in file.parents:
-    if parent.name == "ampscz-formsqc":
+    if parent.name == "ampscz-formsdb":
         ROOT = parent
 sys.path.append(str(ROOT))
 
@@ -26,9 +26,9 @@ from typing import Dict, List
 import pandas as pd
 from rich.logging import RichHandler
 
-from formsqc.helpers import cli, utils, dpdash
+from formsdb.helpers import cli, utils, dpdash
 
-MODULE_NAME = "formsqc.runners.dpdash.merge_metrics"
+MODULE_NAME = "formsdb.runners.dpdash.merge_metrics"
 
 console = utils.get_console()
 

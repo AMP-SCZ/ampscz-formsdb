@@ -10,7 +10,7 @@ file = Path(__file__).resolve()
 parent = file.parent
 ROOT = None
 for parent in file.parents:
-    if parent.name == "ampscz-formsqc":
+    if parent.name == "ampscz-formsdb":
         ROOT = parent
 sys.path.append(str(ROOT))
 
@@ -26,10 +26,10 @@ from typing import Any, Dict, List, Set
 
 from rich.logging import RichHandler
 
-from formsqc.helpers import db, utils
-from formsqc.models import forms as forms_model
+from formsdb.helpers import db, utils
+from formsdb.models import forms as forms_model
 
-MODULE_NAME = "formsqc.runners.imports.export_mongo_to_psql"
+MODULE_NAME = "formsdb.runners.imports.export_mongo_to_psql"
 
 console = utils.get_console()
 

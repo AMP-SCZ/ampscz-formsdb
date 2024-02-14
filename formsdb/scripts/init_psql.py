@@ -10,7 +10,7 @@ file = Path(__file__).resolve()
 parent = file.parent
 ROOT = None
 for parent in file.parents:
-    if parent.name == "ampscz-formsqc":
+    if parent.name == "ampscz-formsdb":
         ROOT = parent
 sys.path.append(str(ROOT))
 
@@ -24,7 +24,7 @@ except ValueError:
 import json
 from typing import Set
 
-from formsqc.helpers import db, utils
+from formsdb.helpers import db, utils
 
 console = utils.get_console()
 

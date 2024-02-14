@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-Runs all export scripts in the formsqc/runners/export directory.
+Run all compute scripts in the formsdb/runners/compute directory.
 """
 
 import sys
@@ -10,7 +10,7 @@ file = Path(__file__).resolve()
 parent = file.parent
 ROOT = None
 for parent in file.parents:
-    if parent.name == "ampscz-formsqc":
+    if parent.name == "ampscz-formsdb":
         ROOT = parent
 sys.path.append(str(ROOT))
 
@@ -24,9 +24,9 @@ import logging
 
 from rich.logging import RichHandler
 
-from formsqc.helpers import utils, cli
+from formsdb.helpers import utils, cli
 
-MODULE_NAME = "formsqc.scripts.export"
+MODULE_NAME = "formsdb.scripts.compute"
 
 console = utils.get_console()
 
@@ -51,18 +51,18 @@ if __name__ == "__main__":
     )
 
     repo_root = cli.get_repo_root()
-    target_dir = repo_root / "formsqc" / "runners" / "export"
-    targets = target_dir.glob("export_*.py")
+    target_dir = repo_root / "formsdb" / "runners" / "compute"
+    targets = target_dir.glob("compute_*.py")
     targets = sorted(targets)
 
     targets = [target for target in targets if target not in [Path(__file__)]]
 
-    logger.info(f"Founds {len(list(targets))} export scripts", extra={"markup": True})
+    logger.info(f"Founds {len(list(targets))} compute scripts", extra={"markup": True})
     logger.info("Modules found:", extra={"markup": True})
     for target in targets:
         logger.info(f"  - {target.name}", extra={"markup": True})
 
-    logger.info("[green]Running export scripts", extra={"markup": True})
+    logger.info("[green]Running compute scripts", extra={"markup": True})
 
     for target in targets:
         if target == Path(__file__):
