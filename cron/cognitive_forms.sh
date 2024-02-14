@@ -67,6 +67,10 @@ echo "Running export.py at $(date)"
 $REPO_ROOT/formsqc/scripts/export.py >/dev/null
 
 echo $SEPARATOR
+echo "Running DPDash Merger at $(date)"
+$REPO_ROOT/formsqc/runners/dpdash/merge_metrics.py >/dev/null
+
+echo $SEPARATOR
 echo "Done at $(date)"
 
 echo $SEPARATOR
