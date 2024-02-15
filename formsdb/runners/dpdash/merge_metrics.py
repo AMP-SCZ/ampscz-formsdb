@@ -26,7 +26,7 @@ from typing import Dict, List
 import pandas as pd
 from rich.logging import RichHandler
 
-from formsdb.helpers import cli, utils, dpdash
+from formsdb.helpers import db, cli, utils, dpdash
 
 MODULE_NAME = "formsdb.runners.dpdash.merge_metrics"
 
@@ -68,6 +68,33 @@ def get_dpdash_sources_variables_map(config_file: Path) -> Dict[str, List[str]]:
         dpdash_sources_variables_map[source_pattern] = variables
 
     return dpdash_sources_variables_map
+
+
+def get_dpdash_name_variables_map(config_file: Path) -> Dict[str, List[str]]:
+    """
+    Get the mapping of names to variables from the dpdash config file.
+
+    Args:
+        config_file (Path): Path to the dpdash config file.
+
+    Returns:
+        Dict[str, List[str]]: Mapping of sources to variables.
+    """
+
+    dpdash_variables = utils.config(path=config_file, section="dpdash-variables")
+
+    dpdash_variables_map = {}
+
+    for name, source_variables in dpdash_variables.items():
+        source_variables = dpdash_variables.get(name)
+        variables = source_variables.split(",") if source_variables else []
+
+        # strip whitespace from variable names
+        variables = [variable.strip() for variable in variables]
+
+        dpdash_variables_map[name] = variables
+
+    return dpdash_variables_map
 
 
 def construct_master_df(
@@ -154,6 +181,71 @@ def make_df_dpdash_ready(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+def commit_df_to_db(config_file: Path, df: pd.DataFrame) -> None:
+    """
+    Push the dataframe to the database.
+
+    Args:
+        config_file (Path): Path to the config file.
+        df (pd.DataFrame): Dataframe to push to the database.
+
+    Returns:
+        None
+    """
+
+    logger.info("Committing data to the database...")
+
+    sql_queries: List[str] = []
+    # Remove existing data
+    sql_query = """
+    DELETE FROM dpdash_charts;
+    """
+    sql_queries.append(sql_query)
+
+    # get all variables
+    variables_map = get_dpdash_name_variables_map(config_file=config_file)
+    named_variables: Dict[str, str] = {}
+    for name, variables in variables_map.items():
+        for variable in variables:
+            named_variables[variable] = f"{name}_{variable}"
+
+    # Create 'dpdash_charts' table
+    sql_query = f"""
+    CREATE TABLE IF NOT EXISTS dpdash_charts (
+        subject_id VARCHAR(255) PRIMARY KEY,
+        {", ".join([f"{variable} VARCHAR(255)" for variable in named_variables.values()])}
+    );
+    """
+    sql_queries.append(sql_query)
+
+    for _, row in df.iterrows():
+        subject_id = row["subject_id"]
+
+        # get required variables
+        values = {}
+        for variable, value in row.items():
+            if variable in named_variables:
+                variable = named_variables[variable]
+                values[variable] = f"'{value}'"  # Surround value with single quotes
+
+        # convert to sql
+        sql_query = f"""
+        INSERT INTO dpdash_charts (subject_id, {", ".join(sorted(values.keys()))})
+        VALUES ('{subject_id}', {", ".join([str(values[key]) for key in sorted(values.keys())])});
+        """
+
+        sql_query = db.handle_nan(sql_query)
+        sql_queries.append(sql_query)
+
+    # execute the queries
+    db.execute_queries(
+        config_file=config_file,
+        queries=sql_queries,
+        show_progress=True,
+        show_commands=False,
+    )
+
+
 def generate_dpdash_imported_csvs(master_df: pd.DataFrame, output_root: Path) -> None:
     """
     Generate the DPDash imported csvs.
@@ -221,6 +313,8 @@ def main(config_file: Path) -> None:
     )
 
     master_df = make_df_dpdash_ready(df=master_df)
+
+    commit_df_to_db(config_file=config_file, df=master_df)
 
     generate_dpdash_imported_csvs(master_df=master_df, output_root=output_root)
 
