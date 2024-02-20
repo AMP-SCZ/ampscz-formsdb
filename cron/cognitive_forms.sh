@@ -71,6 +71,13 @@ echo "Running DPDash Merger at $(date)"
 $REPO_ROOT/formsdb/runners/dpdash/merge_metrics.py >/dev/null
 
 echo $SEPARATOR
+echo "Importing DPDash data to predict2 (dev instance) at $(date)"
+source /data/predict1/utility/.vault/.env.rc-predict-dev
+
+export PATH=/data/predict1/miniconda3/bin/:$PATH
+import.py -c $CONFIG "/data/predict1/data_from_nda/formqc/??-*-form_dpdash_charts-*.csv" >/dev/null
+
+echo $SEPARATOR
 echo "Done at $(date)"
 
 echo $SEPARATOR
