@@ -4,11 +4,12 @@ Module contain helper functions specific to this data pipeline
 
 from pathlib import Path
 from datetime import datetime
-from typing import List
+from typing import List, Optional
+from functools import lru_cache
 
 import pandas as pd
 
-from formsdb.helpers import db
+from formsdb.helpers import db, utils
 from formsdb import constants
 
 
@@ -35,6 +36,26 @@ def get_network(config_file: Path, site: str) -> str:
         raise ValueError(f"Site {site} not found in database.")
 
     return network
+
+
+def get_all_subjects(config_file: Path) -> List[str]:
+    """
+    Get all subjects from the database.
+
+    Args:
+        config_file (Path): The path to the configuration file.
+
+    Returns:
+        List[str]: A list of all subjects.
+    """
+    query = """
+    SELECT id FROM subjects
+        ORDER BY id;
+    """
+
+    subjects = db.execute_sql(config_file=config_file, query=query)
+
+    return subjects["id"].tolist()
 
 
 def check_if_subject_exists(config_file: Path, subject_id: str) -> bool:
@@ -129,6 +150,7 @@ def get_subject_consent_dates(config_file: Path, subject_id: str) -> datetime:
     return date
 
 
+@lru_cache(maxsize=128)
 def get_all_subject_forms(config_file: Path, subject_id: str) -> pd.DataFrame:
     """
     Get all forms for a subject from the database.
@@ -263,3 +285,39 @@ def make_df_dpdash_ready(df: pd.DataFrame, subject_id: str) -> pd.DataFrame:
         df["day"] = df["day"].fillna(1)
 
     return df
+
+
+def get_subject_guid(
+    config_file: Path,
+    subject_id: str
+) -> Optional[str]:
+    """
+    Get the GUID for a subject.
+
+    Args:
+        config_file: Path to the config file.
+        subject_id: Subject ID.
+
+    Returns:
+        GUID for the subject.
+    """
+    
+    forms_df = get_all_subject_forms(
+        config_file=config_file,
+        subject_id=subject_id
+    )
+
+    guid_form_df = forms_df[forms_df["form_name"] == "guid_form"]
+
+    if guid_form_df.empty:
+        return None
+    
+    guid_form_df = utils.explode_col(df=guid_form_df, col="form_data")
+
+    try:
+        # guid variable: chrguid_guid
+        guid = guid_form_df["chrguid_guid"].iloc[0]
+    except KeyError:
+        return None
+
+    return guid
