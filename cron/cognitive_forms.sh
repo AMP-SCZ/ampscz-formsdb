@@ -54,6 +54,12 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
+# # Open SSH tunnel to PostgreSQL
+# # Reference: https://stackoverflow.com/questions/2241063/bash-script-to-set-up-a-temporary-ssh-tunnel
+# echo $SEPARATOR
+# echo "$(date) - Opening SSH tunnel to PostgreSQL at pnl-x80-3.partners.org"
+# ssh -M -S formsdb-ctrl-socket -fNT -L 5433:127.0.0.1:5432 pnl-x80-3.partners.org 2>/dev/null
+
 echo $SEPARATOR
 echo "Running import.py at $(date)"
 $REPO_ROOT/formsdb/scripts/import.py >/dev/null
@@ -74,8 +80,15 @@ echo $SEPARATOR
 echo "Importing DPDash data to predict2 (dev instance) at $(date)"
 source /data/predict1/utility/.vault/.env.rc-predict-dev
 
+# Remove old data from MongoDB
+# export PATH=/data/predict1/mongodb-linux-x86_64-rhel70-4.4.20/bin:$PATH
+# mongo --tls --tlsCAFile $state/ssl/ca/cacert.pem --tlsCertificateKeyFile $state/ssl/mongo_client.pem mongodb://dpdash:$MONGO_PASS@$HOST:$PORT/dpdata?authSource=admin --eval "assess=\"form_dpdash_charts\"" /data/predict1/utility/remove_assess.js
+
 export PATH=/data/predict1/miniconda3/bin/:$PATH
-import.py -c $CONFIG "/data/predict1/data_from_nda/formqc/??-*-form_dpdash_charts-*.csv" >/dev/null
+echo "$(date) - Importing Chart Variables"
+import.py -c $CONFIG "/data/predict1/data_from_nda/formqc/??-*-form_dpdash_charts-*.csv" >/dev/null 2>/dev/null
+echo "$(date) - Importing Recruitment Status"
+import.py -c $CONFIG "/PHShome/dm1447/dev/ampscz-formsdb/data/generated_outputs/recruitment/??-*-form_recruitment_status-*.csv" >/dev/null 2>/dev/null
 
 echo $SEPARATOR
 echo "Done at $(date)"
@@ -88,7 +101,11 @@ pkill -U $(whoami) mongod
 echo "$(date) - Waiting for MongoDB to stop..."
 while pgrep -u $(whoami) mongod >/dev/null; do sleep 1; done
 
-echo "$(date) - Killing PostgreSQL"
-pg_ctl -D $REPO_ROOT/data/postgresql -l $REPO_ROOT/data/postgresql/logfile -o "-p 5433" stop
+# echo "$(date) - Killing PostgreSQL"
+# pg_ctl -D $REPO_ROOT/data/postgresql -l $REPO_ROOT/data/postgresql/logfile -o "-p 5433" stop
+
+# # Stop SSH tunnel to PostgreSQL
+# echo "$(date) - Closing SSH tunnel to PostgreSQL"
+# ssh -S formsdb-ctrl-socket -O exit pnl-x80-3.partners.org
 
 echo "$(date) - Done"

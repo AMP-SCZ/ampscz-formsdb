@@ -125,7 +125,10 @@ def construct_master_df(
                 sources_task, advance=1, description=f"Processing source: {source}"
             )
 
-            source_files = list(data_root.glob(source))
+            if source.startswith("/"):
+                source_files = list(Path(source).parent.glob(Path(source).name))
+            else:
+                source_files = list(data_root.glob(source))
 
             logger.debug(f"source: {source}: variables: {variables}")
             logger.info(f"Processing {source} with {len(source_files)} files")
@@ -198,7 +201,7 @@ def commit_df_to_db(config_file: Path, df: pd.DataFrame) -> None:
     sql_queries: List[str] = []
     # Remove existing data
     sql_query = """
-    DELETE FROM dpdash_charts;
+    DROP TABLE IF EXISTS dpdash_charts;
     """
     sql_queries.append(sql_query)
 
@@ -269,6 +272,10 @@ def generate_dpdash_imported_csvs(master_df: pd.DataFrame, output_root: Path) ->
             )
             subject_id = row["subject_id"]
 
+            recruitment_status = row["recruitment_status"]
+            if not recruitment_status == "recruited":
+                continue
+
             site = subject_id[:2]
 
             dpdash_name = dpdash.get_dpdash_name(
@@ -285,7 +292,8 @@ def generate_dpdash_imported_csvs(master_df: pd.DataFrame, output_root: Path) ->
             df_part = row.to_frame().T
             df_part.to_csv(export_path, index=False)
 
-    logger.info(f"Exported {len(master_df)} files to {output_root}")
+    exported_files_count = len(list(output_root.glob("*dpdash_charts*.csv")))
+    logger.info(f"Exported {exported_files_count} files to {output_root}")
 
 
 def main(config_file: Path) -> None:
