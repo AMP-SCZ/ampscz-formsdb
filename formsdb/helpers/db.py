@@ -322,7 +322,8 @@ def df_to_table(
         config_file (Path): The path to the configuration file.
         df (pd.DataFrame): The DataFrame to write to the database.
         table_name (str): The name of the table to write to.
-        if_exists (Literal["fail", "replace", "append"], optional): What to do if the table already exists.
+        if_exists (Literal["fail", "replace", "append"], optional): What to do
+            if the table already exists.
     """
 
     engine = get_db_connection(config_file=config_file)
