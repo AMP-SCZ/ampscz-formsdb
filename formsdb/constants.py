@@ -125,6 +125,8 @@ form_name_to_abbrv: Dict[str, str] = {
     "conversion_form": "chrconv",
 }
 
+# Similar List at:
+# https://github.com/AMP-SCZ/utility/blob/main/rpms_form_labels.csv
 rmps_to_redcap_form_name: Dict[str, str] = {
     "Actigraphy": "digital_biomarkers_axivity_checkin",
     "AdverseEvents": "adverse_events",
@@ -158,8 +160,8 @@ rmps_to_redcap_form_name: Dict[str, str] = {
     "NSI-PR": "nsipr",
     "OASIS": "oasis",
     "PAS": "premorbid_adjustment_scale",
-    "PDS": "perceived_discrimination_scale",
-    "PDQ": "pubertal_developmental_scale",
+    "PDQ": "perceived_discrimination_scale",
+    "PDS": "pubertal_developmental_scale",
     "PennCNB": "penncnb",
     "PGI-S": "pgis",
     "PharmaceuticalTreatment": "past_pharmaceutical_treatment",
