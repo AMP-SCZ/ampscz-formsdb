@@ -86,9 +86,9 @@ source /data/predict1/utility/.vault/.env.rc-predict-dev
 
 export PATH=/data/predict1/miniconda3/bin/:$PATH
 echo "$(date) - Importing Chart Variables"
-import.py -c $CONFIG "/data/predict1/data_from_nda/formqc/??-*-form_dpdash_charts-*.csv" >/dev/null 2>/dev/null
+import.py -c $CONFIG "/data/predict1/data_from_nda/formqc/??-*-form_dpdash_charts-*.csv" -n 8 >/dev/null 2>/dev/null
 echo "$(date) - Importing Recruitment Status"
-import.py -c $CONFIG "/PHShome/dm1447/dev/ampscz-formsdb/data/generated_outputs/recruitment/??-*-form_recruitment_status-*.csv" >/dev/null 2>/dev/null
+import.py -c $CONFIG "/PHShome/dm1447/dev/ampscz-formsdb/data/generated_outputs/recruitment/??-*-form_recruitment_status-*.csv" -n 8 >/dev/null 2>/dev/null
 
 echo $SEPARATOR
 echo "Done at $(date)"
