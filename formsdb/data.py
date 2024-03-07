@@ -4,7 +4,7 @@ Module contain helper functions specific to this data pipeline
 
 from pathlib import Path
 from datetime import datetime
-from typing import List, Optional
+from typing import List, Optional, Dict
 from functools import lru_cache
 
 import pandas as pd
@@ -118,8 +118,6 @@ class NoSubjectConsentDateException(Exception):
     Custom exception for when no consent date is found in the database.
     """
 
-    pass
-
 
 def get_subject_consent_dates(config_file: Path, subject_id: str) -> datetime:
     """
@@ -148,6 +146,97 @@ def get_subject_consent_dates(config_file: Path, subject_id: str) -> datetime:
     date = datetime.strptime(date, "%Y-%m-%dT%H:%M:%S")
 
     return date
+
+
+def subject_has_consent_date(subject_id: str, config_file: Path) -> bool:
+    """
+    Check if a subject has a consent date
+
+    Args:
+        subject_id: The subject ID
+        config_file: The path to the config file
+
+    Returns:
+        True if the subject has a consent date, otherwise False
+    """
+
+    try:
+        get_subject_consent_dates(config_file=config_file, subject_id=subject_id)
+        return True
+    except NoSubjectConsentDateException:
+        return False
+
+
+def subject_is_included(subject_id: str, config_file: Path) -> bool:
+    """
+    Check if a subject is included in the study.
+
+    Based on 'chrcrit_included' variable from 'inclusionexclusion_criteria_review'
+    form.
+
+    Args:
+        subject_id: The subject ID
+        config_file: The path to the config file
+
+    Returns:
+        True if the subject is included, False is excluded
+    """
+
+    form_df = get_all_subject_forms(config_file=config_file, subject_id=subject_id)
+
+    # Get 'inclusionexclusion_criteria_review' form
+    form_id = "inclusionexclusion_criteria_review"
+
+    icr_df = form_df[form_df["form_name"] == form_id]
+    icr_df.reset_index(drop=True, inplace=True)
+    icr_df = utils.explode_col(df=icr_df, col="form_data")
+
+    # Check if 'chrcrit_included' is 1
+    try:
+        included = icr_df["chrcrit_included"].iloc[0]
+    except KeyError:
+        included = False
+
+    if included == 1:
+        return True
+    else:
+        return False
+
+
+def subject_is_excluded(subject_id: str, config_file: Path) -> bool:
+    """
+    Check if a subject is excluded from the study.
+
+    Based on 'chrcrit_included' variable from 'inclusionexclusion_criteria_review'
+    form.
+
+    Args:
+        subject_id: The subject ID
+        config_file: The path to the config file
+
+    Returns:
+        True if the subject is excluded, False is included
+    """
+
+    form_df = get_all_subject_forms(config_file=config_file, subject_id=subject_id)
+
+    # Get 'inclusionexclusion_criteria_review' form
+    form_id = "inclusionexclusion_criteria_review"
+
+    icr_df = form_df[form_df["form_name"] == form_id]
+    icr_df.reset_index(drop=True, inplace=True)
+    icr_df = utils.explode_col(df=icr_df, col="form_data")
+
+    # Check if 'chrcrit_included' is 1
+    try:
+        included = icr_df["chrcrit_included"].iloc[0]
+    except KeyError:
+        return False
+
+    if included == 0:
+        return True
+    else:
+        return False
 
 
 @lru_cache(maxsize=128)
@@ -287,10 +376,7 @@ def make_df_dpdash_ready(df: pd.DataFrame, subject_id: str) -> pd.DataFrame:
     return df
 
 
-def get_subject_guid(
-    config_file: Path,
-    subject_id: str
-) -> Optional[str]:
+def get_subject_guid(config_file: Path, subject_id: str) -> Optional[str]:
     """
     Get the GUID for a subject.
 
@@ -301,17 +387,14 @@ def get_subject_guid(
     Returns:
         GUID for the subject.
     """
-    
-    forms_df = get_all_subject_forms(
-        config_file=config_file,
-        subject_id=subject_id
-    )
+
+    forms_df = get_all_subject_forms(config_file=config_file, subject_id=subject_id)
 
     guid_form_df = forms_df[forms_df["form_name"] == "guid_form"]
 
     if guid_form_df.empty:
         return None
-    
+
     guid_form_df = utils.explode_col(df=guid_form_df, col="form_data")
 
     try:
@@ -321,3 +404,222 @@ def get_subject_guid(
         return None
 
     return guid
+
+
+@lru_cache(maxsize=128)
+def get_all_rpms_entry_status(
+    config_file: Path,
+    subject_id: str,
+) -> pd.DataFrame:
+    """
+    Get all the entry status for a given form for a subject.
+
+    Args:
+        config_file: The path to the config file
+        subject_id: The subject ID
+        form_name: The form name
+        event_name: The event name
+
+    Returns:
+        Dict[str, Any]: The entry status
+    """
+
+    query = f"""
+    SELECT * FROM rpms_entry_status
+    WHERE subject_id = '{subject_id}'
+    """
+
+    entry_status_df = db.execute_sql(config_file=config_file, query=query)
+
+    return entry_status_df
+
+
+def rpms_form_has_missing_data(
+    config_file: Path,
+    subject_id: str,
+    form_name: str,
+    event_name: Optional[str] = None,
+) -> Optional[bool]:
+    """
+    Check if a subject has missing data for a given form.
+
+    Args:
+        config_file: The path to the config file
+        subject_id: The subject ID
+        form_name: The form name
+
+    Returns:
+        Optional[bool]: True if the subject has missing data, otherwise False.
+            None if form does not exist for the subject.
+    """
+
+    status_form_df = get_all_rpms_entry_status(
+        config_file=config_file, subject_id=subject_id
+    )
+
+    status_form_df = status_form_df[status_form_df["redcap_form_name"] == form_name]
+
+    if event_name:
+        status_form_df = status_form_df[
+            status_form_df["redcap_event_name"].str.contains(event_name)
+        ]
+
+    if status_form_df.empty:
+        return None
+
+    status = status_form_df["CompletionStatus"].iloc[0]
+
+    if status == 4:
+        return True
+
+    return False
+
+
+def form_has_missing_data(
+    config_file: Path,
+    subject_id: str,
+    form_name: str,
+    event_name: Optional[str] = None,
+) -> Optional[bool]:
+    """
+    Check if a subject has missing data for a given form.
+
+    Args:
+        config_file: The path to the config file
+        subject_id: The subject ID
+        form_name: The form name
+
+    Returns:
+        Optional[bool]: True if the subject has missing data, otherwise False.
+            None if form does not exist for the subject.
+    """
+    if subject_uses_rpms(config_file=config_file, subject_id=subject_id):
+        return rpms_form_has_missing_data(
+            config_file=config_file,
+            subject_id=subject_id,
+            form_name=form_name,
+            event_name=event_name,
+        )
+
+    form_df = get_all_subject_forms(config_file=config_file, subject_id=subject_id)
+
+    form_df = form_df[form_df["form_name"] == form_name]
+    if event_name:
+        form_df = form_df[form_df["event_name"].str.contains(event_name)]
+    form_df.reset_index(drop=True, inplace=True)
+
+    if form_df.empty:
+        return None
+
+    form_df = utils.explode_col(df=form_df, col="form_data")
+
+    form_abbrv = constants.form_name_to_abbrv[form_name]
+    missing_variable = f"{form_abbrv}_missing"
+
+    try:
+        missing = form_df[missing_variable].iloc[0]
+    except KeyError:
+        return False
+
+    if missing == 1:
+        return True
+    else:
+        return False
+
+
+def get_all_rpms_form_status_for_event(
+    config_file: Path,
+    subject_id: str,
+    event_name: str,
+) -> Dict[str, int]:
+    """
+    Get the form status for a subject's REDCap event.
+
+    Args:
+        config_file: The path to the config file
+        subject_id: The subject ID
+        event_name: The REDCap event name
+
+    Returns:
+        Dict[str, int]: A dictionary containing the form status for the event.
+            Legend:
+            - 0: Not started -> RPMS 0
+            - 1: In progress  -> RPMS 1
+            - 2: Completed  -> RPMS 2, 3, 4
+    """
+
+    status_form_df = get_all_rpms_entry_status(
+        config_file=config_file, subject_id=subject_id
+    )
+
+    status_form_df = status_form_df[
+        status_form_df["redcap_event_name"].str.contains(event_name)
+    ]
+
+    if status_form_df.empty:
+        return {}
+
+    # substitute RPMS completion status with REDCap completion status
+    status_form_df.loc[:, "CompletionStatus"] = status_form_df["CompletionStatus"].replace(
+        {2: 2, 3: 2, 4: 2}
+    )
+
+    # mimic redcap form name
+    # append '_complete' to the form name
+    status_form_df.loc[:, "redcap_form_name"] = (
+        status_form_df["redcap_form_name"] + "_complete"
+    )
+
+    form_data: Dict[str, int] = (
+        status_form_df[["redcap_form_name", "CompletionStatus"]]
+        .set_index("redcap_form_name")
+        .to_dict()["CompletionStatus"]
+    )
+
+    return form_data
+
+
+def get_all_form_status_for_event(
+    config_file: Path,
+    subject_id: str,
+    event_name: str,
+) -> Dict[str, int]:
+    """
+    Get the form status for a subject's REDCap event.
+
+    Args:
+        config_file: The path to the config file
+        subject_id: The subject ID
+        event_name: The REDCap event name
+
+    Returns:
+        Dict[str, int]: A dictionary containing the form status for the event.
+            Legend:
+            - 0: Not started
+            - 1: In progress
+            - 2: Completed
+    """
+
+    if subject_uses_rpms(config_file=config_file, subject_id=subject_id):
+        return get_all_rpms_form_status_for_event(
+            config_file=config_file, subject_id=subject_id, event_name=event_name
+        )
+
+    form_df = get_all_subject_forms(config_file=config_file, subject_id=subject_id)
+
+    # Filter by event name and form_name = 'uncategorized'
+    form_df = form_df[form_df["event_name"].str.contains(event_name)]
+    form_df = form_df[form_df["form_name"] == "uncategorized"]
+
+    # reset index
+    form_df.reset_index(drop=True, inplace=True)
+
+    if form_df.empty:
+        raise ValueError(
+            f"No 'uncategorized' form for subject {subject_id} and event {event_name}"
+        )
+
+    # Read JSON from form_data column as Dict
+    form_data: Dict[str, int] = form_df["form_data"].iloc[0]
+
+    return form_data

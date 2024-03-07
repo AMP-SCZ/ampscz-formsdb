@@ -22,12 +22,13 @@ except ValueError:
     pass
 
 import logging
-from typing import Dict, List, Optional
+from typing import List, Dict, Tuple
+import multiprocessing
 
 import pandas as pd
 from rich.logging import RichHandler
 
-from formsdb import constants, data
+from formsdb import data
 from formsdb.helpers import db, utils
 
 MODULE_NAME = "formsdb.runners.compute.compute_recruitment_status"
@@ -44,146 +45,6 @@ logargs = {
 logging.basicConfig(**logargs)
 
 required_variables: List[str] = []
-
-
-def subject_has_consent_date(subject_id: str, config_file: Path) -> bool:
-    """
-    Check if a subject has a consent date
-
-    Args:
-        subject_id: The subject ID
-        config_file: The path to the config file
-
-    Returns:
-        True if the subject has a consent date, otherwise False
-    """
-
-    try:
-        data.get_subject_consent_dates(config_file=config_file, subject_id=subject_id)
-        return True
-    except data.NoSubjectConsentDateException:
-        return False
-
-
-def subject_is_included(subject_id: str, config_file: Path) -> bool:
-    """
-    Check if a subject is included in the study.
-
-    Based on 'chrcrit_included' variable from '
-
-    Args:
-        subject_id: The subject ID
-        config_file: The path to the config file
-
-    Returns:
-        True if the subject is included, otherwise False
-    """
-
-    form_df = data.get_all_subject_forms(config_file=config_file, subject_id=subject_id)
-
-    # Get 'inclusionexclusion_criteria_review' form
-    form_id = "inclusionexclusion_criteria_review"
-
-    icr_df = form_df[form_df["form_name"] == form_id]
-    icr_df.reset_index(drop=True, inplace=True)
-    icr_df = utils.explode_col(df=icr_df, col="form_data")
-
-    # Check if 'chrcrit_included' is 1
-    try:
-        included = icr_df["chrcrit_included"].iloc[0]
-    except KeyError:
-        included = False
-
-    if included == 1:
-        return True
-    else:
-        return False
-
-
-def subject_has_missing_data(
-    config_file: Path,
-    subject_id: str,
-    form_name: str,
-    event_name: Optional[str] = None,
-) -> Optional[bool]:
-    """
-    Check if a subject has missing data for a given form.
-
-    Args:
-        config_file: The path to the config file
-        subject_id: The subject ID
-        form_name: The form name
-
-    Returns:
-        Optional[bool]: True if the subject has missing data, otherwise False.
-            None if form does not exist for the subject.
-    """
-
-    form_df = data.get_all_subject_forms(config_file=config_file, subject_id=subject_id)
-
-    form_df = form_df[form_df["form_name"] == form_name]
-    if event_name:
-        form_df = form_df[form_df["event_name"].str.contains(event_name)]
-    form_df.reset_index(drop=True, inplace=True)
-
-    if form_df.empty:
-        return None
-
-    form_df = utils.explode_col(df=form_df, col="form_data")
-
-    form_abbrv = constants.form_name_to_abbrv[form_name]
-    missing_variable = f"{form_abbrv}_missing"
-
-    try:
-        missing = form_df[missing_variable].iloc[0]
-    except KeyError:
-        return False
-
-    if missing == 1:
-        return True
-    else:
-        return False
-
-
-def get_form_status(
-    config_file: Path,
-    subject_id: str,
-    event_name: str,
-) -> Dict[str, int]:
-    """
-    Get the form status for a subject's REDCap event.
-
-    Args:
-        config_file: The path to the config file
-        subject_id: The subject ID
-        event_name: The REDCap event name
-
-    Returns:
-        Dict[str, int]: A dictionary containing the form status for the event.
-            Legend:
-            - 0: Not started
-            - 1: In progress
-            - 2: Completed
-    """
-
-    form_df = data.get_all_subject_forms(config_file=config_file, subject_id=subject_id)
-
-    # Filter by event name and form_name = 'uncategorized'
-    form_df = form_df[form_df["event_name"].str.contains(event_name)]
-    form_df = form_df[form_df["form_name"] == "uncategorized"]
-
-    # reset index
-    form_df.reset_index(drop=True, inplace=True)
-
-    if form_df.empty:
-        raise ValueError(
-            f"No 'uncategorized' form for subject {subject_id} and event {event_name}"
-        )
-
-    # Read JSON from form_data column as Dict
-    form_data: Dict[str, int] = form_df["form_data"].iloc[0]
-
-    return form_data
 
 
 def subject_has_a_valid_baseline_form_data(subject_id: str, config_file: Path) -> bool:
@@ -227,14 +88,14 @@ def subject_has_a_valid_baseline_form_data(subject_id: str, config_file: Path) -
     ]
 
     try:
-        form_status = get_form_status(
+        form_status = data.get_all_form_status_for_event(
             config_file=config_file, subject_id=subject_id, event_name="baseline"
         )
     except ValueError:
         return False
 
     for required_form in recruited_status_baseline_form_requirements:
-        is_missing = subject_has_missing_data(
+        is_missing = data.form_has_missing_data(
             config_file=config_file,
             subject_id=subject_id,
             form_name=required_form,
@@ -276,7 +137,7 @@ def subject_completed_sociodemographics(subject_id: str, config_file: Path) -> b
     event_name = "baseline"
 
     try:
-        form_status = get_form_status(
+        form_status = data.get_all_form_status_for_event(
             config_file=config_file, subject_id=subject_id, event_name=event_name
         )
     except ValueError:
@@ -287,7 +148,7 @@ def subject_completed_sociodemographics(subject_id: str, config_file: Path) -> b
         completion_status = form_status[complete_variable]
         if completion_status == 2:
             # Check if the form has missing data
-            is_missing = subject_has_missing_data(
+            is_missing = data.form_has_missing_data(
                 config_file=config_file,
                 subject_id=subject_id,
                 form_name=form_name,
@@ -304,6 +165,60 @@ def subject_completed_sociodemographics(subject_id: str, config_file: Path) -> b
     else:
         # Form does not have a complete variable
         return False
+
+
+# Define the worker function
+def worker(params: Tuple[str, Path]) -> Dict[str, str | bool | None]:
+    """
+    Worker function to process the data for a single subject.
+
+    Args:
+        params: A tuple containing the subject ID and the config file path.
+    """
+    subject_id, config_file = params
+
+    consented = data.subject_has_consent_date(
+        subject_id=subject_id, config_file=config_file
+    )
+    included = data.subject_is_included(subject_id=subject_id, config_file=config_file)
+    excluded = data.subject_is_excluded(subject_id=subject_id, config_file=config_file)
+    has_sociodemographics = subject_completed_sociodemographics(
+        subject_id=subject_id, config_file=config_file
+    )
+    valid_baseline_form_data = subject_has_a_valid_baseline_form_data(
+        subject_id=subject_id, config_file=config_file
+    )
+
+    # Positive screen: Has consent date + is Included
+    positive_screen = consented and included
+
+    negative_screen = consented and excluded
+
+    # Recruited:
+    #  - Positive screen
+    #  - Completed sociodemographics
+    #  - Atleast 1 valid baseline form data
+    recruited = positive_screen and has_sociodemographics and valid_baseline_form_data
+
+    subject_status = None
+    if consented:
+        subject_status = "consented"
+    if positive_screen:
+        subject_status = "positive_screen"
+    if negative_screen:
+        subject_status = "negative_screen"
+    if recruited:
+        subject_status = "recruited"
+
+    # Return a dictionary with the data for this subject
+    return {
+        "subject_id": subject_id,
+        "consented": consented,
+        "positive_screen": positive_screen,
+        "negative_screen": negative_screen,
+        "recruited": recruited,
+        "recruitment_status": subject_status,
+    }
 
 
 def process_data(config_file: Path) -> None:
@@ -324,60 +239,25 @@ def process_data(config_file: Path) -> None:
     subjects_count = len(subject_ids)
     logger.info(f"Exporting data for {subjects_count} subjects...")
 
-    with utils.get_progress_bar() as progress:
-        task = progress.add_task("Processing...", total=subjects_count)
-        master_df = pd.DataFrame()
+    # Create a Pool object with the number of processes equal to the number of CPU cores / 2
+    num_processes = multiprocessing.cpu_count() / 2
+    logger.info(f"Using {num_processes} processes...")
+    pool = multiprocessing.Pool(
+        processes=int(num_processes)
+    )
 
-        for subject_id in subject_ids:
-            progress.update(task, advance=1, description=f"Processing {subject_id}...")
+    # Create parameters for the worker function
+    worker_params = [(subject_id, config_file) for subject_id in subject_ids]
 
-            consented = subject_has_consent_date(
-                subject_id=subject_id, config_file=config_file
-            )
-            included = subject_is_included(
-                subject_id=subject_id, config_file=config_file
-            )
-            has_sociodemographics = subject_completed_sociodemographics(
-                subject_id=subject_id, config_file=config_file
-            )
-            valid_baseline_form_data = subject_has_a_valid_baseline_form_data(
-                subject_id=subject_id, config_file=config_file
-            )
+    # Use the map method to apply the worker function to each subject_id and get a list of results
+    results = pool.map(worker, worker_params)
 
-            # Positive screen: Has consent date + is Included
-            positive_screen = consented and included
+    # Close the pool and wait for the processes to finish
+    pool.close()
+    pool.join()
 
-            # Recruited:
-            #  - Positive screen
-            #  - Completed sociodemographics
-            #  - Atleast 1 valid baseline form data
-            recruited = (
-                positive_screen and has_sociodemographics and valid_baseline_form_data
-            )
-
-            subject_status = None
-            if consented:
-                subject_status = "consented"
-            if positive_screen:
-                subject_status = "positive_screen"
-            if recruited:
-                subject_status = "recruited"
-
-            # Add to master DataFrame
-            master_df = pd.concat(
-                [
-                    master_df,
-                    pd.DataFrame(
-                        {
-                            "subject_id": [subject_id],
-                            "consented": [consented],
-                            "positive_screen": [positive_screen],
-                            "recruited": [recruited],
-                            "recruitment_status": [subject_status],
-                        }
-                    ),
-                ]
-            )
+    # Convert the results list into a pandas dataframe
+    master_df = pd.DataFrame(results)
 
     logger.info("Exporting data to DB...")
     db.df_to_table(
