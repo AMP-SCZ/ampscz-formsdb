@@ -505,7 +505,7 @@ def form_has_missing_data(
 
     form_df = form_df[form_df["form_name"] == form_name]
     if event_name:
-        form_df = form_df[form_df["event_name"].str.contains(event_name)]
+        form_df = form_df[form_df["event_name"].str.contains(f"{event_name}_")]
     form_df.reset_index(drop=True, inplace=True)
 
     if form_df.empty:
@@ -560,9 +560,9 @@ def get_all_rpms_form_status_for_event(
         return {}
 
     # substitute RPMS completion status with REDCap completion status
-    status_form_df.loc[:, "CompletionStatus"] = status_form_df["CompletionStatus"].replace(
-        {2: 2, 3: 2, 4: 2}
-    )
+    status_form_df.loc[:, "CompletionStatus"] = status_form_df[
+        "CompletionStatus"
+    ].replace({2: 2, 3: 2, 4: 2})
 
     # mimic redcap form name
     # append '_complete' to the form name
@@ -608,7 +608,7 @@ def get_all_form_status_for_event(
     form_df = get_all_subject_forms(config_file=config_file, subject_id=subject_id)
 
     # Filter by event name and form_name = 'uncategorized'
-    form_df = form_df[form_df["event_name"].str.contains(event_name)]
+    form_df = form_df[form_df["event_name"].str.contains(f"{event_name}_")]
     form_df = form_df[form_df["form_name"] == "uncategorized"]
 
     # reset index
@@ -623,3 +623,131 @@ def get_all_form_status_for_event(
     form_data: Dict[str, int] = form_df["form_data"].iloc[0]
 
     return form_data
+
+
+def form_is_complete(
+    config_file: Path,
+    subject_id: str,
+    form_name: str,
+    event_name: str,
+) -> Optional[bool]:
+    """
+    Check if a form is complete for a subject.
+
+    Args:
+        config_file: The path to the config file
+        subject_id: The subject ID
+        form_name: The form name
+        event_name: The event name
+
+    Returns:
+        Optional[bool]: True if the form is complete, otherwise False.
+            None if form_complete is not found for the subject.
+
+    Note:
+        If the form is complete, it could still have missing data.
+    """
+
+    form_status = get_all_form_status_for_event(
+        config_file=config_file, subject_id=subject_id, event_name=event_name
+    )
+
+    form_abbrv = constants.form_name_to_abbrv[form_name]
+    complete_variable = f"{form_abbrv}_complete"
+
+    if complete_variable not in form_status:
+        complete_variable = f"{form_name}_complete"
+        if complete_variable not in form_status:
+            return None
+
+    completion_status = form_status[complete_variable]
+    if completion_status == 2:
+        # Note form could still have missing data
+        return True
+    else:
+        # Form not marked complete
+        return False
+
+
+def get_subject_cohort(
+    config_file: Path,
+    subject_id: str,
+) -> Optional[str]:
+    """
+    Get the cohort for a subject.
+
+    Args:
+        config_file: The path to the config file
+        subject_id: The subject ID
+
+    Returns:
+        Optional[str]: The cohort for the subject.
+    """
+
+    form_df = get_all_subject_forms(config_file=config_file, subject_id=subject_id)
+
+    # Get 'inclusionexclusion_criteria_review' form
+    form_id = "inclusionexclusion_criteria_review"
+
+    icr_df = form_df[form_df["form_name"] == form_id]
+    icr_df.reset_index(drop=True, inplace=True)
+    icr_df = utils.explode_col(df=icr_df, col="form_data")
+
+    # Check if 'chrcrit_part' is present
+    try:
+        cohort = icr_df["chrcrit_part"].iloc[0]
+    except KeyError:
+        return None
+
+    if cohort == 1:
+        return "CHR"
+    elif cohort == 2:
+        return "HC"
+    else:
+        raise ValueError(f"Unknown cohort {cohort} for subject {subject_id}")
+
+
+def is_subject_chr(
+    config_file: Path,
+    subject_id: str,
+) -> bool:
+    """
+    Check if a subject is in the CHR cohort.
+
+    Args:
+        config_file: The path to the config file
+        subject_id: The subject ID
+
+    Returns:
+        bool: True if the subject is in the CHR cohort, otherwise False.
+    """
+
+    cohort = get_subject_cohort(config_file=config_file, subject_id=subject_id)
+
+    if cohort == "CHR":
+        return True
+    else:
+        return False
+
+
+def is_subject_hc(
+    config_file: Path,
+    subject_id: str,
+) -> bool:
+    """
+    Check if a subject is in the HC cohort.
+
+    Args:
+        config_file: The path to the config file
+        subject_id: The subject ID
+
+    Returns:
+        bool: True if the subject is in the HC cohort, otherwise False.
+    """
+
+    cohort = get_subject_cohort(config_file=config_file, subject_id=subject_id)
+
+    if cohort == "HC":
+        return True
+    else:
+        return False
