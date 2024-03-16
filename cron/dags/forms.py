@@ -8,6 +8,8 @@ from airflow import DAG
 from airflow.operators.bash import BashOperator
 from airflow.operators.empty import EmptyOperator
 from airflow.models import Variable
+from airflow.providers.apprise.notifications import apprise
+from apprise import NotifyType
 
 CONDA_ENV_PATH = "/PHShome/dm1447/mambaforge/envs/jupyter/bin"
 PYTHON_PATH = f"{CONDA_ENV_PATH}/python"
@@ -20,15 +22,16 @@ default_args = {
     "start_date": datetime(2024, 3, 15),
     "email_on_failure": True,
     "email_on_retry": False,
-    "retries": 1,
+    "retries": 3,
     "retry_delay": timedelta(minutes=1),
+    "catchup": False
 }
 
 dag = DAG(
     "ampscz_forms_db",
     default_args=default_args,
     description="DAG for AMPSCZ forms database",
-    schedule="@daily"
+    schedule="@daily",
 )
 
 info = BashOperator(
@@ -317,7 +320,24 @@ dpdash_merge_ready.set_downstream(generate_dpdash_csv)
 generate_dpdash_csv.set_downstream(dpimport_dpdash_charts)
 
 
-all_dpimport_done = EmptyOperator(task_id="all_dpimport_done", dag=dag)
+all_dpimport_done = EmptyOperator(
+    task_id="all_dpimport_done",
+    dag=dag,
+    on_success_callback=apprise.send_apprise_notification(
+        title="AMPSCZ Forms DB",
+        body="All DPImport tasks successfully completed",
+        notify_type=NotifyType.SUCCESS,
+        apprise_conn_id="teams",
+        tag="alerts",
+    ),
+    on_failure_callback=apprise.send_apprise_notification(
+        title="AMPSCZ Forms DB",
+        body="One or more FormsDB tasks failed",
+        notify_type=NotifyType.FAILURE,
+        apprise_conn_id="teams",
+        tag="alerts",
+    ),
+)
 dpimport_informed_consent_run_sheet.set_downstream(all_dpimport_done)
 dpimport_inclusionexclusion_criteria_review.set_downstream(all_dpimport_done)
 dpimport_form_sociodemographics.set_downstream(all_dpimport_done)
