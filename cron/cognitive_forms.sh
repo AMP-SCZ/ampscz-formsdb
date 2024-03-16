@@ -85,6 +85,12 @@ source /data/predict1/utility/.vault/.env.rc-predict-dev
 # mongo --tls --tlsCAFile $state/ssl/ca/cacert.pem --tlsCertificateKeyFile $state/ssl/mongo_client.pem mongodb://dpdash:$MONGO_PASS@$HOST:$PORT/dpdata?authSource=admin --eval "assess=\"form_dpdash_charts\"" /data/predict1/utility/remove_assess.js
 
 export PATH=/data/predict1/miniconda3/bin/:$PATH
+echo "$(date) - Importing 'form_informed_consent_run_sheet' data"
+import.py -c $CONFIG "/data/predict1/data_from_nda/formqc/??-*-form_informed_consent_run_sheet-*.csv" -n 8 >/dev/null 2>/dev/null
+echo "$(date) - Importing 'form_inclusionexclusion_criteria_review' data"
+import.py -c $CONFIG "/data/predict1/data_from_nda/formqc/??-*-form_inclusionexclusion_criteria_review-*.csv" -n 8 >/dev/null 2>/dev/null
+echo "$(date) - Importing 'form_sociodemographics' data"
+import.py -c $CONFIG "/data/predict1/data_from_nda/formqc/??-*-form_sociodemographics-*.csv" -n 8 >/dev/null 2>/dev/null
 echo "$(date) - Importing Chart Variables"
 import.py -c $CONFIG "/data/predict1/data_from_nda/formqc/??-*-form_dpdash_charts-*.csv" -n 8 >/dev/null 2>/dev/null
 echo "$(date) - Importing Recruitment Status"
