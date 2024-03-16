@@ -31,7 +31,7 @@ dag = DAG(
     "ampscz_forms_db",
     default_args=default_args,
     description="DAG for AMPSCZ forms database",
-    schedule="@daily",
+    schedule="0 0 * * 1-6",
 )
 
 info = BashOperator(
