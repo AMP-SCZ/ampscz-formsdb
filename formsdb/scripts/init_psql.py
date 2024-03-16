@@ -84,13 +84,6 @@ def create_tables(config_file: Path) -> None:
         );
         """,
         """
-        CREATE TABLE subject_visit_status (
-            subject_id VARCHAR(25) REFERENCES subjects(id),
-            subject_visit_status VARCHAR(255) NOT NULL,
-            PRIMARY KEY (subject_id)
-        );
-        """,
-        """
         CREATE TABLE subject_converted (
             subject_id VARCHAR(25) REFERENCES subjects(id),
             subject_converted BOOLEAN NOT NULL,

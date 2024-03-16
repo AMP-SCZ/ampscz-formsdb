@@ -2,15 +2,16 @@
 Module contain helper functions specific to this data pipeline
 """
 
-from pathlib import Path
+import json
 from datetime import datetime
-from typing import List, Optional, Dict
 from functools import lru_cache
+from pathlib import Path
+from typing import Dict, List, Optional
 
 import pandas as pd
 
-from formsdb.helpers import db, utils
 from formsdb import constants
+from formsdb.helpers import db, utils
 
 
 def get_network(config_file: Path, site: str) -> str:
@@ -774,3 +775,26 @@ def is_subject_hc(
         return True
     else:
         return False
+
+
+def get_forms_cohort_timepoint_map(
+    config_file: Path,
+) -> Dict[str, Dict[str, List[str]]]:
+    """
+    Returns a dictionary containing the forms for each cohort and timepoint.
+
+    Args:
+        config_file: The path to the config file
+
+    Returns:
+        Dict[str, Dict[str, List[str]]]: A dictionary containing the
+            forms for each cohort and timepoint.
+    """
+
+    config_params = utils.config(path=config_file, section="data")
+    forms_cohort_timepoint_map_path = config_params["forms_cohort_timepoint_map"]
+
+    with open(forms_cohort_timepoint_map_path, "r", encoding="utf-8") as f:
+        forms_cohort_timepoint_map = json.load(f)
+
+    return forms_cohort_timepoint_map
