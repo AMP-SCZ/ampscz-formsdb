@@ -3,9 +3,12 @@ Helper functions for interacting with a PostgreSQL database.
 """
 
 import json
-from datetime import datetime
+import logging
+import time
+from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Optional, Literal
+from typing import Literal, Optional
+import random
 
 import pandas as pd
 import psycopg2
@@ -13,6 +16,7 @@ import pymongo
 import pymongo.database as database
 import sqlalchemy
 from rich.console import Console
+from sqlalchemy.exc import OperationalError
 
 from formsdb.helpers import utils
 from formsdb.helpers.config import config
@@ -261,7 +265,7 @@ def get_db_connection(config_file: Path) -> sqlalchemy.engine.base.Engine:
         + params["database"]
     )
 
-    return engine
+    return engine  # type: ignore
 
 
 def execute_sql(config_file: Path, query: str) -> pd.DataFrame:
@@ -279,7 +283,22 @@ def execute_sql(config_file: Path, query: str) -> pd.DataFrame:
     """
     engine = get_db_connection(config_file=config_file)
 
-    df = pd.read_sql(query, engine)
+    timeout = timedelta(seconds=2.5)
+
+    while True:
+        try:
+            df = pd.read_sql(query, engine)
+            break
+        except OperationalError as e:
+            if timeout > timedelta(seconds=300):
+                raise e
+
+            sleep_time = timeout.total_seconds() + random.uniform(1, timeout.total_seconds() / 2)
+            logging.warning(f"OperationalError: Retrying after {sleep_time}s...")
+            time.sleep(sleep_time)
+            timeout = timeout * 2
+
+            engine = get_db_connection(config_file=config_file)
 
     engine.dispose()
 
