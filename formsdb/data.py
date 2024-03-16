@@ -81,6 +81,29 @@ def check_if_subject_exists(config_file: Path, subject_id: str) -> bool:
         return True
 
 
+def get_subject_network(config_file: Path, subject_id: str) -> str:
+    """
+    Get the network of a subject from the database.
+
+    Args:
+        config_file (Path): The path to the configuration file.
+        subject_id (str): The subject ID.
+
+    Returns:
+        str: The network the subject belongs to.
+    """
+    query = f"""
+    SELECT network_id FROM site WHERE id = '{subject_id[0:2]}';
+    """
+
+    network = db.fetch_record(config_file=config_file, query=query)
+
+    if network is None:
+        raise ValueError(f"Site {subject_id[0:2]} not found in database.")
+
+    return network
+
+
 def subject_uses_rpms(config_file: Path, subject_id: str) -> bool:
     """
     Check if a subject uses RPMS (as opposed to REDCap).
@@ -96,14 +119,8 @@ def subject_uses_rpms(config_file: Path, subject_id: str) -> bool:
         ValueError: If the network is not recognized.
         ValueError: If the site is not found in the database.
     """
-    query = f"""
-    SELECT network_id FROM site WHERE id = '{subject_id[0:2]}';
-    """
 
-    network_id = db.fetch_record(config_file=config_file, query=query)
-
-    if network_id is None:
-        raise ValueError(f"Site {subject_id[0:2]} not found in database.")
+    network_id = get_subject_network(config_file=config_file, subject_id=subject_id)
 
     if network_id == "PRESCIENT":
         return True
@@ -469,7 +486,13 @@ def rpms_form_has_missing_data(
 
     status = status_form_df["CompletionStatus"].iloc[0]
 
-    if status == 4:
+    # RMPS completion status
+    # 0: Incomplete
+    # 1: Partial
+    # 2: Complete
+    # 3: N/A
+    # 4: Missing
+    if status == 4 or status == 3:
         return True
 
     return False
