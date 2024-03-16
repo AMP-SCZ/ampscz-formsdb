@@ -206,6 +206,16 @@ export_recruitment_status = BashOperator(
     cwd=REPO_ROOT,
 )
 
+export_visit_status = BashOperator(
+    task_id="export_visit_status",
+    bash_command=PYTHON_PATH
+    + " "
+    + REPO_ROOT
+    + "/formsdb/runners/export/export_visit_status.py",
+    dag=dag,
+    cwd=REPO_ROOT,
+)
+
 # Generate DPDash CSV
 generate_dpdash_csv = BashOperator(
     task_id="generate_dpdash_csv",
@@ -306,6 +316,7 @@ all_imports_done.set_downstream(compute_visit_status)
 
 compute_cognition.set_downstream(export_cognitive_summary)
 compute_cognition.set_downstream(export_combined_cognitive)
+compute_visit_status.set_downstream(export_visit_status)
 
 export_combined_cognitive.set_downstream(export_consolidated_combined_cognitive)
 
@@ -314,7 +325,8 @@ export_recruitment_status.set_downstream(dpimport_recruitment_status)
 
 dpdash_merge_ready = EmptyOperator(task_id="dpdash_merge_ready", dag=dag)
 export_cognitive_summary.set_downstream(dpdash_merge_ready)
-compute_recruitment_status.set_downstream(dpdash_merge_ready)
+export_recruitment_status.set_downstream(dpdash_merge_ready)
+export_visit_status.set_downstream(dpdash_merge_ready)
 
 dpdash_merge_ready.set_downstream(generate_dpdash_csv)
 generate_dpdash_csv.set_downstream(dpimport_dpdash_charts)
