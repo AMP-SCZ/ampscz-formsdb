@@ -26,7 +26,8 @@ from typing import Dict, List
 import pandas as pd
 from rich.logging import RichHandler
 
-from formsdb.helpers import db, cli, utils, dpdash
+from formsdb import constants
+from formsdb.helpers import cli, db, dpdash, utils
 
 MODULE_NAME = "formsdb.runners.dpdash.merge_metrics"
 
@@ -114,7 +115,7 @@ def construct_master_df(
     for source, variables in dpdash_sources_variables_map.items():
         all_variables.extend(variables)
 
-    master_df = pd.DataFrame()
+    master_df = pd.DataFrame(dtype=str)
 
     with utils.get_progress_bar() as progress:
         sources_task = progress.add_task(
@@ -146,10 +147,10 @@ def construct_master_df(
                 subject_id = dpdash_dict["subject"]
 
                 try:
-                    temp_df = pd.read_csv(file)
+                    temp_df = pd.read_csv(file, dtype=str)
                     for var in variables:
                         try:
-                            var_value = temp_df[var].values[0]
+                            var_value = str(temp_df[var].values[0])
                             master_df.loc[subject_id, var] = var_value  # type: ignore
                         except KeyError:
                             pass
@@ -184,69 +185,33 @@ def make_df_dpdash_ready(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def commit_df_to_db(config_file: Path, df: pd.DataFrame) -> None:
+def append_nr_to_non_recruited_subjects(master_df: pd.DataFrame) -> pd.DataFrame:
     """
-    Push the dataframe to the database.
+    Differentiate between recruited and non-recruited subjects.
+
+    Append _n_r to all the other statuses for non-recruited subjects.
 
     Args:
-        config_file (Path): Path to the config file.
-        df (pd.DataFrame): Dataframe to push to the database.
+        master_df (pd.DataFrame): Master dataframe.
 
     Returns:
-        None
+        pd.DataFrame: Master dataframe with _n_r appended to non-recruited subjects.
     """
+    master_df = master_df.fillna("nan")
 
-    logger.info("Committing data to the database...")
+    for idx, row in master_df.iterrows():
+        recruitment_status = row["recruitment_status"]
 
-    sql_queries: List[str] = []
-    # Remove existing data
-    sql_query = """
-    DROP TABLE IF EXISTS dpdash_charts;
-    """
-    sql_queries.append(sql_query)
+        if recruitment_status != "recruited":
+            # append n_r to all the other statuses
+            for col in master_df.columns:
+                if (
+                    col not in constants.dp_dash_required_cols
+                    and col not in constants.skip_adding_nr
+                ):
+                    master_df.loc[idx, col] = f"{master_df.loc[idx, col]}_n_r"  # type: ignore
 
-    # get all variables
-    variables_map = get_dpdash_name_variables_map(config_file=config_file)
-    named_variables: Dict[str, str] = {}
-    for name, variables in variables_map.items():
-        for variable in variables:
-            named_variables[variable] = f"{name}_{variable}"
-
-    # Create 'dpdash_charts' table
-    sql_query = f"""
-    CREATE TABLE IF NOT EXISTS dpdash_charts (
-        subject_id VARCHAR(255) PRIMARY KEY,
-        {", ".join([f"{variable} VARCHAR(255)" for variable in named_variables.values()])}
-    );
-    """
-    sql_queries.append(sql_query)
-
-    for _, row in df.iterrows():
-        subject_id = row["subject_id"]
-
-        # get required variables
-        values = {}
-        for variable, value in row.items():
-            if variable in named_variables:
-                variable = named_variables[variable]
-                values[variable] = f"'{value}'"  # Surround value with single quotes
-
-        # convert to sql
-        sql_query = f"""
-        INSERT INTO dpdash_charts (subject_id, {", ".join(sorted(values.keys()))})
-        VALUES ('{subject_id}', {", ".join([str(values[key]) for key in sorted(values.keys())])});
-        """
-
-        sql_query = db.handle_nan(sql_query)
-        sql_queries.append(sql_query)
-
-    # execute the queries
-    db.execute_queries(
-        config_file=config_file,
-        queries=sql_queries,
-        show_progress=True,
-        show_commands=False,
-    )
+    return master_df
 
 
 def generate_dpdash_imported_csvs(master_df: pd.DataFrame, output_root: Path) -> None:
@@ -271,10 +236,6 @@ def generate_dpdash_imported_csvs(master_df: pd.DataFrame, output_root: Path) ->
                 description=f"Exporting data for {row['subject_id']}",
             )
             subject_id = row["subject_id"]
-
-            recruitment_status = row["recruitment_status"]
-            if not recruitment_status == "recruited":
-                continue
 
             site = subject_id[:2]
 
@@ -322,7 +283,15 @@ def main(config_file: Path) -> None:
 
     master_df = make_df_dpdash_ready(df=master_df)
 
-    commit_df_to_db(config_file=config_file, df=master_df)
+    logger.info("Exporting DataFrame to database")
+    db.df_to_table(
+        df=master_df,
+        table_name="dpdash_charts",
+        config_file=config_file,
+    )
+
+    logger.info("Appending _n_r to non-recruited subjects")
+    master_df = append_nr_to_non_recruited_subjects(master_df=master_df)
 
     generate_dpdash_imported_csvs(master_df=master_df, output_root=output_root)
 

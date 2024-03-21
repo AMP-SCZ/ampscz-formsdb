@@ -36,11 +36,16 @@ upenn_visit_order: List[str] = [
     "month_24",
 ]
 
-dp_dash_required_cols = [
+dp_dash_required_cols: List[str] = [
     "reftime",
     "day",
     "timeofday",
     "weekday",
+    'subject_id',
+]
+
+skip_adding_nr: List[str] = [
+    "recruitment_status",
 ]
 
 upenn_tests: List[str] = [
