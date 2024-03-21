@@ -64,7 +64,7 @@ dag = DAG(
     "flush_dpdash",
     default_args=default_args,
     description="DAG for flushing DPDash data",
-    schedule="0 0 * * 0",  # Run only on Sundays at midnight
+    schedule="0 0 * * 6",  # Run only on Saturdays at midnight
 )
 
 

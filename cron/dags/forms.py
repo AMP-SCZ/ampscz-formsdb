@@ -31,7 +31,7 @@ dag = DAG(
     "ampscz_forms_db",
     default_args=default_args,
     description="DAG for AMPSCZ forms database",
-    schedule="0 0 * * 1-6",
+    schedule="0 0 * * 0-5",  # All days at midnight, except Saturdays
 )
 
 info = BashOperator(
@@ -49,19 +49,6 @@ echo "$(date) - Uptime: $(uptime)"''',
     dag=dag,
     cwd=REPO_ROOT,
 )
-
-# # Ignore exit code
-# t1 = BashOperator(
-#     task_id="kill_mongo",
-#     bash_command="pkill -U $(whoami) mongod || true",
-#     dag=dag,
-# )
-
-# t2 = BashOperator(
-#     task_id="wait_for_mongo_to_exit",
-#     bash_command="while pgrep -u $(whoami) mongod; do sleep 1; done",
-#     dag=dag,
-# )
 
 # Ignore exit code
 start_mongo = BashOperator(
@@ -280,15 +267,15 @@ dpimport_dpdash_charts = BashOperator(
     dag=dag,
 )
 
-dpimport_recruitment_status = BashOperator(
-    task_id="dpimport_recruitment_status",
-    bash_command=f'{DPIMPORT_SCRIPT} \
--c {dpimport_env["CONFIG"]} \
-"{REPO_ROOT}/data/generated_outputs/recruitment/??-*-form_recruitment_status-*.csv" \
--n {NUM_PARALLEL_IMPORT}',
-    env=dpimport_env,
-    dag=dag,
-)
+# dpimport_recruitment_status = BashOperator(
+#     task_id="dpimport_recruitment_status",
+#     bash_command=f'{DPIMPORT_SCRIPT} \
+# -c {dpimport_env["CONFIG"]} \
+# "{REPO_ROOT}/data/generated_outputs/recruitment/??-*-form_recruitment_status-*.csv" \
+# -n {NUM_PARALLEL_IMPORT}',
+#     env=dpimport_env,
+#     dag=dag,
+# )
 
 
 # Done
@@ -321,7 +308,7 @@ compute_visit_status.set_downstream(export_visit_status)
 export_combined_cognitive.set_downstream(export_consolidated_combined_cognitive)
 
 compute_recruitment_status.set_downstream(export_recruitment_status)
-export_recruitment_status.set_downstream(dpimport_recruitment_status)
+# export_recruitment_status.set_downstream(dpimport_recruitment_status)
 
 dpdash_merge_ready = EmptyOperator(task_id="dpdash_merge_ready", dag=dag)
 export_cognitive_summary.set_downstream(dpdash_merge_ready)
@@ -354,4 +341,4 @@ dpimport_informed_consent_run_sheet.set_downstream(all_dpimport_done)
 dpimport_inclusionexclusion_criteria_review.set_downstream(all_dpimport_done)
 dpimport_form_sociodemographics.set_downstream(all_dpimport_done)
 dpimport_dpdash_charts.set_downstream(all_dpimport_done)
-dpimport_recruitment_status.set_downstream(all_dpimport_done)
+# dpimport_recruitment_status.set_downstream(all_dpimport_done)
