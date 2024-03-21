@@ -205,10 +205,10 @@ def worker(params: Tuple[str, Path]) -> Dict[str, str | bool | None]:
         subject_status = "consented"
     if positive_screen:
         subject_status = "positive_screen"
-    if negative_screen:
-        subject_status = "negative_screen"
     if recruited:
         subject_status = "recruited"
+    if negative_screen:
+        subject_status = "negative_screen"
 
     # Return a dictionary with the data for this subject
     return {
