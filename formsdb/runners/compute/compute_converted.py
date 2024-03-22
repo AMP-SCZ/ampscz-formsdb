@@ -54,7 +54,7 @@ def count_converted(config_file: Path) -> int:
     Returns:
         int: Number of subjects that have been converted.
     """
-    query = "SELECT COUNT(*) FROM subject_converted WHERE subject_converted = 'True';"
+    query = "SELECT COUNT(*) FROM conversion_status WHERE converted = 'True';"
     converted_count_r = db.fetch_record(config_file=config_file, query=query)
     if converted_count_r is None:
         raise ValueError("No converted subjects found in the database.")
@@ -63,7 +63,44 @@ def count_converted(config_file: Path) -> int:
     return converted_count
 
 
-def check_if_converted(
+def check_if_converted(subject_id: str, config_file: Path) -> bool:
+    """
+    Checks subject's conversion forms for conversion status.
+
+    Args:
+        subject_id (str): The subject ID.
+        config_file (Path): Path to the config file.
+
+    Returns:
+        bool: Whether the subject has been converted.
+    """
+    all_forms_df = data.get_all_subject_forms(
+        config_file=config_file, subject_id=subject_id
+    )
+
+    conversion_df = all_forms_df[
+        all_forms_df["form_name"].str.contains("conversion_form")
+    ]
+
+    if conversion_df.empty:
+        return False
+
+    conversion_df.reset_index(drop=True, inplace=True)
+
+    for idx, _ in conversion_df.iterrows():
+        form_r = conversion_df.iloc[idx, :]  # type: ignore
+        form_data: Dict[str, Any] = form_r["form_data"]
+
+        variable = "chrconv_conv"
+
+        if variable in form_data:
+            if form_data[variable] == 1:
+                return True
+
+    return False
+
+
+def get_converted_visit(
     df: pd.DataFrame, visit_order: List[str], debug: bool = False
 ) -> Optional[str]:
     """
@@ -126,37 +163,38 @@ def compute_converted(
     )
     logger.info("Computing if subjects got converted...")
 
-    query = "SELECT COUNT(*) FROM subjects;"
-    subject_count_r = db.fetch_record(config_file=config_file, query=query)
-    if subject_count_r is None:
-        raise ValueError("No subjects found in the database.")
-    subject_count = int(subject_count_r)
+    subject_ids = data.get_all_subjects(config_file=config_file)
+    overidden_subjects = data.get_overrides(
+        config_file=config_file, measure="conversion"
+    )
 
-    logger.info(f"Found {subject_count} subjects.")
-
-    query = "SELECT id FROM subjects ORDER BY id;"
-    engine = db.get_db_connection(config_file=config_file)
-
-    subject_ids_r = pd.read_sql(query, engine, chunksize=1)
+    logger.info(f"Overridden subjects: {overidden_subjects}")
 
     with utils.get_progress_bar() as progress:
-        task = progress.add_task("[red]Processing...", total=subject_count)
+        task = progress.add_task("[red]Processing...", total=len(subject_ids))
 
-        for row in subject_ids_r:
-            subject_id = row["id"].values[0]
-
+        for subject_id in subject_ids:
             progress.update(task, advance=1, description=f"Processing {subject_id}...")
 
-            df = data.get_all_subject_forms(
-                config_file=config_file, subject_id=subject_id
-            )
-            converted = check_if_converted(df=df, visit_order=visit_order, debug=debug)
-            if converted is None:
-                converted_visit = np.nan
-                converted = False
-            else:
-                converted_visit = converted
+            if subject_id in overidden_subjects:
                 converted = True
+                converted_visit = "overidden"
+
+                logger.info(f"Subject {subject_id} is overidden to be converted.")
+            else:
+                df = data.get_all_subject_forms(
+                    config_file=config_file, subject_id=subject_id
+                )
+                converted_visit = get_converted_visit(
+                    df=df, visit_order=visit_order, debug=debug
+                )
+                if converted_visit is None:
+                    converted_visit = np.nan
+                    converted = check_if_converted(
+                        subject_id=subject_id, config_file=config_file
+                    )
+                else:
+                    converted = True
 
             visit_status_df = pd.concat(
                 [
@@ -171,52 +209,52 @@ def compute_converted(
                 ]
             )
 
-    logger.info(f"Done computing converted status for {subject_count} subjects.")
+    logger.info(f"Done computing converted status for {len(subject_ids)} subjects.")
 
     return visit_status_df
 
 
-def commit_converted_status_to_db(config_file: Path, df: pd.DataFrame) -> None:
-    """
-    Write the converted status of subjects to the database.
+# def commit_converted_status_to_db(config_file: Path, df: pd.DataFrame) -> None:
+#     """
+#     Write the converted status of subjects to the database.
 
-    Removes existing data and commits new data.
+#     Removes existing data and commits new data.
 
-    Args:
-        config_file (Path): Path to the config file.
-        df (pd.DataFrame): DataFrame containing the converted status of subjects.
+#     Args:
+#         config_file (Path): Path to the config file.
+#         df (pd.DataFrame): DataFrame containing the converted status of subjects.
 
-    Returns:
-        None
-    """
-    logger.info("Committing converted status to the database...")
+#     Returns:
+#         None
+#     """
+#     logger.info("Committing converted status to the database...")
 
-    sql_queries: List[str] = []
-    # Remove existing data
-    sql_query = """
-    DELETE FROM subject_converted;
-    """
-    sql_queries.append(sql_query)
+#     sql_queries: List[str] = []
+#     # Remove existing data
+#     sql_query = """
+#     DELETE FROM subject_converted;
+#     """
+#     sql_queries.append(sql_query)
 
-    for _, row in df.iterrows():
-        subject_id = row["subject_id"]
-        converted = row["converted"]
-        converted_visit = row["converted_visit"]
+#     for _, row in df.iterrows():
+#         subject_id = row["subject_id"]
+#         converted = row["converted"]
+#         converted_visit = row["converted_visit"]
 
-        if pd.isna(converted_visit):
-            converted_visit = "NULL"
+#         if pd.isna(converted_visit):
+#             converted_visit = "NULL"
 
-        sql_query = f"""
-        INSERT INTO subject_converted (subject_id, subject_converted, subject_converted_event)
-        VALUES ('{subject_id}', '{converted}', '{converted_visit}');
-        """
-        sql_query = db.handle_null(sql_query)
-        sql_queries.append(sql_query)
+#         sql_query = f"""
+#         INSERT INTO subject_converted (subject_id, subject_converted, subject_converted_event)
+#         VALUES ('{subject_id}', '{converted}', '{converted_visit}');
+#         """
+#         sql_query = db.handle_null(sql_query)
+#         sql_queries.append(sql_query)
 
-    logger.info("Removing existing data and committing new data...")
-    db.execute_queries(
-        config_file=config_file, queries=sql_queries, show_commands=False
-    )
+#     logger.info("Removing existing data and committing new data...")
+#     db.execute_queries(
+#         config_file=config_file, queries=sql_queries, show_commands=False
+#     )
 
 
 if __name__ == "__main__":
@@ -237,7 +275,11 @@ if __name__ == "__main__":
         config_file, visit_order=constants.visit_order, debug=False
     )
 
-    commit_converted_status_to_db(config_file, converted_status_df)
+    db.df_to_table(
+        config_file=config_file,
+        df=converted_status_df,
+        table_name="conversion_status",
+    )
 
     UPDATED_CONVERTED_COUNT = count_converted(config_file=config_file)
     logger.info(f"Found {UPDATED_CONVERTED_COUNT} converted subjects after update.")

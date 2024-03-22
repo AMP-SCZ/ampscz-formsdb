@@ -14,6 +14,28 @@ from formsdb import constants
 from formsdb.helpers import db, utils
 
 
+def get_overrides(config_file: Path, measure: str) -> List[str]:
+    """
+    Get the subject IDs that have been overridden for a measure.
+
+    Args:
+        config_file (Path): The path to the configuration file.
+        measure (str): The measure.
+
+    Returns:
+        List[str]: A list of subject IDs that have been overridden for the measure.
+    """
+    config_params = utils.config(path=config_file, section="overrides")
+    overrides = config_params.get(measure, "")
+
+    subject_ids = overrides.split(",")
+    subject_ids = [subject_id.strip() for subject_id in subject_ids]
+    # Remove ' if present
+    subject_ids = [subject_id.strip().strip("'") for subject_id in subject_ids]
+
+    return subject_ids
+
+
 def get_network(config_file: Path, site: str) -> str:
     """
     Get the network of a site from the database.
@@ -372,6 +394,7 @@ def make_df_dpdash_ready(df: pd.DataFrame, subject_id: str) -> pd.DataFrame:
         pd.DataFrame: Output DataFrame.
     """
     dp_dash_required_cols = constants.dp_dash_required_cols + ["subject_id"]
+    df = df.copy()
 
     for col in dp_dash_required_cols:
         if col not in df.columns:

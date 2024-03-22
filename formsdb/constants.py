@@ -46,6 +46,8 @@ dp_dash_required_cols: List[str] = [
 
 skip_adding_nr: List[str] = [
     "recruitment_status",
+    "converted",
+    "timepoint"
 ]
 
 upenn_tests: List[str] = [
