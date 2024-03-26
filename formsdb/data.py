@@ -61,20 +61,34 @@ def get_network(config_file: Path, site: str) -> str:
     return network
 
 
-def get_all_subjects(config_file: Path) -> List[str]:
+def get_all_subjects(
+    config_file: Path,
+    network: Optional[str] = None,
+) -> List[str]:
     """
     Get all subjects from the database.
 
     Args:
         config_file (Path): The path to the configuration file.
+        network (Optional[str], optional): The network to filter by.
+            Defaults to None.
 
     Returns:
         List[str]: A list of all subjects.
     """
-    query = """
-    SELECT id FROM subjects
+
+    if network:
+        query = f"""
+        SELECT subjects.id FROM subjects
+        INNER JOIN site ON subjects.site_id = site.id
+        WHERE site.network_id = '{network}'
         ORDER BY id;
-    """
+        """
+    else:
+        query = """
+        SELECT id FROM subjects
+        ORDER BY id;
+        """
 
     subjects = db.execute_sql(config_file=config_file, query=query)
 
@@ -798,6 +812,29 @@ def is_subject_hc(
         return True
     else:
         return False
+
+
+def get_subject_recruitment_status(config_file: Path, subject_id: str) -> Optional[str]:
+    """
+    Get the recruitment status for a subject.
+
+    Args:
+        config_file: The path to the config file
+        subject_id: The subject ID
+
+    Returns:
+        Optional[str]: The recruitment status for the subject.
+    """
+
+    query = f"""
+    SELECT recruitment_status
+    FROM recruitment_status
+    WHERE subject_id = '{subject_id}'
+    """
+
+    recruitment_status = db.fetch_record(config_file=config_file, query=query)
+
+    return recruitment_status
 
 
 def get_forms_cohort_timepoint_map(

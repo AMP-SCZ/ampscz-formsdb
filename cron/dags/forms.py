@@ -213,6 +213,16 @@ export_converted = BashOperator(
     cwd=REPO_ROOT,
 )
 
+export_withdrawal = BashOperator(
+    task_id="export_withdrawal",
+    bash_command=PYTHON_PATH
+    + " "
+    + REPO_ROOT
+    + "/formsdb/runners/export/export_withdrawal.py",
+    dag=dag,
+    cwd=REPO_ROOT,
+)
+
 # Generate DPDash CSV
 generate_dpdash_csv = BashOperator(
     task_id="generate_dpdash_csv",
@@ -308,12 +318,14 @@ export_combined_cognitive.set_downstream(export_consolidated_combined_cognitive)
 
 compute_recruitment_status.set_downstream(export_recruitment_status)
 compute_converted.set_downstream(export_converted)
+compute_removed.set_downstream(export_withdrawal)
 
 dpdash_merge_ready = EmptyOperator(task_id="dpdash_merge_ready", dag=dag)
 export_cognitive_summary.set_downstream(dpdash_merge_ready)
 export_recruitment_status.set_downstream(dpdash_merge_ready)
 export_visit_status.set_downstream(dpdash_merge_ready)
 export_converted.set_downstream(dpdash_merge_ready)
+export_withdrawal.set_downstream(dpdash_merge_ready)
 
 dpdash_merge_ready.set_downstream(generate_dpdash_csv)
 generate_dpdash_csv.set_downstream(dpimport_dpdash_charts)
@@ -341,4 +353,3 @@ dpimport_informed_consent_run_sheet.set_downstream(all_dpimport_done)
 dpimport_inclusionexclusion_criteria_review.set_downstream(all_dpimport_done)
 dpimport_form_sociodemographics.set_downstream(all_dpimport_done)
 dpimport_dpdash_charts.set_downstream(all_dpimport_done)
-# dpimport_recruitment_status.set_downstream(all_dpimport_done)

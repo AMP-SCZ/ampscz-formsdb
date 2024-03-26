@@ -54,7 +54,7 @@ def count_removed(config_file: Path) -> int:
     Returns:
         int: Number of subjects that have been removed.
     """
-    query = "SELECT COUNT(*) FROM subject_removed WHERE subject_removed = 'True';"
+    query = "SELECT COUNT(*) FROM subject_removed WHERE removed = 'True';"
     removed_count_r = db.fetch_record(config_file=config_file, query=query)
     if removed_count_r is None:
         raise ValueError("No removed subjects found in the database.")
@@ -188,50 +188,6 @@ def compute_removed(
     return removed_df
 
 
-def commit_removed_status_to_db(config_file: Path, df: pd.DataFrame) -> None:
-    """
-    Drop old subject_removed data and commit new data to the database.
-
-    Args:
-        config_file (Path): Path to the config file.
-        df (pd.DataFrame): DataFrame containing the removed status of each subject.
-
-    Returns:
-        None
-    """
-    logger.info("Committing removed status to the database...")
-
-    sql_queries: List[str] = []
-    # Remove existing data
-    sql_query = """
-    DELETE FROM subject_removed;
-    """
-    sql_queries.append(sql_query)
-
-    for _, row in df.iterrows():
-        subject_id = row["subject_id"]
-        removed = row["removed"]
-        removed_event = row["removed_event"]
-        removed_reason = row["removed_reason"]
-
-        if pd.isna(removed_event):
-            removed_event = "NULL"
-        if pd.isna(removed_reason):
-            removed_reason = "NULL"
-
-        sql_query = f"""
-        INSERT INTO subject_removed (subject_id, subject_removed, subject_removed_event, subject_removed_reason)
-        VALUES ('{subject_id}', '{removed}', '{removed_event}', '{removed_reason}');
-        """
-        sql_query = db.handle_null(sql_query)
-        sql_queries.append(sql_query)
-
-    logger.info("Removing existing data and committing new data...")
-    db.execute_queries(
-        config_file=config_file, queries=sql_queries, show_commands=False
-    )
-
-
 if __name__ == "__main__":
     console.rule(f"[bold red]{MODULE_NAME}")
 
@@ -250,7 +206,13 @@ if __name__ == "__main__":
         config_file, visit_order=constants.visit_order, debug=False
     )
 
-    commit_removed_status_to_db(config_file, converted_status_df)
+    # commit_removed_status_to_db(config_file, converted_status_df)
+    logger.info("Committing subject_removed table to the database...")
+    db.df_to_table(
+        config_file=config_file,
+        df=converted_status_df,
+        table_name="subject_removed"
+    )
     UPDATED_REMOVED_COUNT = count_removed(config_file=config_file)
 
     logger.info(f"Found {UPDATED_REMOVED_COUNT} subjects with removed status.")
