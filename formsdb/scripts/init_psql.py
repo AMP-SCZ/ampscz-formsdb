@@ -50,6 +50,7 @@ def create_tables(config_file: Path) -> None:
             id VARCHAR(25) PRIMARY KEY,
             site_name VARCHAR(255) NOT NULL,
             site_country VARCHAR(255),
+            site_country_code VARCHAR(3),
             network_id VARCHAR(25) REFERENCES network(id)
         );
         """,
@@ -124,10 +125,11 @@ def populate_sites(sites_json: Path, config_file: Path) -> None:
         Represents a site.
         """
 
-        def __init__(self, site_id, name, country, network_id):
+        def __init__(self, site_id, name, country, country_code, network_id):
             self.id = site_id
             self.name = name
             self.country = country
+            self.country_code = country_code
             self.network_id = network_id
 
             if self.country == "":
@@ -144,14 +146,19 @@ def populate_sites(sites_json: Path, config_file: Path) -> None:
             site_id=db.santize_string(site["id"]),
             name=db.santize_string(site["name"]),
             country=db.santize_string(site["country"]),
+            country_code=db.santize_string(site["country_code"]),
             network_id=db.santize_string(site["network"]),
         )
 
         networks.add(site_obj.network_id)
 
         command = f"""
-        INSERT INTO site (id, site_name, site_country, network_id)
-        VALUES ('{site_obj.id}', '{site_obj.name}', '{site_obj.country}', '{site_obj.network_id}');
+        INSERT INTO site (
+            id, site_name, site_country,
+            site_country_code, network_id
+        ) VALUES (
+            '{site_obj.id}', '{site_obj.name}', '{site_obj.country}',
+            '{site_obj.country}', '{site_obj.network_id}');
         """
 
         command = db.handle_null(command)
