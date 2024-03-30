@@ -21,6 +21,7 @@ except ValueError:
     pass
 
 import logging
+from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 import numpy as np
@@ -98,6 +99,44 @@ def check_if_converted(subject_id: str, config_file: Path) -> bool:
                 return True
 
     return False
+
+
+def get_conversion_date(subject_id: str, config_file: Path) -> Optional[datetime]:
+    """
+    Checks subject's conversion forms for conversion date.
+    Args:
+        subject_id (str): The subject ID.
+        config_file (Path): Path to the config file.
+
+    Returns:
+        Optional[datetime]: The date of conversion.
+    """
+    all_forms_df = data.get_all_subject_forms(
+        config_file=config_file, subject_id=subject_id
+    )
+
+    conversion_df = all_forms_df[
+        all_forms_df["form_name"].str.contains("conversion_form")
+    ]
+
+    if conversion_df.empty:
+        return None
+
+    conversion_df.reset_index(drop=True, inplace=True)
+
+    for idx, _ in conversion_df.iterrows():
+        form_r = conversion_df.iloc[idx, :]  # type: ignore
+        form_data: Dict[str, Any] = form_r["form_data"]
+
+        variable = "chrconv_interview_date"
+
+        if variable in form_data:
+            conversion_date = form_data[variable]
+            # date format '2024-01-05T00:00:00'
+            conversion_date_d = datetime.strptime(conversion_date, "%Y-%m-%dT%H:%M:%S")
+            return conversion_date_d
+
+    return None
 
 
 def get_converted_visit(
@@ -196,6 +235,10 @@ def compute_converted(
                 else:
                     converted = True
 
+            conversion_date = get_conversion_date(
+                subject_id=subject_id, config_file=config_file
+            )
+
             visit_status_df = pd.concat(
                 [
                     visit_status_df,
@@ -204,6 +247,7 @@ def compute_converted(
                             "subject_id": [subject_id],
                             "converted": [converted],
                             "converted_visit": [converted_visit],
+                            "conversion_date": [conversion_date],
                         }
                     ),
                 ]
