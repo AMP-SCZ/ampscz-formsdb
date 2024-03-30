@@ -21,6 +21,7 @@ except ValueError:
     pass
 
 import logging
+import multiprocessing
 from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
@@ -117,73 +118,109 @@ def check_if_removed(
     return None
 
 
-def compute_removed(
-    config_file: Path, visit_order: List[str], debug: bool = False
-) -> pd.DataFrame:
+def get_subject_removed_status(
+    config_file: Path, subject_id: str, visit_order: List[str]
+) -> Dict[str, Any]:
+    """
+    Get the removed status of a subject.
+
+    Args:
+        config_file (Path): Path to the config file.
+        subject_id (str): Subject ID.
+        visit_order (List[str]): List of visits in the order they were conducted.
+
+    Returns:
+        Dict[str, Any]: Dictionary containing the removed status of the subject.
+    """
+    df = data.get_all_subject_forms(config_file=config_file, subject_id=subject_id)
+    removed_r = check_if_removed(df, visit_order)
+
+    if removed_r is None:
+        removed_event = np.nan
+        removed_reason = np.nan
+        removed = False
+    else:
+        removed_event, removed_reason = removed_r
+        removed = True
+
+    recruitment_status = data.get_subject_recruitment_status(
+        config_file=config_file, subject_id=subject_id
+    )
+
+    if not removed:
+        withdrawal_status = "not_withdrawn"
+    else:
+        if removed_event == "screening":
+            if recruitment_status == "consented":
+                withdrawal_status = "withdrawn_before_screening_outcome"
+            else:
+                withdrawal_status = f"withdrawn_before_baseline_{recruitment_status}"
+        else:
+            withdrawal_status = "withdrawn_after_baseline"
+
+    subject_data = {
+        "subject_id": subject_id,
+        "removed": removed,
+        "removed_event": removed_event,
+        "removed_reason": removed_reason,
+        "withdrawal_status": withdrawal_status,
+    }
+
+    return subject_data
+
+
+def process_subject(params: Tuple[Path, str, List[str]]) -> Dict[str, Any]:
+    """
+    Wrapper function for the `get_subject_removed_status` function.
+
+    Args:
+        params (Tuple[Path, str, List[str]]): A tuple containing the config file, subject ID,
+            and the visit order.
+
+    Returns:
+        Dict[str, Any]: Dictionary containing the removed status of the subject.
+    """
+    config_file, subject_id, visit_order = params
+    subject_data = get_subject_removed_status(
+        config_file=config_file, subject_id=subject_id, visit_order=visit_order
+    )
+
+    return subject_data
+
+
+def compute_removed(config_file: Path, visit_order: List[str]) -> pd.DataFrame:
     """
     For each subject, compute if they have been removed.
 
     Args:
         config_file (Path): Path to the config file.
         visit_order (List[str]): List of visits in the order they were conducted.
-        debug (bool, optional): Whether to print debug messages. Defaults to False.
 
     Returns:
         pd.DataFrame: DataFrame containing the removed status of each subject.
     """
-    removed_df = pd.DataFrame(
-        columns=["subject_id", "removed", "removed_event", "removed_reason"]
-    )
     logger.info("Computing if subjects got removed...")
 
-    query = "SELECT COUNT(*) FROM subjects;"
-    subject_count_r = db.fetch_record(config_file=config_file, query=query)
-    if subject_count_r is None:
-        raise ValueError("No subjects found in the database.")
-    subject_count = int(subject_count_r)
+    subject_ids = data.get_all_subjects(config_file=config_file)
+    subjects_count = len(subject_ids)
+    logger.info(f"Found {subjects_count} subjects.")
 
-    logger.info(f"Found {subject_count} subjects.")
+    num_processes = 8
+    logger.info(f"Using {num_processes} processes.")
 
-    query = "SELECT id FROM subjects ORDER BY id;"
-    engine = db.get_db_connection(config_file=config_file)
+    params = [(config_file, subject_id, visit_order) for subject_id in subject_ids]
+    results = []
 
-    subject_ids_r = pd.read_sql(query, engine, chunksize=1)
+    with multiprocessing.Pool(processes=int(num_processes)) as pool:
+        with utils.get_progress_bar() as progress:
+            task = progress.add_task("Processing subjects...", total=len(params))
+            for result in pool.imap_unordered(process_subject, params):
+                results.append(result)
+                progress.update(task, advance=1)
 
-    with utils.get_progress_bar() as progress:
-        task = progress.add_task("[red]Processing...", total=subject_count)
+    logger.info(f"Done computing removed status for {subjects_count} subjects.")
 
-        for row in subject_ids_r:
-            subject_id = row["id"].values[0]
-
-            progress.update(task, advance=1, description=f"Processing {subject_id}...")
-
-            df = data.get_all_subject_forms(
-                config_file=config_file, subject_id=subject_id
-            )
-            removed_r = check_if_removed(df, visit_order, debug=debug)
-            if removed_r is None:
-                removed_event = np.nan
-                removed_reason = np.nan
-                removed = False
-            else:
-                removed_event, removed_reason = removed_r
-                removed = True
-
-            removed_df = pd.concat(
-                [
-                    removed_df,
-                    pd.DataFrame(
-                        {
-                            "subject_id": [subject_id],
-                            "removed": [removed],
-                            "removed_event": [removed_event],
-                            "removed_reason": [removed_reason],
-                        }
-                    ),
-                ]
-            )
-
-    logger.info(f"Done computing removed status for {subject_count} subjects.")
+    removed_df = pd.DataFrame(results)
 
     return removed_df
 
@@ -203,15 +240,13 @@ if __name__ == "__main__":
     logger.info(f"Found {REMOVED_COUNT} subjects with removed status.")
 
     converted_status_df = compute_removed(
-        config_file, visit_order=constants.visit_order, debug=False
+        config_file, visit_order=constants.visit_order
     )
 
     # commit_removed_status_to_db(config_file, converted_status_df)
     logger.info("Committing subject_removed table to the database...")
     db.df_to_table(
-        config_file=config_file,
-        df=converted_status_df,
-        table_name="subject_removed"
+        config_file=config_file, df=converted_status_df, table_name="subject_removed"
     )
     UPDATED_REMOVED_COUNT = count_removed(config_file=config_file)
 

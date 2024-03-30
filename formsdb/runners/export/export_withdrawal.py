@@ -60,17 +60,6 @@ def fetch_withdrawal_data(config_file: Path, subject_id: str) -> pd.DataFrame:
 
     df = db.execute_sql(config_file=config_file, query=query)
 
-    removed = df["removed"].values[0]
-    removed_event = df["removed_event"].values[0]
-
-    if not removed:
-        df["withdrawal_status"] = "not_withdrawn"
-    else:
-        if removed_event == "screening":
-            df["withdrawal_status"] = "withdrawn_before_baseline"
-        else:
-            df["withdrawal_status"] = "withdrawn_after_baseline"
-
     return df
 
 
