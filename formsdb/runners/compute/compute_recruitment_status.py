@@ -22,8 +22,8 @@ except ValueError:
     pass
 
 import logging
-from typing import List, Dict, Tuple
 import multiprocessing
+from typing import Dict, List, Tuple
 
 import pandas as pd
 from rich.logging import RichHandler
@@ -210,6 +210,60 @@ def worker(params: Tuple[str, Path]) -> Dict[str, str | bool | None]:
     if negative_screen:
         subject_status = "negative_screen"
 
+    recruitmest_status_v2 = None
+    # C1 - consented
+    # C2 - consented + withdrawn before baseline (withdrawal before screen outcome)
+    # C3 - negative screen
+    # C4 - positive screen + withdrawn before baseline (withdrawal before baseline)
+    # C5 - recruited
+    withdrawal_status = data.get_subject_withdrawal_status(
+        config_file=config_file, subject_id=subject_id
+    )
+
+    if withdrawal_status:
+        if withdrawal_status == "not_withdrawn":
+            match subject_status:
+                case "consented":
+                    recruitmest_status_v2 = "C1"
+                case "positive_screen":
+                    recruitmest_status_v2 = "C4"
+                case "recruited":
+                    recruitmest_status_v2 = "C5"
+                case "negative_screen":
+                    recruitmest_status_v2 = "C3"
+                case _:
+                    recruitmest_status_v2 = None
+        elif withdrawal_status == "withdrawn_before_screening_outcome":
+            recruitmest_status_v2 = "C2"
+        elif (
+            "withdrawn_before_baseline" in withdrawal_status
+            and subject_status == "positive_screen"
+        ):
+            recruitmest_status_v2 = "C4"
+        else:
+            match subject_status:
+                case "recruited":
+                    recruitmest_status_v2 = "C5"
+                case "consented":
+                    recruitmest_status_v2 = "C1"
+                case "positive_screen":
+                    recruitmest_status_v2 = "C4"
+                case "negative_screen":
+                    recruitmest_status_v2 = "C3"
+                case _:
+                    recruitmest_status_v2 = None
+
+    recruitment_status_v2_mappping = {
+        "C1": "consented",
+        "C2": "withdrawn_before_screening_outcome",
+        "C3": "negative_screen",
+        "C4": "withdrawn_before_baseline",
+        "C5": "recruited",
+        None: None,
+    }
+
+    recruitmest_status_v2 = recruitment_status_v2_mappping.get(recruitmest_status_v2)
+
     # Return a dictionary with the data for this subject
     return {
         "subject_id": subject_id,
@@ -218,6 +272,7 @@ def worker(params: Tuple[str, Path]) -> Dict[str, str | bool | None]:
         "negative_screen": negative_screen,
         "recruited": recruited,
         "recruitment_status": subject_status,
+        "recruitment_status_v2": recruitmest_status_v2,
     }
 
 
@@ -242,19 +297,17 @@ def process_data(config_file: Path) -> None:
     # Create a Pool object with the number of processes equal to the number of CPU cores / 2
     num_processes = multiprocessing.cpu_count() / 2
     logger.info(f"Using {num_processes} processes...")
-    pool = multiprocessing.Pool(
-        processes=int(num_processes)
-    )
 
     # Create parameters for the worker function
     worker_params = [(subject_id, config_file) for subject_id in subject_ids]
+    results = []
 
-    # Use the map method to apply the worker function to each subject_id and get a list of results
-    results = pool.map(worker, worker_params)
-
-    # Close the pool and wait for the processes to finish
-    pool.close()
-    pool.join()
+    with multiprocessing.Pool(processes=int(num_processes)) as pool:
+        with utils.get_progress_bar() as progress:
+            task = progress.add_task("Processing subjects...", total=len(worker_params))
+            for result in pool.imap_unordered(worker, worker_params):  # type: ignore
+                results.append(result)
+                progress.update(task, advance=1)
 
     # Convert the results list into a pandas dataframe
     master_df = pd.DataFrame(results)

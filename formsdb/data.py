@@ -397,9 +397,7 @@ def get_upenn_days_since_consent(
 
 
 def estimate_event_date(
-    subject_id: str,
-    event: str,
-    config_file: Path
+    subject_id: str, event: str, config_file: Path
 ) -> Optional[datetime]:
     """
     Infers the events date.
@@ -913,3 +911,29 @@ def get_forms_cohort_timepoint_map(
         forms_cohort_timepoint_map = json.load(f)
 
     return forms_cohort_timepoint_map
+
+
+def get_subject_withdrawal_status(
+    config_file: Path,
+    subject_id: str,
+) -> Optional[str]:
+    """
+    Get the withdrawal status for a subject.
+
+    Args:
+        config_file: The path to the config file
+        subject_id: The subject ID
+
+    Returns:
+        Optional[str]: The withdrawal status for the subject.
+    """
+
+    query = f"""
+    SELECT withdrawal_status
+    FROM subject_removed
+    WHERE subject_id = '{subject_id}'
+    """
+
+    withdrawal_status = db.fetch_record(config_file=config_file, query=query)
+
+    return withdrawal_status
