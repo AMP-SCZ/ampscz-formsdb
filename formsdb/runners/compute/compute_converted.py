@@ -132,7 +132,6 @@ def get_conversion_date(subject_id: str, config_file: Path) -> Optional[datetime
 
         if variable in form_data:
             conversion_date = form_data[variable]
-            # date format '2024-01-05T00:00:00'
             conversion_date_d = datetime.strptime(conversion_date, "%Y-%m-%dT%H:%M:%S")
             return conversion_date_d
 
