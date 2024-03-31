@@ -6,7 +6,7 @@ import json
 from datetime import datetime
 from functools import lru_cache
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 import pandas as pd
 
@@ -394,6 +394,61 @@ def get_upenn_days_since_consent(
     )
 
     return (event_date - consent_date).days + 1
+
+
+def estimate_event_date(
+    subject_id: str,
+    event: str,
+    config_file: Path
+) -> Optional[datetime]:
+    """
+    Infers the events date.
+
+    Args:
+        subject_id (str): The subject ID.
+        event (str): The event name.
+        config_file (Path): The path to the config file.
+
+    Returns:
+        Optional[datetime]: The date of the event.
+    """
+
+    forms_df = get_all_subject_forms(subject_id=subject_id, config_file=config_file)
+
+    forms_df = get_all_subject_forms(subject_id=subject_id, config_file=config_file)
+    visit_df = forms_df[forms_df["event_name"].str.contains(f"{event}_")]
+
+    if visit_df.empty:
+        return None
+
+    for _, row in visit_df.iterrows():
+        form_name = row["form_name"]
+
+        if form_name == "sociodemographics":
+            continue
+
+        if "digital_biomarkers" in form_name:
+            continue
+
+        form_data_r: Dict[str, Any] = row["form_data"]
+        form_variables = form_data_r.keys()
+
+        date_variables = [v for v in form_variables if "date" in v]
+
+        for date_variable in date_variables:
+            date = form_data_r[date_variable]
+
+            # Validate date
+            if not utils.validate_date(date):
+                continue
+            else:
+                date_ts: pd.Timestamp = pd.to_datetime(date)
+                if date_ts < datetime(2019, 1, 1):
+                    continue
+                date_dt = date_ts.to_pydatetime()
+                return date_dt
+
+    return None
 
 
 def make_df_dpdash_ready(df: pd.DataFrame, subject_id: str) -> pd.DataFrame:

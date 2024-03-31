@@ -22,6 +22,7 @@ except ValueError:
 
 import logging
 import multiprocessing
+from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
@@ -65,19 +66,21 @@ def count_removed(config_file: Path) -> int:
 
 
 def check_if_removed(
-    df: pd.DataFrame, visit_order: List[str], debug: bool = False
-) -> Optional[Tuple[str, str]]:
+    subject_id: str, visit_order: List[str], config_file: Path, debug: bool = False
+) -> Optional[Tuple[str, str, Optional[datetime]]]:
     """
     Check if a subject has been removed.
 
     Args:
-        df (pd.DataFrame): DataFrame containing the subject's forms.
+        subject_id (str): Subject ID.
+        config_file (Path): Path to the config file.
         visit_order (List[str]): List of visits in the order they were conducted.
         debug (bool, optional): Whether to print debug messages. Defaults to False.
 
     Returns:
         Optional[Tuple[str, str]]: If the subject was removed, returns the event and reason.
     """
+    df = data.get_all_subject_forms(subject_id=subject_id, config_file=config_file)
     missing_df = df[df["form_name"].str.contains("missing_data")]
 
     if missing_df.shape[0] == 0:
@@ -98,9 +101,12 @@ def check_if_removed(
         withdrawn_variable = "chrmiss_withdrawn"
         if withdrawn_variable in form_variables:
             if form_data[withdrawn_variable] == 1:
+                withdrawn_date = data.estimate_event_date(
+                    subject_id=subject_id, event=visit, config_file=config_file
+                )
                 if debug:
-                    print(f"Subject withdrew at {visit}.")
-                return visit, "withdrawn"
+                    print(f"Subject withdrew at {visit} on {withdrawn_date}.")
+                return visit, "withdrawn", withdrawn_date
         else:
             if debug:
                 print(f"{withdrawn_variable} not found in {visit}.")
@@ -108,9 +114,12 @@ def check_if_removed(
         discontinued_variable = "chrmiss_discon"
         if discontinued_variable in form_variables:
             if form_data[discontinued_variable] == 1:
+                withdrawn_date = data.estimate_event_date(
+                    subject_id=subject_id, event=visit, config_file=config_file
+                )
                 if debug:
-                    print(f"Subject discontinued at {visit}.")
-                return visit, "discontinued"
+                    print(f"Subject discontinued at {visit} on {withdrawn_date}.")
+                return visit, "discontinued", withdrawn_date
         else:
             if debug:
                 print(f"{discontinued_variable} not found in {visit}.")
@@ -132,15 +141,17 @@ def get_subject_removed_status(
     Returns:
         Dict[str, Any]: Dictionary containing the removed status of the subject.
     """
-    df = data.get_all_subject_forms(config_file=config_file, subject_id=subject_id)
-    removed_r = check_if_removed(df, visit_order)
+    removed_r = check_if_removed(
+        subject_id=subject_id, visit_order=visit_order, config_file=config_file
+    )
 
     if removed_r is None:
         removed_event = np.nan
         removed_reason = np.nan
         removed = False
+        withdrawn_date = np.nan
     else:
-        removed_event, removed_reason = removed_r
+        removed_event, removed_reason, withdrawn_date = removed_r
         removed = True
 
     recruitment_status = data.get_subject_recruitment_status(
@@ -161,6 +172,7 @@ def get_subject_removed_status(
     subject_data = {
         "subject_id": subject_id,
         "removed": removed,
+        "removed_date": withdrawn_date,
         "removed_event": removed_event,
         "removed_reason": removed_reason,
         "withdrawal_status": withdrawal_status,
