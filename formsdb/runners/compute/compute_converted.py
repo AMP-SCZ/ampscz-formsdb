@@ -257,49 +257,6 @@ def compute_converted(
     return visit_status_df
 
 
-# def commit_converted_status_to_db(config_file: Path, df: pd.DataFrame) -> None:
-#     """
-#     Write the converted status of subjects to the database.
-
-#     Removes existing data and commits new data.
-
-#     Args:
-#         config_file (Path): Path to the config file.
-#         df (pd.DataFrame): DataFrame containing the converted status of subjects.
-
-#     Returns:
-#         None
-#     """
-#     logger.info("Committing converted status to the database...")
-
-#     sql_queries: List[str] = []
-#     # Remove existing data
-#     sql_query = """
-#     DELETE FROM subject_converted;
-#     """
-#     sql_queries.append(sql_query)
-
-#     for _, row in df.iterrows():
-#         subject_id = row["subject_id"]
-#         converted = row["converted"]
-#         converted_visit = row["converted_visit"]
-
-#         if pd.isna(converted_visit):
-#             converted_visit = "NULL"
-
-#         sql_query = f"""
-#         INSERT INTO subject_converted (subject_id, subject_converted, subject_converted_event)
-#         VALUES ('{subject_id}', '{converted}', '{converted_visit}');
-#         """
-#         sql_query = db.handle_null(sql_query)
-#         sql_queries.append(sql_query)
-
-#     logger.info("Removing existing data and committing new data...")
-#     db.execute_queries(
-#         config_file=config_file, queries=sql_queries, show_commands=False
-#     )
-
-
 if __name__ == "__main__":
     console.rule(f"[bold red]{MODULE_NAME}")
 
