@@ -152,6 +152,16 @@ compute_visit_status = BashOperator(
     cwd=REPO_ROOT,
 )
 
+compute_blood_metrics = BashOperator(
+    task_id="compute_blood_metrics",
+    bash_command=PYTHON_PATH
+    + " "
+    + REPO_ROOT
+    + "/formsdb/runners/compute/compute_blood_metrics.py",
+    dag=dag,
+    cwd=REPO_ROOT,
+)
+
 # export
 export_cognitive_summary = BashOperator(
     task_id="export_cognitive_summary",
@@ -219,6 +229,16 @@ export_withdrawal = BashOperator(
     + " "
     + REPO_ROOT
     + "/formsdb/runners/export/export_withdrawal.py",
+    dag=dag,
+    cwd=REPO_ROOT,
+)
+
+export_blood_metrics = BashOperator(
+    task_id="export_blood_metrics",
+    bash_command=PYTHON_PATH
+    + " "
+    + REPO_ROOT
+    + "/formsdb/runners/export/export_blood_metrics.py",
     dag=dag,
     cwd=REPO_ROOT,
 )
@@ -309,6 +329,7 @@ all_imports_done.set_downstream(compute_converted)
 all_imports_done.set_downstream(compute_recruitment_status)
 all_imports_done.set_downstream(compute_removed)
 all_imports_done.set_downstream(compute_visit_status)
+all_imports_done.set_downstream(compute_blood_metrics)
 
 compute_cognition.set_downstream(export_cognitive_summary)
 compute_cognition.set_downstream(export_combined_cognitive)
@@ -319,6 +340,7 @@ export_combined_cognitive.set_downstream(export_consolidated_combined_cognitive)
 compute_recruitment_status.set_downstream(export_recruitment_status)
 compute_converted.set_downstream(export_converted)
 compute_removed.set_downstream(export_withdrawal)
+compute_blood_metrics.set_downstream(export_blood_metrics)
 
 dpdash_merge_ready = EmptyOperator(task_id="dpdash_merge_ready", dag=dag)
 export_cognitive_summary.set_downstream(dpdash_merge_ready)
@@ -326,6 +348,7 @@ export_recruitment_status.set_downstream(dpdash_merge_ready)
 export_visit_status.set_downstream(dpdash_merge_ready)
 export_converted.set_downstream(dpdash_merge_ready)
 export_withdrawal.set_downstream(dpdash_merge_ready)
+export_blood_metrics.set_downstream(dpdash_merge_ready)
 
 dpdash_merge_ready.set_downstream(generate_dpdash_csv)
 generate_dpdash_csv.set_downstream(dpimport_dpdash_charts)

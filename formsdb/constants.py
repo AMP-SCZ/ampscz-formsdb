@@ -46,6 +46,7 @@ dp_dash_required_cols: List[str] = [
 
 skip_adding_nr: List[str] = [
     "recruitment_status",
+    "recruitment_status_v2",
     "converted",
     "withdrawal_status",
     "timepoint"
