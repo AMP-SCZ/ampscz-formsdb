@@ -24,7 +24,7 @@ default_args = {
     "email_on_retry": False,
     "retries": 3,
     "retry_delay": timedelta(minutes=1),
-    "catchup": False
+    "catchup": False,
 }
 
 dag = DAG(
@@ -256,6 +256,8 @@ generate_dpdash_csv = BashOperator(
 
 # Import to DPDash Development instance
 DPIMPORT_SCRIPT = "/data/predict1/miniconda3/bin/import.py"
+STAGING_DPIMPORT_SCRIPT = "/PHShome/dm1447/dev/dpimport/scripts/import.py"
+STAGING_DPDASH_CONFIG = "/PHShome/dm1447/.keys/staging_dpdash.yaml"
 
 # Read variables from Airflow's Variables
 dpimport_env = {
@@ -267,6 +269,7 @@ dpimport_env = {
 }
 NUM_PARALLEL_IMPORT = 4
 
+# Production DPDash
 dpimport_informed_consent_run_sheet = BashOperator(
     task_id="dpimport_informed_consent_run_sheet",
     bash_command=f'{DPIMPORT_SCRIPT} \
@@ -307,12 +310,64 @@ dpimport_dpdash_charts = BashOperator(
     dag=dag,
 )
 
+# Staging DPDash
+dpimport_metadata_staging = BashOperator(
+    task_id="dpimport_metadata_staging",
+    bash_command=f'{PYTHON_PATH} \
+{STAGING_DPIMPORT_SCRIPT} \
+-c {STAGING_DPDASH_CONFIG} \
+"/data/predict1/data_from_nda/Pr*/PHOENIX/PROTECTED/P*/P*_metadata.csv"',
+    dag=dag,
+)
 
-# Done
+dpimport_informed_consent_run_sheet_staging = BashOperator(
+    task_id="dpimport_informed_consent_run_sheet_staging",
+    bash_command=f'{PYTHON_PATH} \
+{STAGING_DPIMPORT_SCRIPT} \
+-c {STAGING_DPDASH_CONFIG} \
+"/data/predict1/data_from_nda/formqc/??-*-form_informed_consent_run_sheet-*.csv"',
+    dag=dag,
+)
+
+dpimport_inclusionexclusion_criteria_review_staging = BashOperator(
+    task_id="dpimport_inclusionexclusion_criteria_review_staging",
+    bash_command=f'{PYTHON_PATH} \
+{STAGING_DPIMPORT_SCRIPT} \
+-c {STAGING_DPDASH_CONFIG} \
+"/data/predict1/data_from_nda/formqc/??-*-form_inclusionexclusion_criteria_review-*.csv"',
+    dag=dag,
+)
+
+dpimport_form_sociodemographics_staging = BashOperator(
+    task_id="dpimport_form_sociodemographics_staging",
+    bash_command=f'{PYTHON_PATH} \
+{STAGING_DPIMPORT_SCRIPT} \
+-c {STAGING_DPDASH_CONFIG} \
+"/data/predict1/data_from_nda/formqc/??-*-form_sociodemographics-*.csv"',
+    dag=dag,
+)
+
+dpimport_dpdash_charts_staging = BashOperator(
+    task_id="dpimport_dpdash_charts_staging",
+    bash_command=f'{PYTHON_PATH} \
+{STAGING_DPIMPORT_SCRIPT} \
+-c {STAGING_DPDASH_CONFIG} \
+"/data/predict1/data_from_nda/formqc/??-*-form_dpdash_charts-*.csv"',
+    dag=dag,
+)
+# Done Task Definitions
+
+# Start DAG construction
 info.set_downstream(start_mongo)
+# Production
 info.set_downstream(dpimport_informed_consent_run_sheet)
 info.set_downstream(dpimport_inclusionexclusion_criteria_review)
 info.set_downstream(dpimport_form_sociodemographics)
+# Staging
+info.set_downstream(dpimport_metadata_staging)
+info.set_downstream(dpimport_informed_consent_run_sheet_staging)
+info.set_downstream(dpimport_inclusionexclusion_criteria_review_staging)
+info.set_downstream(dpimport_form_sociodemographics_staging)
 
 start_mongo.set_downstream(import_upenn_jsons)
 start_mongo.set_downstream(import_harmonized_jsons)
@@ -351,7 +406,8 @@ export_withdrawal.set_downstream(dpdash_merge_ready)
 export_blood_metrics.set_downstream(dpdash_merge_ready)
 
 dpdash_merge_ready.set_downstream(generate_dpdash_csv)
-generate_dpdash_csv.set_downstream(dpimport_dpdash_charts)
+generate_dpdash_csv.set_downstream(dpimport_dpdash_charts)  # Production
+generate_dpdash_csv.set_downstream(dpimport_dpdash_charts_staging)  # Staging
 
 
 all_dpimport_done = EmptyOperator(
@@ -359,20 +415,56 @@ all_dpimport_done = EmptyOperator(
     dag=dag,
     on_success_callback=apprise.send_apprise_notification(
         title="AMPSCZ Forms DB",
-        body="All DPImport tasks successfully completed",
+        body="All DPImport tasks successfully completed - Production",
         notify_type=NotifyType.SUCCESS,
         apprise_conn_id="teams",
         tag="alerts",
     ),
     on_failure_callback=apprise.send_apprise_notification(
         title="AMPSCZ Forms DB",
-        body="One or more FormsDB tasks failed",
+        body="One or more FormsDB tasks failed - Production",
         notify_type=NotifyType.FAILURE,
         apprise_conn_id="teams",
         tag="alerts",
     ),
 )
+
 dpimport_informed_consent_run_sheet.set_downstream(all_dpimport_done)
 dpimport_inclusionexclusion_criteria_review.set_downstream(all_dpimport_done)
 dpimport_form_sociodemographics.set_downstream(all_dpimport_done)
 dpimport_dpdash_charts.set_downstream(all_dpimport_done)
+
+all_dpimport_done_staging = EmptyOperator(
+    task_id="all_dpimport_done_staging",
+    dag=dag,
+    on_success_callback=apprise.send_apprise_notification(
+        title="AMPSCZ Forms DB",
+        body="All DPImport tasks successfully completed - Staging",
+        notify_type=NotifyType.SUCCESS,
+        apprise_conn_id="teams",
+        tag="alerts",
+    ),
+    on_failure_callback=apprise.send_apprise_notification(
+        title="AMPSCZ Forms DB",
+        body="One or more FormsDB tasks failed - Staging",
+        notify_type=NotifyType.FAILURE,
+        apprise_conn_id="teams",
+        tag="alerts",
+    ),
+)
+
+dpimport_metadata_staging.set_downstream(all_dpimport_done_staging)
+dpimport_informed_consent_run_sheet_staging.set_downstream(all_dpimport_done_staging)
+dpimport_inclusionexclusion_criteria_review_staging.set_downstream(
+    all_dpimport_done_staging
+)
+dpimport_form_sociodemographics_staging.set_downstream(all_dpimport_done_staging)
+dpimport_dpdash_charts_staging.set_downstream(all_dpimport_done_staging)
+
+all_done = EmptyOperator(task_id="all_done", dag=dag)
+
+all_dpimport_done.set_downstream(all_done)
+all_dpimport_done_staging.set_downstream(all_done)
+export_consolidated_combined_cognitive.set_downstream(all_done)
+
+# Done DAG construction
