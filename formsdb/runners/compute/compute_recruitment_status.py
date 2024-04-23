@@ -226,7 +226,7 @@ def worker(params: Tuple[str, Path]) -> Dict[str, str | bool | None]:
                 case "consented":
                     recruitmest_status_v2 = "C1"
                 case "positive_screen":
-                    recruitmest_status_v2 = "C4"
+                    recruitmest_status_v2 = "C4a"
                 case "recruited":
                     recruitmest_status_v2 = "C5"
                 case "negative_screen":
@@ -239,7 +239,7 @@ def worker(params: Tuple[str, Path]) -> Dict[str, str | bool | None]:
             "withdrawn_before_baseline" in withdrawal_status
             and subject_status == "positive_screen"
         ):
-            recruitmest_status_v2 = "C4"
+            recruitmest_status_v2 = "C4a"
         else:
             match subject_status:
                 case "recruited":
@@ -247,7 +247,7 @@ def worker(params: Tuple[str, Path]) -> Dict[str, str | bool | None]:
                 case "consented":
                     recruitmest_status_v2 = "C1"
                 case "positive_screen":
-                    recruitmest_status_v2 = "C4"
+                    recruitmest_status_v2 = "C4b"
                 case "negative_screen":
                     recruitmest_status_v2 = "C3"
                 case _:
@@ -257,7 +257,8 @@ def worker(params: Tuple[str, Path]) -> Dict[str, str | bool | None]:
         "C1": "consented",
         "C2": "withdrawn_before_screening_outcome",
         "C3": "negative_screen",
-        "C4": "withdrawn_before_baseline",
+        "C4a": "withdrawn_before_baseline",
+        "C4b": "positive_screen",
         "C5": "recruited",
         None: None,
     }
