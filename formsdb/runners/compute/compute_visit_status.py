@@ -112,7 +112,7 @@ def get_subject_started_visit(
             timepoint
         ) - subject_timepoints.index(current_timepoint)
         if (
-            timepoint_delta > 3
+            timepoint_delta > 6
             and not timepoint_not_found
             and cohort.lower()
             == "chr"  # Only for CHR subjects; HC subjects can have large gaps
