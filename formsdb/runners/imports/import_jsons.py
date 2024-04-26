@@ -50,6 +50,8 @@ logargs = {
 }
 logging.basicConfig(**logargs)
 
+FAILED_IMPORT_SUBJECTS: List[str] = []
+
 
 def generate_all_forms(
     df_all_forms: pd.DataFrame, data_dictionry: pd.DataFrame, progress: Progress
@@ -212,6 +214,8 @@ def import_forms_by_network(
     Returns:
         None
     """
+    global FAILED_IMPORT_SUBJECTS
+
     subjects_glob = glob(
         f"{data_root}/{network}/PHOENIX/PROTECTED/*/raw/*/surveys/*.{network}.json"
     )
@@ -257,8 +261,15 @@ def import_forms_by_network(
                 skip_buffer = _empty_buffer(skip_buffer)
                 processed_buffer.append(subject_id)
 
-            with open(subject, "r", encoding="utf-8") as f:
-                json_data = json.load(f)
+            try:
+                with open(subject, "r", encoding="utf-8") as f:
+                    json_data = json.load(f)
+            except json.JSONDecodeError as e:
+                logger.error(f"Error: {e}")
+                logger.error(f"JSON file: {subject}")
+                logger.error(f"Import failed for {subject_id}")
+                FAILED_IMPORT_SUBJECTS.append(subject_id)
+                continue
 
             sub_data_all = pd.DataFrame.from_dict(json_data, orient="columns")
             sub_data_all = sub_data_all.apply(lambda x: x.str.strip()).replace(
@@ -299,6 +310,9 @@ def import_forms_by_network(
     logger.info(f"Processed {len(processed_buffer)} subjects")
     if len(processed_buffer) > 0:
         logger.info(f"Processed subjects: {', '.join(processed_buffer)}")
+    if len(FAILED_IMPORT_SUBJECTS) > 0:
+        logger.error(f"Failed to import {len(FAILED_IMPORT_SUBJECTS)} subjects")
+        logger.error(f"Failed subjects: {', '.join(FAILED_IMPORT_SUBJECTS)}")
 
 
 if __name__ == "__main__":
