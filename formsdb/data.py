@@ -202,6 +202,43 @@ def get_subject_consent_dates(config_file: Path, subject_id: str) -> datetime:
     return date
 
 
+def get_subject_age(config_file: Path, subject_id: str) -> Optional[int]:
+    """
+    Get the age of the subject.
+
+    Uses the `chrdemo_age_mos_chr` and 'chrdemo_age_mos_hc` fields to calculate the age of the subject.
+    Args:
+        config_file (Path): The path to the configuration file.
+        subject_id (str): The subject ID.
+
+    Returns:
+        Optional[int]: The age of the subject in yrs.
+    """
+
+    variables: List[str] = ["chrdemo_age_mos_chr", "chrdemo_age_mos_hc"]
+
+    for variable in variables:
+        query = f"""
+        SELECT form_data ->> '{variable}' as age
+        FROM forms
+        WHERE subject_id = '{subject_id}' AND
+            form_name = 'sociodemographics' AND
+            form_data ? '{variable}';
+        """
+
+        age = db.fetch_record(config_file=config_file, query=query)
+
+        if age is not None:
+            break
+
+    if age is None:
+        return None
+
+    age = int(int(age) / 12)
+
+    return age
+
+
 def subject_has_consent_date(subject_id: str, config_file: Path) -> bool:
     """
     Check if a subject has a consent date
@@ -781,6 +818,39 @@ def form_is_complete(
     else:
         # Form not marked complete
         return False
+
+
+def get_subject_gender(config_file: Path, subject_id: str) -> Optional[str]:
+    """
+    Get the sex assigned at birth for the subject.
+
+    Parameters
+        - config_file: Path to the configuration file.
+        - subject_id: The subject ID to
+
+    Returns
+        - The subject's sex
+    """
+
+    query = f"""
+SELECT
+    CASE
+        WHEN form_data ->> 'chrdemo_sexassigned' = '1' THEN 'Male'
+        WHEN form_data ->> 'chrdemo_sexassigned' = '2' THEN 'Female'
+        ELSE 'Other'
+    END AS sex
+FROM
+    forms
+WHERE
+    form_name = 'sociodemographics'
+    AND form_data ? 'chrdemo_sexassigned'
+    AND form_data ->> 'chrdemo_sexassigned' IS NOT NULL
+    AND subject_id = '{subject_id}'
+"""
+
+    subject_gender = db.fetch_record(config_file=config_file, query=query)
+
+    return subject_gender
 
 
 def get_subject_cohort(
