@@ -27,6 +27,24 @@ visit_order: List[str] = [
     "month_24",
 ]
 
+client_status_visit_mapping: Dict[str, str] = {
+    "Baseline": "baseline",
+    "Month 1": "month_1",
+    "Month 2": "month_2",
+    "Month 3": "month_3",
+    "Month 4": "month_4",
+    "Month 5": "month_5",
+    "Month 6": "month_6",
+    "Month 7": "month_7",
+    "Month 8": "month_8",
+    "Month 9": "month_9",
+    "Month 10": "month_10",
+    "Month 11": "month_11",
+    "Month 12": "month_12",
+    "Month 18": "month_18",
+    "Month 24": "month_24",
+}
+
 upenn_visit_order: List[str] = [
     "baseline",
     "month_2",
@@ -41,7 +59,7 @@ dp_dash_required_cols: List[str] = [
     "day",
     "timeofday",
     "weekday",
-    'subject_id',
+    "subject_id",
 ]
 
 skip_adding_nr: List[str] = [
@@ -49,7 +67,7 @@ skip_adding_nr: List[str] = [
     "recruitment_status_v2",
     "converted",
     "withdrawal_status",
-    "timepoint"
+    "timepoint",
 ]
 
 upenn_tests: List[str] = [

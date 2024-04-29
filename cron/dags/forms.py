@@ -101,6 +101,16 @@ export_harmonized_jsons = BashOperator(
     cwd=REPO_ROOT,
 )
 
+import_client_status = BashOperator(
+    task_id="import_client_status",
+    bash_command=PYTHON_PATH
+    + " "
+    + REPO_ROOT
+    + "/formsdb/runners/imports/import_client_status.py",
+    dag=dag,
+    cwd=REPO_ROOT,
+)
+
 # Compute
 compute_cognition = BashOperator(
     task_id="compute_cognition",
@@ -371,6 +381,7 @@ info.set_downstream(dpimport_form_sociodemographics_staging)
 
 start_mongo.set_downstream(import_upenn_jsons)
 start_mongo.set_downstream(import_harmonized_jsons)
+start_mongo.set_downstream(import_client_status)
 
 import_upenn_jsons.set_downstream(export_upenn_json)
 import_harmonized_jsons.set_downstream(export_harmonized_jsons)
@@ -378,6 +389,7 @@ import_harmonized_jsons.set_downstream(export_harmonized_jsons)
 all_imports_done = EmptyOperator(task_id="all_imports_done", dag=dag)
 export_upenn_json.set_downstream(all_imports_done)
 export_harmonized_jsons.set_downstream(all_imports_done)
+import_client_status.set_downstream(all_imports_done)
 
 all_imports_done.set_downstream(compute_cognition)
 all_imports_done.set_downstream(compute_converted)

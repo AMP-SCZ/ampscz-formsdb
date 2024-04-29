@@ -127,6 +127,65 @@ def check_if_removed(
     return None
 
 
+def check_if_removed_rpms(
+    subject_id: str,
+    visit_order: List[str],
+    visit_mapping: Dict[str, str],
+    config_file: Path,
+) -> Optional[Tuple[str, str, Optional[datetime]]]:
+    """
+    Check if a subject has been removed.
+
+    Args:
+        subject_id (str): Subject ID.
+        config_file (Path): Path to the config file.
+        visit_order (List[str]): List of visits in the order they were conducted.
+        visit_mapping (Dict[str, str]): Mapping of visit names to db acceptable names.
+
+    Returns:
+        Optional[Tuple[str, str]]: If the subject was removed, returns the event, reason and date.
+    """
+
+    query = f"""
+        SELECT * FROM client_status WHERE subject_id = '{subject_id}'
+    """
+
+    df = db.execute_sql(config_file=config_file, query=query)
+
+    if df.empty:
+        return None
+
+    if df["Withdrawn"][0] is not None:
+        withdrawn_reason = "withdrawn"
+        withdrawn_date = df["Withdrawn"][0]
+    elif df["Discontinued"][0] is not None:
+        withdrawn_reason = "discontinued"
+        withdrawn_date = df["Discontinued"][0]
+    else:
+        return None
+
+    withdrawn_visit = None
+
+    for visit in visit_order:
+        if visit == "screening":
+            continue
+
+        # Get visit name from mapping:
+        # Visit order uses DB names, we need to get actual names from the mapping
+        #   mapping: Actual(key) -> DB(value)
+        # Actual names are used in the client_status table
+        # Actual names are the keys in the mapping
+        def get_key_from_value(dictionary: Dict[str, str], value: str):
+            return next((key for key, val in dictionary.items() if val == value), None)
+
+        visit_name = get_key_from_value(visit_mapping, visit)
+
+        if df[visit_name][0] is not None:
+            withdrawn_visit = visit_name
+
+    return withdrawn_visit, withdrawn_reason, withdrawn_date  # type: ignore
+
+
 def get_subject_removed_status(
     config_file: Path, subject_id: str, visit_order: List[str]
 ) -> Dict[str, Any]:
@@ -141,9 +200,17 @@ def get_subject_removed_status(
     Returns:
         Dict[str, Any]: Dictionary containing the removed status of the subject.
     """
-    removed_r = check_if_removed(
-        subject_id=subject_id, visit_order=visit_order, config_file=config_file
-    )
+    if data.subject_uses_rpms(config_file=config_file, subject_id=subject_id):
+        removed_r = check_if_removed_rpms(
+            subject_id=subject_id,
+            visit_order=visit_order,
+            visit_mapping=constants.client_status_visit_mapping,
+            config_file=config_file,
+        )
+    else:
+        removed_r = check_if_removed(
+            subject_id=subject_id, visit_order=visit_order, config_file=config_file
+        )
 
     if removed_r is None:
         removed_event = np.nan
