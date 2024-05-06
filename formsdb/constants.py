@@ -68,6 +68,7 @@ skip_adding_nr: List[str] = [
     "converted",
     "withdrawal_status",
     "timepoint",
+    "visit_status",
 ]
 
 upenn_tests: List[str] = [

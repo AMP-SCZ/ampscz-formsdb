@@ -497,7 +497,7 @@ def make_df_dpdash_ready(df: pd.DataFrame, subject_id: str) -> pd.DataFrame:
     Returns:
         pd.DataFrame: Output DataFrame.
     """
-    dp_dash_required_cols = constants.dp_dash_required_cols + ["subject_id"]
+    dp_dash_required_cols = constants.dp_dash_required_cols
     df = df.copy()
 
     for col in dp_dash_required_cols:
@@ -516,7 +516,12 @@ def make_df_dpdash_ready(df: pd.DataFrame, subject_id: str) -> pd.DataFrame:
     if df["day"].isnull().values.any():  # type: ignore
         df["day"] = df["day"].ffill()
         df["day"] = df["day"].bfill()
-        df["day"] = df["day"].fillna(1)
+
+        # Fill na with 1 to n
+        if df["day"].isnull().values.any():  # type: ignore
+            for i, row in df.iterrows():
+                if pd.isna(row["day"]):
+                    df.at[i, "day"] = i + 1  # type: ignore
 
     return df
 

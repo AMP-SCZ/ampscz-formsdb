@@ -310,6 +310,16 @@ dpimport_form_sociodemographics = BashOperator(
     dag=dag,
 )
 
+dpimport_blood_metrics = BashOperator(
+    task_id="dpimport_blood_metrics",
+    bash_command=f'{DPIMPORT_SCRIPT} \
+-c {dpimport_env["CONFIG"]} \
+"/PHShome/dm1447/dev/ampscz-formsdb/data/generated_outputs/blood_metrics/??-*-form_bloodMetrics-*.csv" \
+-n {NUM_PARALLEL_IMPORT}',
+    env=dpimport_env,
+    dag=dag,
+)
+
 dpimport_dpdash_charts = BashOperator(
     task_id="dpimport_dpdash_charts",
     bash_command=f'{DPIMPORT_SCRIPT} \
@@ -354,6 +364,15 @@ dpimport_form_sociodemographics_staging = BashOperator(
 {STAGING_DPIMPORT_SCRIPT} \
 -c {STAGING_DPDASH_CONFIG} \
 "/data/predict1/data_from_nda/formqc/??-*-form_sociodemographics-*.csv"',
+    dag=dag,
+)
+
+dpimport_blood_metrics_staging = BashOperator(
+    task_id="dpimport_blood_metrics_staging",
+    bash_command=f'{PYTHON_PATH} \
+{STAGING_DPIMPORT_SCRIPT} \
+-c {STAGING_DPDASH_CONFIG} \
+"/PHShome/dm1447/dev/ampscz-formsdb/data/generated_outputs/blood_metrics/??-*-form_bloodMetrics-*.csv',
     dag=dag,
 )
 
@@ -416,6 +435,8 @@ export_visit_status.set_downstream(dpdash_merge_ready)
 export_converted.set_downstream(dpdash_merge_ready)
 export_withdrawal.set_downstream(dpdash_merge_ready)
 export_blood_metrics.set_downstream(dpdash_merge_ready)
+export_blood_metrics.set_downstream(dpimport_blood_metrics)
+export_blood_metrics.set_downstream(dpimport_blood_metrics_staging)
 
 dpdash_merge_ready.set_downstream(generate_dpdash_csv)
 generate_dpdash_csv.set_downstream(dpimport_dpdash_charts)  # Production
@@ -445,6 +466,7 @@ dpimport_informed_consent_run_sheet.set_downstream(all_dpimport_done)
 dpimport_inclusionexclusion_criteria_review.set_downstream(all_dpimport_done)
 dpimport_form_sociodemographics.set_downstream(all_dpimport_done)
 dpimport_dpdash_charts.set_downstream(all_dpimport_done)
+dpimport_blood_metrics.set_downstream(all_dpimport_done)
 
 all_dpimport_done_staging = EmptyOperator(
     task_id="all_dpimport_done_staging",
@@ -472,6 +494,7 @@ dpimport_inclusionexclusion_criteria_review_staging.set_downstream(
 )
 dpimport_form_sociodemographics_staging.set_downstream(all_dpimport_done_staging)
 dpimport_dpdash_charts_staging.set_downstream(all_dpimport_done_staging)
+dpimport_blood_metrics_staging.set_downstream(all_dpimport_done_staging)
 
 all_done = EmptyOperator(task_id="all_done", dag=dag)
 
