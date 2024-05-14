@@ -97,7 +97,7 @@ def get_subject_started_visit(
                     event_name=timepoint,
                 )
                 if is_complete and not is_missing:
-                    if "digital_biomarkers" in form:
+                    if "digital_biomarkers" in form or "sociodemographics" in form:
                         # Skip: not a reliable form for determining timepoint
                         continue
                     current_timepoint = timepoint
