@@ -3,6 +3,7 @@ Module contain helper functions specific to this data pipeline
 """
 
 import json
+import logging
 from datetime import datetime
 from functools import lru_cache
 from pathlib import Path
@@ -12,6 +13,8 @@ import pandas as pd
 
 from formsdb import constants
 from formsdb.helpers import db, utils
+
+logger = logging.getLogger(__name__)
 
 
 def get_overrides(config_file: Path, measure: str) -> List[str]:
@@ -433,59 +436,6 @@ def get_upenn_days_since_consent(
     return (event_date - consent_date).days + 1
 
 
-def estimate_event_date(
-    subject_id: str, event: str, config_file: Path
-) -> Optional[datetime]:
-    """
-    Infers the events date.
-
-    Args:
-        subject_id (str): The subject ID.
-        event (str): The event name.
-        config_file (Path): The path to the config file.
-
-    Returns:
-        Optional[datetime]: The date of the event.
-    """
-
-    forms_df = get_all_subject_forms(subject_id=subject_id, config_file=config_file)
-
-    forms_df = get_all_subject_forms(subject_id=subject_id, config_file=config_file)
-    visit_df = forms_df[forms_df["event_name"].str.contains(f"{event}_")]
-
-    if visit_df.empty:
-        return None
-
-    for _, row in visit_df.iterrows():
-        form_name = row["form_name"]
-
-        if form_name == "sociodemographics":
-            continue
-
-        if "digital_biomarkers" in form_name:
-            continue
-
-        form_data_r: Dict[str, Any] = row["form_data"]
-        form_variables = form_data_r.keys()
-
-        date_variables = [v for v in form_variables if "date" in v]
-
-        for date_variable in date_variables:
-            date = form_data_r[date_variable]
-
-            # Validate date
-            if not utils.validate_date(date):
-                continue
-            else:
-                date_ts: pd.Timestamp = pd.to_datetime(date)
-                if date_ts < datetime(2019, 1, 1):
-                    continue
-                date_dt = date_ts.to_pydatetime()
-                return date_dt
-
-    return None
-
-
 def make_df_dpdash_ready(df: pd.DataFrame, subject_id: str) -> pd.DataFrame:
     """
     Make a DataFrame DPDash ready, by adding DPDash required columns and the subject_id column.
@@ -858,6 +808,9 @@ WHERE
     return subject_gender
 
 
+# Cohort specific functions
+
+
 def get_subject_cohort(
     config_file: Path,
     subject_id: str,
@@ -942,6 +895,9 @@ def is_subject_hc(
         return False
 
 
+# Recruitment Status
+
+
 def get_subject_recruitment_status(config_file: Path, subject_id: str) -> Optional[str]:
     """
     Get the recruitment status for a subject.
@@ -963,29 +919,6 @@ def get_subject_recruitment_status(config_file: Path, subject_id: str) -> Option
     recruitment_status = db.fetch_record(config_file=config_file, query=query)
 
     return recruitment_status
-
-
-def get_forms_cohort_timepoint_map(
-    config_file: Path,
-) -> Dict[str, Dict[str, List[str]]]:
-    """
-    Returns a dictionary containing the forms for each cohort and timepoint.
-
-    Args:
-        config_file: The path to the config file
-
-    Returns:
-        Dict[str, Dict[str, List[str]]]: A dictionary containing the
-            forms for each cohort and timepoint.
-    """
-
-    config_params = utils.config(path=config_file, section="data")
-    forms_cohort_timepoint_map_path = config_params["forms_cohort_timepoint_map"]
-
-    with open(forms_cohort_timepoint_map_path, "r", encoding="utf-8") as f:
-        forms_cohort_timepoint_map = json.load(f)
-
-    return forms_cohort_timepoint_map
 
 
 def get_subject_withdrawal_status(
@@ -1012,3 +945,187 @@ def get_subject_withdrawal_status(
     withdrawal_status = db.fetch_record(config_file=config_file, query=query)
 
     return withdrawal_status
+
+
+# Timepoint / Visit / Event Dates
+
+
+def estimate_event_date(
+    subject_id: str, event: str, config_file: Path
+) -> Optional[datetime]:
+    """
+    Infers the events date.
+
+    Args:
+        subject_id (str): The subject ID.
+        event (str): The event name.
+        config_file (Path): The path to the config file.
+
+    Returns:
+        Optional[datetime]: The date of the event.
+    """
+
+    forms_df = get_all_subject_forms(subject_id=subject_id, config_file=config_file)
+
+    forms_df = get_all_subject_forms(subject_id=subject_id, config_file=config_file)
+    visit_df = forms_df[forms_df["event_name"].str.contains(f"{event}_")]
+
+    if visit_df.empty:
+        return None
+
+    for _, row in visit_df.iterrows():
+        form_name = row["form_name"]
+
+        if form_name == "sociodemographics":
+            continue
+
+        if "digital_biomarkers" in form_name:
+            continue
+
+        form_data_r: Dict[str, Any] = row["form_data"]
+        form_variables = form_data_r.keys()
+
+        date_variables = [v for v in form_variables if "date" in v]
+
+        for date_variable in date_variables:
+            date = form_data_r[date_variable]
+
+            # Validate date
+            if not utils.validate_date(date):
+                continue
+            else:
+                date_ts: pd.Timestamp = pd.to_datetime(date)
+                if date_ts < datetime(2019, 1, 1):
+                    continue
+                date_dt = date_ts.to_pydatetime()
+                return date_dt
+
+    return None
+
+
+def get_forms_cohort_timepoint_map(
+    config_file: Path,
+) -> Dict[str, Dict[str, List[str]]]:
+    """
+    Returns a dictionary containing the forms for each cohort and timepoint.
+
+    Args:
+        config_file: The path to the config file
+
+    Returns:
+        Dict[str, Dict[str, List[str]]]: A dictionary containing the
+            forms for each cohort and timepoint.
+    """
+
+    config_params = utils.config(path=config_file, section="data")
+    forms_cohort_timepoint_map_path = config_params["forms_cohort_timepoint_map"]
+
+    with open(forms_cohort_timepoint_map_path, "r", encoding="utf-8") as f:
+        forms_cohort_timepoint_map = json.load(f)
+
+    return forms_cohort_timepoint_map
+
+
+def get_subject_timepoints(subject_id: str, config_file: Path) -> List[str]:
+    """
+    Get all timepoints for a subject.
+
+    Args:
+        subject_id: Subject ID.
+        config_file: Path to the config file.
+
+    Returns:
+        List of timepoints / events / visits.
+    """
+    forms_cohort_timepoint_map = get_forms_cohort_timepoint_map(config_file=config_file)
+    cohort = get_subject_cohort(config_file=config_file, subject_id=subject_id)
+    if cohort is None:
+        logger.warning(f"No cohort found for subject: {subject_id}")
+        cohort = "CHR"  # Assume CHR if cohort is not found.
+    timepoints = forms_cohort_timepoint_map[cohort.lower()].keys()
+    return list(timepoints)
+
+
+def get_subject_visit_date_map(
+    config_file: Path, subject_id: str
+) -> Dict[str, datetime]:
+    """
+    Get a dictionary mapping visit names to visit dates for a subject.
+
+    Args:
+        config_file: Path to the config file.
+        subject_id: The subject ID.
+
+    Returns:
+        A dictionary mapping visit names to visit dates.
+    """
+
+    visit_date_map = {}
+
+    subject_timepoints = get_subject_timepoints(
+        config_file=config_file, subject_id=subject_id
+    )
+
+    for timepoint in subject_timepoints:
+        date_estimate = estimate_event_date(
+            config_file=config_file, subject_id=subject_id, event=timepoint
+        )
+        visit_date_map[timepoint] = date_estimate
+
+    return visit_date_map
+
+
+def get_closest_timepoint(
+    subject_id: str, date: datetime, config_file: Path
+) -> Optional[str]:
+    """
+    Get the closest timepoint to a given date for a subject.
+
+    Args:
+        subject_id: Subject ID.
+        date: The date.
+        config_file: Path to the config file.
+
+    Returns:
+        The closest timepoint.
+    """
+    visit_date_map = get_subject_visit_date_map(
+        config_file=config_file, subject_id=subject_id
+    )
+
+    # Drop keys with None values.
+    visit_date_map = {k: v for k, v in visit_date_map.items() if v is not None}
+
+    if not visit_date_map:
+        return None
+
+    closest_timepoint = min(
+        visit_date_map.keys(), key=lambda x: abs(visit_date_map[x] - date)
+    )
+
+    return closest_timepoint
+
+
+def get_subject_latest_visit_started(
+    config_file: Path,
+    subject_id: str,
+) -> Optional[str]:
+    """
+    Returns the timepoint of the most recent form completed by the subject.
+
+    Args:
+        config_file (Path): Path to the config file.
+        subject_id (str): The subject ID.
+
+    Returns:
+        Optional[str]: The timepoint of the most recent form completed by the subject.
+    """
+
+    qurery = f"""
+        SELECT timepoint FROM subject_visit_status
+        WHERE subject_id = '{subject_id}';
+    """
+
+    timepoint = db.fetch_record(config_file=config_file, query=qurery)
+
+    return timepoint

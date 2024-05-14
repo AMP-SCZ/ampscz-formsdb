@@ -173,6 +173,7 @@ def check_if_removed_rpms(
 
     for visit in visit_order:
         if visit == "screening":
+            # RPMS does not have a date recorded for screening
             continue
 
         # Get visit name from mapping:
@@ -190,6 +191,10 @@ def check_if_removed_rpms(
 
     if withdrawn_visit:
         withdrawn_visit = visit_mapping[withdrawn_visit]
+
+    if withdrawn_visit is None and withdrawn_date is not None:
+        # Since the withdrawn date is not associated with a visit, we assume it is from screening
+        withdrawn_visit = "screening"
 
     return withdrawn_visit, withdrawn_reason, withdrawn_date  # type: ignore
 
@@ -233,6 +238,11 @@ def check_if_removed_redcap(
     else:
         try:
             result_dt = datetime.strptime(result, "%Y-%m-%d")
+            withdrawn_timepoint = data.get_closest_timepoint(
+                config_file=config_file, subject_id=subject_id, date=result_dt
+            )
+            if withdrawn_timepoint is not None:
+                return withdrawn_timepoint, "withdrawn", result_dt
         except ValueError:
             logger.error(f"{subject_id}: Could not parse date: {result}")
             return None
@@ -254,6 +264,8 @@ def get_subject_removed_status(
     Returns:
         Dict[str, Any]: Dictionary containing the removed status of the subject.
     """
+    removed_info_source = None
+
     # If the subject uses RPMS, check the client_status table
     # Else use all forms to determing if the subject was removed
     # If still not withdrawn, check the statusform_withdrawal on floating_forms
@@ -264,21 +276,25 @@ def get_subject_removed_status(
             visit_mapping=constants.client_status_visit_mapping,
             config_file=config_file,
         )
+        removed_info_source = "client_status"
     else:
         removed_r = check_if_removed(
             subject_id=subject_id, visit_order=visit_order, config_file=config_file
         )
+        removed_info_source = "missing_data_form"
 
         if removed_r is None:
             removed_r = check_if_removed_redcap(
                 subject_id=subject_id, config_file=config_file
             )
+            removed_info_source = "floating_forms(statusform_withdrawal)"
 
     if removed_r is None:
         removed_event = np.nan
         removed_reason = np.nan
         removed = False
         withdrawn_date = np.nan
+        removed_info_source = None
     else:
         removed_event, removed_reason, withdrawn_date = removed_r
         removed = True
@@ -305,6 +321,7 @@ def get_subject_removed_status(
         "removed_event": removed_event,
         "removed_reason": removed_reason,
         "withdrawal_status": withdrawal_status,
+        "removed_info_source": removed_info_source,
     }
 
     return subject_data
