@@ -23,7 +23,7 @@ except ValueError:
 
 import logging
 import multiprocessing
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Any
 
 import pandas as pd
 from rich.logging import RichHandler
@@ -277,6 +277,44 @@ def worker(params: Tuple[str, Path]) -> Dict[str, str | bool | None]:
     }
 
 
+def process_subject_filters(params: Tuple[str, Path]) -> Dict[str, Any]:
+    """
+    Retrieve variables relevant for dashboard filters
+
+    Args:
+        params: A tuple containing the subject ID and the config file path.
+
+    Returns:
+        A dictionary containing the subject ID and the relevant variables.
+    """
+    subject, config_file = params
+
+    try:
+        cohort = data.get_subject_cohort(config_file=config_file, subject_id=subject)
+    except ValueError:
+        cohort = None
+    try:
+        consent_date = data.get_subject_consent_dates(
+            config_file=config_file, subject_id=subject
+        )
+    except data.NoSubjectConsentDateException:
+        consent_date = None
+    chrcrit_included = data.subject_is_included(
+        config_file=config_file, subject_id=subject
+    )
+    gender = data.get_subject_gender(config_file=config_file, subject_id=subject)
+    age = data.get_subject_age(config_file=config_file, subject_id=subject)
+
+    return {
+        "subject": subject,
+        "consent_date": consent_date,
+        "gender": gender,
+        "age": age,
+        "cohort": cohort,
+        "chrcrit_included": chrcrit_included,
+    }
+
+
 def process_data(config_file: Path) -> None:
     """
     Processes the data by fetching the data for each subject and constructing
@@ -301,23 +339,41 @@ def process_data(config_file: Path) -> None:
 
     # Create parameters for the worker function
     worker_params = [(subject_id, config_file) for subject_id in subject_ids]
-    results = []
+    recruitment_status_results = []
+    filter_results = []
 
+    logger.info("Computing recruitment status...")
     with multiprocessing.Pool(processes=int(num_processes)) as pool:
         with utils.get_progress_bar() as progress:
             task = progress.add_task("Processing subjects...", total=len(worker_params))
             for result in pool.imap_unordered(worker, worker_params):  # type: ignore
-                results.append(result)
+                recruitment_status_results.append(result)
+                progress.update(task, advance=1)
+
+    logger.info("Computing subject filters...")
+    with multiprocessing.Pool(processes=int(num_processes)) as pool:
+        with utils.get_progress_bar() as progress:
+            task = progress.add_task("Processing subjects...", total=len(worker_params))
+            for result in pool.imap_unordered(process_subject_filters, worker_params):
+                filter_results.append(result)
                 progress.update(task, advance=1)
 
     # Convert the results list into a pandas dataframe
-    master_df = pd.DataFrame(results)
+    master_df = pd.DataFrame(recruitment_status_results)
+    filters_df = pd.DataFrame(filter_results)
 
     logger.info("Exporting data to DB...")
     db.df_to_table(
         config_file=config_file,
         df=master_df,
         table_name="recruitment_status",
+        if_exists="replace",
+    )
+
+    db.df_to_table(
+        config_file=config_file,
+        df=filters_df,
+        table_name="filters",
         if_exists="replace",
     )
 

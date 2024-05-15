@@ -71,6 +71,8 @@ def check_if_removed(
     """
     Check if a subject has been removed.
 
+    Looks for 'chrmiss_withdrawn' and 'chrmiss_discon' in the missing_data forms.
+
     Args:
         subject_id (str): Subject ID.
         config_file (Path): Path to the config file.
@@ -127,6 +129,127 @@ def check_if_removed(
     return None
 
 
+def check_if_removed_rpms(
+    subject_id: str,
+    visit_order: List[str],
+    visit_mapping: Dict[str, str],
+    config_file: Path,
+) -> Optional[Tuple[str, str, Optional[datetime]]]:
+    """
+    Check if a subject has been removed.
+
+    Uses the client_status table to check if the subject has been withdrawn or discontinued.
+    Only applicable if the subject uses RPMS.
+
+    Args:
+        subject_id (str): Subject ID.
+        config_file (Path): Path to the config file.
+        visit_order (List[str]): List of visits in the order they were conducted.
+        visit_mapping (Dict[str, str]): Mapping of visit names to db acceptable names.
+
+    Returns:
+        Optional[Tuple[str, str]]: If the subject was removed, returns the event, reason and date.
+    """
+
+    query = f"""
+        SELECT * FROM client_status WHERE subject_id = '{subject_id}'
+    """
+
+    df = db.execute_sql(config_file=config_file, query=query)
+
+    if df.empty:
+        return None
+
+    if df["Withdrawn"][0] is not None:
+        withdrawn_reason = "withdrawn"
+        withdrawn_date = df["Withdrawn"][0]
+    elif df["Discontinued"][0] is not None:
+        withdrawn_reason = "discontinued"
+        withdrawn_date = df["Discontinued"][0]
+    else:
+        return None
+
+    withdrawn_visit = None
+
+    for visit in visit_order:
+        if visit == "screening":
+            # RPMS does not have a date recorded for screening
+            continue
+
+        # Get visit name from mapping:
+        # Visit order uses DB names, we need to get actual names from the mapping
+        #   mapping: Actual(key) -> DB(value)
+        # Actual names are used in the client_status table
+        # Actual names are the keys in the mapping
+        def get_key_from_value(dictionary: Dict[str, str], value: str):
+            return next((key for key, val in dictionary.items() if val == value), None)
+
+        visit_name = get_key_from_value(visit_mapping, visit)
+
+        if df[visit_name][0] is not None:
+            withdrawn_visit = visit_name
+
+    if withdrawn_visit:
+        withdrawn_visit = visit_mapping[withdrawn_visit]
+
+    if withdrawn_visit is None and withdrawn_date is not None:
+        # Since the withdrawn date is not associated with a visit, we assume it is from screening
+        withdrawn_visit = "screening"
+
+    return withdrawn_visit, withdrawn_reason, withdrawn_date  # type: ignore
+
+
+def check_if_removed_redcap(
+    subject_id: str, config_file: Path
+) -> Optional[Tuple[str, str, Optional[datetime]]]:
+    """
+    Checks for statusform_withdrawal on floating_forms (statusform)
+
+    Returns:
+        Optional[Tuple[str, str, Optional[datetime]]]: If the subject was removed,
+            returns the event, reason and date. Else, returns None.
+    """
+    variable = "statusform_withdrawal"
+    variable_name = "withdrawal_date"
+    form_name = "uncategorized"
+    event_name = "floating_forms"
+
+    query = f"""
+    SELECT
+        CASE
+            WHEN LENGTH(form_data ->> '{variable}') >= 10 THEN
+                TO_DATE(form_data ->> '{variable}', 'YYYY-MM-DD')
+            ELSE
+                NULL
+        END AS {variable_name}
+    FROM
+        forms
+    WHERE
+        subject_id = '{subject_id}'
+        AND form_name = '{form_name}'
+        AND event_name LIKE '%%{event_name}%%'
+        AND form_data ? '{variable}';
+    """
+
+    result = db.fetch_record(config_file=config_file, query=query)
+
+    if result is None:
+        return None
+    else:
+        try:
+            result_dt = datetime.strptime(result, "%Y-%m-%d")
+            withdrawn_timepoint = data.get_closest_timepoint(
+                config_file=config_file, subject_id=subject_id, date=result_dt
+            )
+            if withdrawn_timepoint is not None:
+                return withdrawn_timepoint, "withdrawn", result_dt
+        except ValueError:
+            logger.error(f"{subject_id}: Could not parse date: {result}")
+            return None
+
+    return "uncategorized", "withdrawn", result_dt
+
+
 def get_subject_removed_status(
     config_file: Path, subject_id: str, visit_order: List[str]
 ) -> Dict[str, Any]:
@@ -141,15 +264,37 @@ def get_subject_removed_status(
     Returns:
         Dict[str, Any]: Dictionary containing the removed status of the subject.
     """
-    removed_r = check_if_removed(
-        subject_id=subject_id, visit_order=visit_order, config_file=config_file
-    )
+    removed_info_source = None
+
+    # If the subject uses RPMS, check the client_status table
+    # Else use all forms to determing if the subject was removed
+    # If still not withdrawn, check the statusform_withdrawal on floating_forms
+    if data.subject_uses_rpms(config_file=config_file, subject_id=subject_id):
+        removed_r = check_if_removed_rpms(
+            subject_id=subject_id,
+            visit_order=visit_order,
+            visit_mapping=constants.client_status_visit_mapping,
+            config_file=config_file,
+        )
+        removed_info_source = "client_status"
+    else:
+        removed_r = check_if_removed(
+            subject_id=subject_id, visit_order=visit_order, config_file=config_file
+        )
+        removed_info_source = "missing_data_form"
+
+        if removed_r is None:
+            removed_r = check_if_removed_redcap(
+                subject_id=subject_id, config_file=config_file
+            )
+            removed_info_source = "floating_forms(statusform_withdrawal)"
 
     if removed_r is None:
         removed_event = np.nan
         removed_reason = np.nan
         removed = False
         withdrawn_date = np.nan
+        removed_info_source = None
     else:
         removed_event, removed_reason, withdrawn_date = removed_r
         removed = True
@@ -176,6 +321,7 @@ def get_subject_removed_status(
         "removed_event": removed_event,
         "removed_reason": removed_reason,
         "withdrawal_status": withdrawal_status,
+        "removed_info_source": removed_info_source,
     }
 
     return subject_data

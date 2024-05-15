@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-Export the blood metrics of subjects to CSVs.
+Export the filters for DP Dash.
 """
 
 import sys
@@ -28,7 +28,7 @@ from rich.logging import RichHandler
 from formsdb import data
 from formsdb.helpers import cli, db, dpdash, utils
 
-MODULE_NAME = "formsdb.runners.export.export_blood_metrics"
+MODULE_NAME = "formsdb.runners.export.export_filters"
 
 console = utils.get_console()
 
@@ -42,24 +42,23 @@ logargs = {
 logging.basicConfig(**logargs)
 
 
-def fetch_blood_metrics(
-    config_file: Path, subject_id: str
-) -> pd.DataFrame:
+def fetch_recruitment_data(config_file: Path, subject_id: str) -> pd.DataFrame:
     """
-    Fetch the blood metrics for a subject, for a specific event.
+    Fetch the recruitment data for a subject.
 
     Args:
         config_file (Path): Path to the config file.
         subject_id (str): Subject ID.
-        event_name (str): Event name.
 
     Returns:
-        pd.DataFrame: DataFrame containing the blood metrics for the subject.
+        pd.DataFrame: DataFrame containing the recruitment data for the subject.
     """
     query = f"""
-        SELECT *
-        FROM blood_metrics
-        WHERE subject_id='{subject_id}'
+        SELECT filters.subject AS subject_id, filters.gender, filters.cohort,
+            filters.chrcrit_included, recruitment_status.recruitment_status_v2 AS recruitment_status
+        FROM filters
+        LEFT JOIN recruitment_status ON filters.subject = recruitment_status.subject_id
+        WHERE subject='{subject_id}'
         """
 
     df = db.execute_sql(config_file=config_file, query=query)
@@ -67,34 +66,35 @@ def fetch_blood_metrics(
     return df
 
 
-def generate_blood_metrics_filename(subject_id: str) -> str:
+def generate_filter_filename(subject_id: str) -> str:
     """
-    Generate DP Dash compliant the filename for the blood metrics data.
+    Generate DP Dash compliant the filename for the filters data.
     Args:
         subject_id (str): Subject ID.
 
     Returns:
-        str: Filename for the blood metrics data.
+        str: Filename for the UPenn data summary.
     """
 
     filename = dpdash.get_dpdash_name(
         study=subject_id[:2],
         subject=subject_id,
         data_type="form",
-        category="bloodMetrics",
+        category="filters",
+        optional_tag=["status"],
         time_range="day1to1",
     )
 
     return f"{filename}.csv"
 
 
-def get_blood_metrics_output_dir(config_file: Path) -> Path:
+def get_filters_output_dir(config_file: Path) -> Path:
     """
-    Get the output directory for the blood metrics data.
+    Get the output directory for the filter data.
     """
     output_params = utils.config(config_file, "outputs")
 
-    output_dir = Path(output_params["blood_metrics_root"])
+    output_dir = Path(output_params["filters_root"])
     return output_dir
 
 
@@ -104,26 +104,20 @@ def generate_csv(
     output_dir: Path,
 ) -> None:
     """
-    Generate the CSV file for the blood metrics data.
+    Generate the CSV file for the filter data.
 
     Args:
         config_file (Path): Path to the config file.
         subject_id (str): Subject ID.
         output_dir (Path): Path to the output directory.
     """
-    df = fetch_blood_metrics(
-        config_file=config_file, subject_id=subject_id
-    )
+    df = fetch_recruitment_data(config_file=config_file, subject_id=subject_id)
 
     if df.empty:
-        # logger.warning(
-        #     f"No blood metrics data found for subject {subject_id}: {event_name}"
-        # )
+        logger.warning(f"No recruitment data found for subject {subject_id}.")
         return
 
-    filename = generate_blood_metrics_filename(
-        subject_id=subject_id
-    )
+    filename = generate_filter_filename(subject_id=subject_id)
     output_path = output_dir / filename
 
     df = data.make_df_dpdash_ready(df=df, subject_id=subject_id)
@@ -133,7 +127,7 @@ def generate_csv(
 
 def export_data(config_file: Path, output_root: Path) -> None:
     """
-    Export the blood metrics data to CSVs.
+    Export the recruitment status data to CSVs.
 
     Args:
         config_file (Path): Path to the config file.
@@ -164,14 +158,14 @@ if __name__ == "__main__":
         config_file=config_file, module_name=MODULE_NAME, logger=logger
     )
 
-    output_root = get_blood_metrics_output_dir(config_file=config_file)
+    output_root = get_filters_output_dir(config_file=config_file)
 
-    logger.info(f"Exporting blood metrics to {output_root}...")
+    logger.info(f"Exporting recruitment status data to {output_root}...")
 
     output_root.mkdir(parents=True, exist_ok=True)
 
     logger.warning("Clearing existing files in the output directory...")
-    cli.clear_directory(output_root, pattern="*form_bloodMetrics*.csv")
+    cli.clear_directory(output_root, pattern="*form_filters*.csv")
 
     logger.info("Exporting data...")
     export_data(config_file=config_file, output_root=output_root)

@@ -102,6 +102,26 @@ export_harmonized_jsons = BashOperator(
     cwd=REPO_ROOT,
 )
 
+import_rpms_entry_status = BashOperator(
+    task_id="import_rpms_entry_status",
+    bash_command=PYTHON_PATH
+    + " "
+    + REPO_ROOT
+    + "/formsdb/runners/imports/import_rpms_entry_status.py",
+    dag=dag,
+    cwd=REPO_ROOT,
+)
+
+import_client_status = BashOperator(
+    task_id="import_client_status",
+    bash_command=PYTHON_PATH
+    + " "
+    + REPO_ROOT
+    + "/formsdb/runners/imports/import_client_status.py",
+    dag=dag,
+    cwd=REPO_ROOT,
+)
+
 # Compute
 compute_cognition = BashOperator(
     task_id="compute_cognition",
@@ -261,12 +281,19 @@ STAGING_DPIMPORT_SCRIPT = "/PHShome/dm1447/dev/dpimport/scripts/import.py"
 STAGING_DPDASH_CONFIG = "/PHShome/dm1447/.keys/staging_dpdash.yaml"
 
 # Read variables from Airflow's Variables
-dpimport_env = {
+dpimport_dev_env = {
     "state": Variable.get("DEV_STATE"),
     "HOST": Variable.get("DEV_HOST"),
     "PORT": Variable.get("MONGODB_PORT"),
     "MONGO_PASS": Variable.get("DEV_MONGO_PASS"),
     "CONFIG": Variable.get("DPIMPORT_CONFIG"),
+}
+dpimport_prod_env = {
+    "state": Variable.get("DPDASH_PROD_STATE"),
+    "HOST": Variable.get("DPDASH_PROD_HOST"),
+    "PORT": Variable.get("MONGODB_PORT"),
+    "MONGO_PASS": Variable.get("DPDASH_PROD_MONGO_PASS"),
+    "CONFIG": Variable.get("DPIMPORT_PROD_CONFIG"),
 }
 NUM_PARALLEL_IMPORT = 4
 
@@ -274,40 +301,60 @@ NUM_PARALLEL_IMPORT = 4
 dpimport_informed_consent_run_sheet = BashOperator(
     task_id="dpimport_informed_consent_run_sheet",
     bash_command=f'{DPIMPORT_SCRIPT} \
--c {dpimport_env["CONFIG"]} \
+-c {dpimport_dev_env["CONFIG"]} \
 "/data/predict1/data_from_nda/formqc/??-*-form_informed_consent_run_sheet-*.csv" \
 -n {NUM_PARALLEL_IMPORT}',
-    env=dpimport_env,
+    env=dpimport_dev_env,
     dag=dag,
 )
 
 dpimport_inclusionexclusion_criteria_review = BashOperator(
     task_id="dpimport_inclusionexclusion_criteria_review",
     bash_command=f'{DPIMPORT_SCRIPT} \
--c {dpimport_env["CONFIG"]} \
+-c {dpimport_dev_env["CONFIG"]} \
 "/data/predict1/data_from_nda/formqc/??-*-form_inclusionexclusion_criteria_review-*.csv" \
 -n {NUM_PARALLEL_IMPORT}',
-    env=dpimport_env,
+    env=dpimport_dev_env,
     dag=dag,
 )
 
 dpimport_form_sociodemographics = BashOperator(
     task_id="dpimport_form_sociodemographics",
     bash_command=f'{DPIMPORT_SCRIPT} \
--c {dpimport_env["CONFIG"]} \
+-c {dpimport_dev_env["CONFIG"]} \
 "/data/predict1/data_from_nda/formqc/??-*-form_sociodemographics-*.csv" \
 -n {NUM_PARALLEL_IMPORT}',
-    env=dpimport_env,
+    env=dpimport_dev_env,
+    dag=dag,
+)
+
+dpimport_blood_metrics = BashOperator(
+    task_id="dpimport_blood_metrics",
+    bash_command=f'{DPIMPORT_SCRIPT} \
+-c {dpimport_dev_env["CONFIG"]} \
+"/PHShome/dm1447/dev/ampscz-formsdb/data/generated_outputs/blood_metrics/??-*-form_bloodMetrics-*.csv" \
+-n {NUM_PARALLEL_IMPORT}',
+    env=dpimport_dev_env,
+    dag=dag,
+)
+
+dpimport_blood_metrics_prod = BashOperator(
+    task_id="dpimport_blood_metrics_prod",
+    bash_command=f'{DPIMPORT_SCRIPT} \
+-c {dpimport_prod_env["CONFIG"]} \
+"/PHShome/dm1447/dev/ampscz-formsdb/data/generated_outputs/blood_metrics/??-*-form_bloodMetrics-*.csv" \
+-n {NUM_PARALLEL_IMPORT}',
+    env=dpimport_prod_env,
     dag=dag,
 )
 
 dpimport_dpdash_charts = BashOperator(
     task_id="dpimport_dpdash_charts",
     bash_command=f'{DPIMPORT_SCRIPT} \
--c {dpimport_env["CONFIG"]} \
+-c {dpimport_dev_env["CONFIG"]} \
 "/data/predict1/data_from_nda/formqc/??-*-form_dpdash_charts-*.csv" \
 -n {NUM_PARALLEL_IMPORT}',
-    env=dpimport_env,
+    env=dpimport_dev_env,
     dag=dag,
 )
 
@@ -348,6 +395,15 @@ dpimport_form_sociodemographics_staging = BashOperator(
     dag=dag,
 )
 
+dpimport_blood_metrics_staging = BashOperator(
+    task_id="dpimport_blood_metrics_staging",
+    bash_command=f'{PYTHON_PATH} \
+{STAGING_DPIMPORT_SCRIPT} \
+-c {STAGING_DPDASH_CONFIG} \
+"/PHShome/dm1447/dev/ampscz-formsdb/data/generated_outputs/blood_metrics/??-*-form_bloodMetrics-*.csv"',
+    dag=dag,
+)
+
 dpimport_dpdash_charts_staging = BashOperator(
     task_id="dpimport_dpdash_charts_staging",
     bash_command=f'{PYTHON_PATH} \
@@ -372,6 +428,8 @@ info.set_downstream(dpimport_form_sociodemographics_staging)
 
 start_mongo.set_downstream(import_upenn_jsons)
 start_mongo.set_downstream(import_harmonized_jsons)
+start_mongo.set_downstream(import_rpms_entry_status)
+start_mongo.set_downstream(import_client_status)
 
 import_upenn_jsons.set_downstream(export_upenn_json)
 import_harmonized_jsons.set_downstream(export_harmonized_jsons)
@@ -379,6 +437,8 @@ import_harmonized_jsons.set_downstream(export_harmonized_jsons)
 all_imports_done = EmptyOperator(task_id="all_imports_done", dag=dag)
 export_upenn_json.set_downstream(all_imports_done)
 export_harmonized_jsons.set_downstream(all_imports_done)
+import_rpms_entry_status.set_downstream(all_imports_done)
+import_client_status.set_downstream(all_imports_done)
 
 all_imports_done.set_downstream(compute_cognition)
 all_imports_done.set_downstream(compute_converted)
@@ -405,6 +465,9 @@ export_visit_status.set_downstream(dpdash_merge_ready)
 export_converted.set_downstream(dpdash_merge_ready)
 export_withdrawal.set_downstream(dpdash_merge_ready)
 export_blood_metrics.set_downstream(dpdash_merge_ready)
+export_blood_metrics.set_downstream(dpimport_blood_metrics)
+export_blood_metrics.set_downstream(dpimport_blood_metrics_prod)
+export_blood_metrics.set_downstream(dpimport_blood_metrics_staging)
 
 dpdash_merge_ready.set_downstream(generate_dpdash_csv)
 generate_dpdash_csv.set_downstream(dpimport_dpdash_charts)  # Production
@@ -434,6 +497,8 @@ dpimport_informed_consent_run_sheet.set_downstream(all_dpimport_done)
 dpimport_inclusionexclusion_criteria_review.set_downstream(all_dpimport_done)
 dpimport_form_sociodemographics.set_downstream(all_dpimport_done)
 dpimport_dpdash_charts.set_downstream(all_dpimport_done)
+dpimport_blood_metrics.set_downstream(all_dpimport_done)
+dpimport_blood_metrics_prod.set_downstream(all_dpimport_done)
 
 all_dpimport_done_staging = EmptyOperator(
     task_id="all_dpimport_done_staging",
@@ -461,6 +526,7 @@ dpimport_inclusionexclusion_criteria_review_staging.set_downstream(
 )
 dpimport_form_sociodemographics_staging.set_downstream(all_dpimport_done_staging)
 dpimport_dpdash_charts_staging.set_downstream(all_dpimport_done_staging)
+dpimport_blood_metrics_staging.set_downstream(all_dpimport_done_staging)
 
 all_done = EmptyOperator(task_id="all_done", dag=dag)
 

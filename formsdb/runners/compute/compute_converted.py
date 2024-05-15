@@ -138,11 +138,45 @@ def get_conversion_date(subject_id: str, config_file: Path) -> Optional[datetime
     return None
 
 
+def get_converted_date_rpms(subject_id: str, config_file: Path) -> Optional[datetime]:
+    """
+    Checks subject's conversion forms for conversion status.
+
+    Specific to subjects that use RPMS
+
+    Args:
+        subject_id (str): The subject ID.
+        config_file (Path): Path to the config file.
+
+    Returns:
+        bool: Whether the subject has been converted.
+    """
+    query = f"""
+        SELECT * FROM client_status WHERE subject_id = '{subject_id}'
+    """
+
+    df = db.execute_sql(config_file=config_file, query=query)
+
+    if df.empty:
+        return None
+
+    if df["Transition / Conversion"][0] is not None:
+        conversion_date = df["Transition / Conversion"][0]
+        conversion_date_dt = datetime.strptime(
+            conversion_date, "%d/%m/%Y"
+        )  # Updated format string
+        return conversion_date_dt
+
+    return None
+
+
 def get_converted_visit(
     df: pd.DataFrame, visit_order: List[str], debug: bool = False
 ) -> Optional[str]:
     """
     Check if a subject has been converted.
+
+    Uses the psychs_p9ac32_fu form to determine if a subject has been converted.
 
     Args:
         df (pd.DataFrame): DataFrame containing the forms data.
@@ -182,6 +216,30 @@ def get_converted_visit(
     return None
 
 
+def get_converted_visit_rpms(subject_id: str, config_file: Path) -> Optional[str]:
+    """
+    Check's ClientStatus table for the converted visit for RPMS subjects.
+
+    Args:
+        subject_id (str): The subject ID.
+        config_file (Path): Path to the config file.
+
+    Returns:
+        str: The converted visit.
+    """
+
+    converted_date = get_converted_date_rpms(
+        subject_id=subject_id, config_file=config_file
+    )
+    if converted_date is None:
+        return None
+    closest_timepoint = data.get_closest_timepoint(
+        subject_id=subject_id, date=converted_date, config_file=config_file
+    )
+
+    return closest_timepoint
+
+
 def compute_converted(
     config_file: Path, visit_order: List[str], debug: bool = False
 ) -> pd.DataFrame:
@@ -213,30 +271,54 @@ def compute_converted(
 
         for subject_id in subject_ids:
             progress.update(task, advance=1, description=f"Processing {subject_id}...")
+            converted = False
+            converted_visit = None
+            conversion_info_source = None
 
             if subject_id in overidden_subjects:
                 converted = True
                 converted_visit = "overidden"
 
                 logger.info(f"Subject {subject_id} is overidden to be converted.")
-            else:
-                df = data.get_all_subject_forms(
-                    config_file=config_file, subject_id=subject_id
-                )
-                converted_visit = get_converted_visit(
-                    df=df, visit_order=visit_order, debug=debug
-                )
-                if converted_visit is None:
-                    converted_visit = np.nan
-                    converted = check_if_converted(
-                        subject_id=subject_id, config_file=config_file
-                    )
-                else:
-                    converted = True
 
-            conversion_date = get_conversion_date(
-                subject_id=subject_id, config_file=config_file
+            df = data.get_all_subject_forms(
+                config_file=config_file, subject_id=subject_id
             )
+            converted_visit = get_converted_visit(
+                df=df, visit_order=visit_order, debug=debug
+            )
+            if converted_visit is None:
+                converted_visit = np.nan
+                converted = check_if_converted(
+                    subject_id=subject_id, config_file=config_file
+                )
+                if converted:
+                    conversion_info_source = "conversion_form"
+            else:
+                converted = True
+                conversion_info_source = "psychs_p9ac32_fu_form"
+
+            if data.subject_uses_rpms(subject_id=subject_id, config_file=config_file):
+                converted_visit_rpms = get_converted_visit_rpms(
+                    subject_id=subject_id, config_file=config_file
+                )
+                if converted_visit_rpms is not None:
+                    converted_visit = converted_visit_rpms
+                    converted = True
+                    conversion_info_source = "client_status"
+                conversion_date = get_converted_date_rpms(
+                    subject_id=subject_id, config_file=config_file
+                )
+            else:
+                conversion_date = get_conversion_date(
+                    subject_id=subject_id, config_file=config_file
+                )
+                if conversion_date is not None and converted_visit is np.nan:
+                    converted_visit = data.get_closest_timepoint(
+                        subject_id=subject_id,
+                        date=conversion_date,
+                        config_file=config_file,
+                    )
 
             visit_status_df = pd.concat(
                 [
@@ -247,6 +329,7 @@ def compute_converted(
                             "converted": [converted],
                             "converted_visit": [converted_visit],
                             "conversion_date": [conversion_date],
+                            "conversion_info_source": [conversion_info_source],
                         }
                     ),
                 ]
