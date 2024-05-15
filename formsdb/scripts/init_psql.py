@@ -158,7 +158,7 @@ def populate_sites(sites_json: Path, config_file: Path) -> None:
             site_country_code, network_id
         ) VALUES (
             '{site_obj.id}', '{site_obj.name}', '{site_obj.country}',
-            '{site_obj.country}', '{site_obj.network_id}');
+            '{site_obj.country_code}', '{site_obj.network_id}');
         """
 
         command = db.handle_null(command)

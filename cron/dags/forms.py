@@ -11,15 +11,16 @@ from airflow.models import Variable
 from airflow.providers.apprise.notifications import apprise
 from apprise import NotifyType
 
-CONDA_ENV_PATH = "/PHShome/dm1447/mambaforge/envs/jupyter/bin"
+# CONDA_ENV_PATH = "/PHShome/dm1447/mambaforge/envs/jupyter/bin"
+CONDA_ENV_PATH = Variable.get("CONDA_ENV_PATH")
 PYTHON_PATH = f"{CONDA_ENV_PATH}/python"
-REPO_ROOT = "/PHShome/dm1447/dev/ampscz-formsdb"
+REPO_ROOT = "/data/predict1/home/dm1447/ampscz-formsdb"
 
 # Define variables
 default_args = {
     "owner": "admin",
     "depends_on_past": False,
-    "start_date": datetime(2024, 3, 15),
+    "start_date": datetime(2024, 4, 23),
     "email_on_failure": True,
     "email_on_retry": False,
     "retries": 3,

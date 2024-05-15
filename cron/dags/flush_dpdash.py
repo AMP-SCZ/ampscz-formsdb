@@ -14,9 +14,10 @@ from airflow.models import Variable
 from airflow.providers.apprise.notifications import apprise
 from apprise import NotifyType
 
-CONDA_ENV_PATH = "/PHShome/dm1447/mambaforge/envs/jupyter/bin"
+# CONDA_ENV_PATH = "/PHShome/dm1447/mambaforge/envs/jupyter/bin"
+CONDA_ENV_PATH = Variable.get("CONDA_ENV_PATH")
 PYTHON_PATH = f"{CONDA_ENV_PATH}/python"
-REPO_ROOT = "/PHShome/dm1447/dev/ampscz-formsdb"
+REPO_ROOT = "/data/predict1/home/dm1447/ampscz-formsdb"
 
 MONGO_BIN = "/data/predict1/mongodb-linux-x86_64-rhel70-4.4.20/bin/mongo"
 
