@@ -57,9 +57,13 @@ def count_removed(config_file: Path) -> int:
         int: Number of subjects that have been removed.
     """
     query = "SELECT COUNT(*) FROM subject_removed WHERE removed = 'True';"
-    removed_count_r = db.fetch_record(config_file=config_file, query=query)
-    if removed_count_r is None:
-        raise ValueError("No removed subjects found in the database.")
+    try:
+        removed_count_r = db.fetch_record(config_file=config_file, query=query)
+        if removed_count_r is None:
+            raise ValueError("No removed subjects found in the database.")
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        logger.error(e)
+        removed_count_r = 0
     removed_count = int(removed_count_r)
 
     return removed_count
@@ -299,14 +303,20 @@ def get_subject_removed_status(
         removed_event, removed_reason, withdrawn_date = removed_r
         removed = True
 
-    recruitment_status = data.get_subject_recruitment_status(
-        config_file=config_file, subject_id=subject_id
-    )
+    try:
+        recruitment_status = data.get_subject_recruitment_status(
+            config_file=config_file, subject_id=subject_id
+        )
+    except Exception as e:  # pylint: disable=broad-except
+        logger.error(e)
+        recruitment_status = "unknown"
 
     if not removed:
         withdrawal_status = "not_withdrawn"
     else:
-        if removed_event == "screening":
+        if recruitment_status == "unknown":
+            withdrawal_status = "withdrawn_unknown"
+        elif removed_event == "screening":
             if recruitment_status == "consented":
                 withdrawal_status = "withdrawn_before_screening_outcome"
             else:

@@ -277,8 +277,8 @@ generate_dpdash_csv = BashOperator(
 
 # Import to DPDash Development instance
 DPIMPORT_SCRIPT = "/data/predict1/miniconda3/bin/import.py"
-STAGING_DPIMPORT_SCRIPT = "/PHShome/dm1447/dev/dpimport/scripts/import.py"
-STAGING_DPDASH_CONFIG = "/PHShome/dm1447/.keys/staging_dpdash.yaml"
+STAGING_DPIMPORT_SCRIPT = "/data/predict1/home/dm1447/dpimport/scripts/import.py"
+STAGING_DPDASH_CONFIG = "/home/dm1447/.keys/staging_dpdash.yaml"
 
 # Read variables from Airflow's Variables
 dpimport_dev_env = {
@@ -442,10 +442,11 @@ import_client_status.set_downstream(all_imports_done)
 
 all_imports_done.set_downstream(compute_cognition)
 all_imports_done.set_downstream(compute_converted)
-all_imports_done.set_downstream(compute_recruitment_status)
 all_imports_done.set_downstream(compute_removed)
 all_imports_done.set_downstream(compute_visit_status)
 all_imports_done.set_downstream(compute_blood_metrics)
+
+compute_removed.set_downstream(compute_recruitment_status)
 
 compute_cognition.set_downstream(export_cognitive_summary)
 compute_cognition.set_downstream(export_combined_cognitive)

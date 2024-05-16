@@ -56,9 +56,13 @@ def count_converted(config_file: Path) -> int:
         int: Number of subjects that have been converted.
     """
     query = "SELECT COUNT(*) FROM conversion_status WHERE converted = 'True';"
-    converted_count_r = db.fetch_record(config_file=config_file, query=query)
-    if converted_count_r is None:
-        raise ValueError("No converted subjects found in the database.")
+    try:
+        converted_count_r = db.fetch_record(config_file=config_file, query=query)
+        if converted_count_r is None:
+            raise ValueError("No converted subjects found in the database.")
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        logger.error(f"Error: {e}")
+        converted_count_r = 0
     converted_count = int(converted_count_r)
 
     return converted_count
