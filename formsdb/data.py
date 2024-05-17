@@ -209,7 +209,8 @@ def get_subject_age(config_file: Path, subject_id: str) -> Optional[int]:
     """
     Get the age of the subject.
 
-    Uses the `chrdemo_age_mos_chr` and 'chrdemo_age_mos_hc` fields to calculate the age of the subject.
+    Uses the `chrdemo_age_mos_chr` and 'chrdemo_age_mos_hc` fields
+    to calculate the age of the subject.
     Args:
         config_file (Path): The path to the configuration file.
         subject_id (str): The subject ID.
@@ -659,7 +660,7 @@ def get_all_rpms_form_status_for_event(
     )
 
     status_form_df = status_form_df[
-        status_form_df["redcap_event_name"].str.contains(event_name)
+        status_form_df["redcap_event_name"] == event_name
     ]
 
     if status_form_df.empty:

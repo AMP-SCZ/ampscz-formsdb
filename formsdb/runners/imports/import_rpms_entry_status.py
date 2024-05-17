@@ -55,6 +55,7 @@ def import_data(config_file: Path) -> None:
     config_params = utils.config(config_file, "general")
     data_root = Path(config_params["data_root"])
 
+    logger.info("Searching for RPMS Entry Status files...")
     entry_status_files = list(
         data_root.glob(
             "Prescient/PHOENIX/PROTECTED/Prescient*/raw/*/surveys/*_entry_status.csv"
@@ -88,6 +89,36 @@ def import_data(config_file: Path) -> None:
     entry_status_df["redcap_event_name"] = entry_status_df["visit"].map(
         rpms_to_redcap_visit_mapping
     )
+
+    # Fix SOFAS rpms form
+    # Set redcap_form_name to sofas_screening, if redcap_form_name is 'sofas_followup' and
+    # redcap_event_name is 'screening'
+    entry_status_df.loc[
+        (entry_status_df["redcap_form_name"] == "sofas_followup")
+        & (entry_status_df["redcap_event_name"] == "screening"),
+        "redcap_form_name",
+    ] = "sofas_screening"
+
+    # Similarly for redcap_form_name 'psychs_p1p8_fu' and 'psychs_p9ac32_fu'
+    # Set redcap_form_name to 'psychs_p1p8' and 'psychs_p9ac32' respectively
+    entry_status_df.loc[
+        (entry_status_df["redcap_form_name"] == "psychs_p1p8_fu")
+        & (entry_status_df["redcap_event_name"] == "screening"),
+        "redcap_form_name",
+    ] = "psychs_p1p8"
+    entry_status_df.loc[
+        (entry_status_df["redcap_form_name"] == "psychs_p9ac32_fu")
+        & (entry_status_df["redcap_event_name"] == "screening"),
+        "redcap_form_name",
+    ] = "psychs_p9ac32"
+
+    # Similarly for redcap_form_name 'cssrs_followup'
+    # Set redcap_form_name to 'cssrs_baseline' if redcap_event_name is 'baseline'
+    entry_status_df.loc[
+        (entry_status_df["redcap_form_name"] == "cssrs_followup")
+        & (entry_status_df["redcap_event_name"] == "baseline"),
+        "redcap_form_name",
+    ] = "cssrs_baseline"
 
     logger.info("Importing RPMS Entry Status data into the database...")
     db.df_to_table(

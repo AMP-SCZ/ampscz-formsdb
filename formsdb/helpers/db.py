@@ -268,7 +268,7 @@ def get_db_connection(config_file: Path) -> sqlalchemy.engine.base.Engine:
     return engine  # type: ignore
 
 
-def execute_sql(config_file: Path, query: str) -> pd.DataFrame:
+def execute_sql(config_file: Path, query: str, silence_logs: bool = True) -> pd.DataFrame:
     """
     Executes a SQL query on a PostgreSQL database and returns the result as a
     pandas DataFrame.
@@ -294,7 +294,8 @@ def execute_sql(config_file: Path, query: str) -> pd.DataFrame:
                 raise e
 
             sleep_time = timeout.total_seconds() + random.uniform(1, timeout.total_seconds() / 2)
-            logging.warning(f"OperationalError: Retrying after {sleep_time}s...")
+            if not silence_logs:
+                logging.warning(f"OperationalError: Retrying after {sleep_time}s...")
             time.sleep(sleep_time)
             timeout = timeout * 2
 

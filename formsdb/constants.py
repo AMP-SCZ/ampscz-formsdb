@@ -27,6 +27,8 @@ visit_order: List[str] = [
     "month_24",
 ]
 
+# RPMS ClientStatus CSVs use the following visit names,
+# which are mapped to the respective REDCap event names.
 client_status_visit_mapping: Dict[str, str] = {
     "Baseline": "baseline",
     "Month 1": "month_1",
@@ -168,7 +170,7 @@ rmps_to_redcap_form_name: Dict[str, str] = {
     "CDSS": "cdss",
     "Coenrollment": "coenrollment_form",
     "ConversionForm": "conversion_form",
-    "CSSRS": "cssrs_baseline",
+    "CSSRS": "cssrs_followup",
     "CurrentHealthStatus": "current_health_status",
     "CurrentHealthStatus_GCP": "gcp_current_health_status",
     "Demographics": "sociodemographics",
@@ -180,7 +182,7 @@ rmps_to_redcap_form_name: Dict[str, str] = {
     "GlobalFuncSS": "global_functioning_social_scale",
     "GlobalFuncSSFUP": "global_functioning_social_scale_followup",
     "GUID": "guid_form",
-    "HealthConditions": "health_conditions_medicalpsychiatric_history",
+    "HealthConditions": "health_conditions_genetics_fluid_biomarkers",
     "InclusionExclusionCriteriaReview": "inclusionexclusion_criteria_review",
     "IQ Assessment": "iq_assessment_wasiii_wiscv_waisiv",
     "LifetimeAP": "lifetime_ap_exposure_screen",
@@ -208,19 +210,19 @@ rmps_to_redcap_form_name: Dict[str, str] = {
     "PROMIS-SD": "item_promis_for_sleep",
     "PSS": "perceived_stress_scale",
     "PsychosocialTreatment": "psychosocial_treatment_form",
-    "PSYCHSP1P8": "psychs_p1p8",
-    "PSYCHSP9": "psychs_p9ac32",
-    "PSYCHSP1P8_v1": "psychs_p1p8_fu",
-    "PSYCHSP9_v1": "psychs_p9ac32_fu",
+    "PSYCHSP1P8": "psychs_p1p8_fu",  # Can also be "psychs_p1p8" if it's the first form, or "psychs_p1p8_fu_hc"
+    "PSYCHSP9": "psychs_p9ac32_fu",  # Can also be "psychs_p9ac32" if it's the first form or "psychs_p9ac32_fu_hc"
+    # "PSYCHSP1P8_v1": "psychs_p1p8_fu",
+    # "PSYCHSP9_v1": "psychs_p9ac32_fu",
     "PsychsRunsheet": "psychs_av_recording_run_sheet",
     "RA Prediction": "ra_prediction",
     "RecruitmentSource": "recruitment_source",
     "RUL": "resource_use_log",
     "Saliva": "daily_activity_and_saliva_sample_collection",
     "SCID": "scid5_psychosis_mood_substance_abuse",
-    "SCID5PD": "scid5_psychosis_mood_substance_abuse",
-    "SCIDv1": "scid5_psychosis_mood_substance_abuse",
-    "SOFAS": "sofas_screening",
+    # "SCIDv1": "scid5_psychosis_mood_substance_abuse",
+    "SCID5PD": "scid5_schizotypal_personality_sciddpq",
+    "SOFAS": "sofas_followup",  # Can also be "sofas_screening" if it's the first form
     "SpeechSampling": "speech_sampling_run_sheet",
     "TBI": "traumatic_brain_injury_screen",
 }
