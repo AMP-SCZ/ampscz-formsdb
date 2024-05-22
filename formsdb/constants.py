@@ -52,7 +52,6 @@ upenn_visit_order: List[str] = [
     "month_2",
     "month_6",
     "month_12",
-    "month_18",
     "month_24",
 ]
 
