@@ -811,7 +811,7 @@ WHERE
 
 # Cohort specific functions
 
-
+@lru_cache(maxsize=None)
 def get_subject_cohort(
     config_file: Path,
     subject_id: str,
@@ -837,10 +837,19 @@ def get_subject_cohort(
     icr_df = utils.explode_col(df=icr_df, col="form_data")
 
     # Check if 'chrcrit_part' is present
+    cohort = None
     try:
         cohort = icr_df["chrcrit_part"].iloc[0]
     except KeyError:
-        return None
+        # Try looking for arm information in event_name column
+        event_names = form_df["event_name"].unique()
+        for event_name in event_names:
+            if "_arm_1" in event_name:
+                cohort = 1
+                break
+            elif "_arm_2" in event_name:
+                cohort = 2
+                break
 
     if cohort == 1:
         return "CHR"
