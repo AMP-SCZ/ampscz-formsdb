@@ -24,7 +24,7 @@ import json
 import logging
 from datetime import datetime
 from glob import glob
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 import numpy as np
 import pandas as pd
@@ -177,7 +177,11 @@ def get_closest_visit(
 
 
 def generate_upenn_form(
-    df_upenn: pd.DataFrame, all_forms_df: pd.DataFrame
+    subject_id: str,
+    df_upenn: pd.DataFrame,
+    all_forms_df: pd.DataFrame,
+    collection: Literal["upenn", "upenn_nda"],
+    config_file: Path,
 ) -> Dict[str, Dict[str, Dict[str, Any]]]:
     """
     Break down the UPENN form data into a dictionary of visit names, session IDs, and session data.
@@ -195,17 +199,19 @@ def generate_upenn_form(
     form_data: Dict[str, Dict[str, Any]] = {}
 
     for _, row in df_upenn.iterrows():
-        session_date = row["session_date"]
-        session_id = row["session_battery"]
+        if collection == "upenn":
+            session_date = row["session_date"]  # 2023-1-20
+            session_id = row["session_battery"]
 
-        session_date_dt = datetime.strptime(session_date, "%Y-%m-%d")
+            session_date_dt = datetime.strptime(session_date, "%Y-%m-%d")
 
-        if "NOSPLLT" in session_id:
-            session_id = "NOSPLLT"
-        else:
-            session_id = "SPLLT"
-
-        subject_id = row["session_subid"]
+            if "NOSPLLT" in session_id:
+                session_id = "NOSPLLT"
+            else:
+                session_id = "SPLLT"
+        elif collection == "upenn_nda":
+            session_date = row["interview_date"]  # 1/20/23
+            session_date_dt = datetime.strptime(session_date, "%m/%d/%y")
 
         try:
             visit = get_event_name_cognitive(
@@ -222,7 +228,7 @@ def generate_upenn_form(
             )
 
         if visit is None:
-            logger.warning(f"Could not find visit for {subject_id} ({session_id})")
+            logger.warning(f"Could not find visit for {subject_id} {collection}")
             logger.warning(f"Falling back to visit date map for {subject_id}")
 
             visit_date_map = compute_visit_date_map(
@@ -239,7 +245,16 @@ def generate_upenn_form(
                 )
                 visit = "uncategorized"
             else:
-                visit = f"uncategorized ({visit})"
+                cohort = data.get_subject_cohort(
+                    config_file=config_file, subject_id=subject_id
+                )
+                match cohort:
+                    case "CHR":
+                        visit = f"{visit}_arm_1_i"
+                    case "HC":
+                        visit = f"{visit}_arm_2_i"
+                    case _:
+                        visit = f"{visit}_arm_x_i"
 
         if visit not in form_data:
             form_data[visit] = {}
@@ -253,12 +268,18 @@ def generate_upenn_form(
             value = utils.str_to_typed(value)  # type: ignore
             session_data[variable] = value
 
-        form_data[visit][session_id] = session_data
+        if collection == "upenn":
+            form_data[visit][session_id] = session_data
+        elif collection == "upenn_nda":
+            form_data[visit] = session_data
     return form_data
 
 
 def upsert_form_data(
-    config_file: Path, subject_id: str, form_data: Dict[str, Any]
+    config_file: Path,
+    subject_id: str,
+    form_data: Dict[str, Any],
+    collection: Literal["upenn", "upenn_nda"],
 ) -> None:
     """
     Update or insert form data into the MongoDB's 'upenn' collection.
@@ -272,7 +293,7 @@ def upsert_form_data(
         None
     """
     mongodb = db.get_mongo_db(config_file)
-    subject_form_data = mongodb["upenn"]
+    subject_form_data = mongodb[collection]
 
     subject_form_data.replace_one({"_id": subject_id}, form_data, upsert=True)
 
@@ -292,78 +313,101 @@ def import_forms_by_network(
     Returns:
         None
     """
-    subjects_glob = glob(
-        f"{data_root}/{network}/PHOENIX/PROTECTED/*/raw/*/surveys/*.UPENN.json"
-    )
-    logger.info(f"Found {len(subjects_glob)} subjects for {network}")
-
-    # Sort subjects by subject ID
-    subjects_glob = sorted(subjects_glob)
-
-    skip_buffer = []
-
+    upenn_sources: List[str] = ["UPENN_nda", "UPENN"]
     with utils.get_progress_bar() as progress:
-        subject_process = progress.add_task(
-            "[red]Processing subjects...", total=len(subjects_glob)
+        source_process = progress.add_task(
+            "[red]Processing source...", total=len(upenn_sources)
         )
-        for subject in subjects_glob:
-            subject_id = subject.split("/")[-1].split(".")[0]
+        for source in upenn_sources:
             progress.update(
-                subject_process,
+                source_process,
                 advance=1,
-                description=f"Processing UPENN JSON for subject ({subject_id})...",
+                description=f"Importing UPENN JSONs for {network} ({source})...",
             )
-            source_m_date = utils.get_file_mtime(Path(subject))
 
-            if (
-                db.check_if_subject_upenn_data_exists(
-                    config_file, subject_id, source_m_date
+            subjects_glob = glob(
+                f"{data_root}/{network}/PHOENIX/PROTECTED/*/raw/*/surveys/*.{source}.json"
+            )
+            logger.info(f"Found {len(subjects_glob)} subjects for {network}")
+
+            # Sort subjects by subject ID
+            subjects_glob = sorted(subjects_glob)
+
+            skip_buffer = []
+
+            subject_process = progress.add_task(
+                "[red]Processing subjects...", total=len(subjects_glob)
+            )
+            for subject in subjects_glob:
+                subject_id = subject.split("/")[-1].split(".")[0]
+                progress.update(
+                    subject_process,
+                    advance=1,
+                    description=f"Processing UPENN JSON for subject ({subject_id})...",
                 )
-                and not force_import
-            ):
-                skip_buffer.append(subject_id)
-                continue
-            else:
-                if len(skip_buffer) > 0:
-                    temp_str = ", ".join(skip_buffer)
-                    logger.info(
-                        f"Skipping {temp_str} as data already exists, and is up to date"
+                source_m_date = utils.get_file_mtime(Path(subject))
+                mongo_collection = source.lower()
+                if (
+                    db.check_if_subject_upenn_data_exists(
+                        config_file,
+                        subject_id,
+                        source_m_date,
+                        collection=mongo_collection,  # type: ignore
                     )
-                    skip_buffer = []
+                    and not force_import
+                ):
+                    skip_buffer.append(subject_id)
+                    continue
+                else:
+                    if len(skip_buffer) > 0:
+                        temp_str = ", ".join(skip_buffer)
+                        logger.info(
+                            f"Skipping {temp_str} as data already exists, and is up to date"
+                        )
+                        skip_buffer = []
 
-            with open(subject, "r", encoding="utf-8") as f:
-                json_data = json.load(f)
+                with open(subject, "r", encoding="utf-8") as f:
+                    json_data = json.load(f)
 
-            sub_data_all = pd.DataFrame.from_dict(json_data, orient="columns")
-            sub_data_all = sub_data_all.apply(lambda x: x.str.strip()).replace(
-                "", np.nan
-            )
-            sub_data_all.dropna(axis=1, how="all", inplace=True)
+                sub_data_all = pd.DataFrame.from_dict(json_data, orient="columns")
+                sub_data_all = sub_data_all.apply(lambda x: x.str.strip()).replace(
+                    "", np.nan
+                )
+                sub_data_all.dropna(axis=1, how="all", inplace=True)
 
-            all_forms_df = data.get_all_subject_forms(
-                config_file=config_file, subject_id=subject_id
-            )
+                all_forms_df = data.get_all_subject_forms(
+                    config_file=config_file, subject_id=subject_id
+                )
 
-            form_data: Dict[str, Any] = generate_upenn_form(
-                df_upenn=sub_data_all, all_forms_df=all_forms_df
-            )
+                form_data: Dict[str, Any] = generate_upenn_form(
+                    subject_id=subject_id,
+                    df_upenn=sub_data_all,
+                    all_forms_df=all_forms_df,
+                    config_file=config_file,
+                    collection=mongo_collection  # type: ignore
+                )
 
-            # Label form data with subject ID
-            form_data["_id"] = subject_id
-            form_data["_date_imported"] = utils.get_curent_datetime()
-            form_data["_source"] = subject
-            form_data["_source_mdate"] = source_m_date
+                # Label form data with subject ID
+                form_data["_id"] = subject_id
+                form_data["_date_imported"] = utils.get_curent_datetime()
+                form_data["_source"] = subject
+                form_data["_source_mdate"] = source_m_date
 
-            try:
-                upsert_form_data(config_file, subject_id, form_data)
-            except Exception as e:
-                logger.error(f"Error: {e}")
-                logger.error(f"Subject: {subject_id}")
-                f_name = f"{subject_id}_UPENN_DEBUG.json"
-                with open(f_name, "w", encoding="utf-8") as f:
-                    json.dump(form_data, f, indent=4, default=str)
-                logger.error(f"Dumped subject data to {f_name}")
-                raise e
+                try:
+                    upsert_form_data(
+                        config_file=config_file,
+                        subject_id=subject_id,
+                        form_data=form_data,
+                        collection=mongo_collection,  # type: ignore
+                    )
+                except Exception as e:
+                    logger.error(f"Error: {e}")
+                    logger.error(f"Subject: {subject_id}")
+                    f_name = f"{subject_id}_UPENN_DEBUG.json"
+                    with open(f_name, "w", encoding="utf-8") as f:
+                        json.dump(form_data, f, indent=4, default=str)
+                    logger.error(f"Dumped subject data to {f_name}")
+                    raise e
 
 
 if __name__ == "__main__":
@@ -380,7 +424,7 @@ if __name__ == "__main__":
     data_params = utils.config(config_file, "data")
     data_root = Path(config_params["data_root"])
 
-    FORCE_IMPORT = False
+    FORCE_IMPORT = True
     logger.info(f"Force import: {FORCE_IMPORT}")
 
     for network in constants.networks:

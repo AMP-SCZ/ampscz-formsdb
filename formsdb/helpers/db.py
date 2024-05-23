@@ -74,7 +74,7 @@ def check_if_subject_form_data_exists(
 
 
 def check_if_subject_upenn_data_exists(
-    config_file: Path, subject_id: str, source_m_date: datetime
+    config_file: Path, subject_id: str, source_m_date: datetime, collection: Literal["upenn", "upenn_nda"]
 ):
     """
     Checks if a subject's UPenn data exists in the MongoDB database.
@@ -85,7 +85,7 @@ def check_if_subject_upenn_data_exists(
         source_m_date (datetime): The source modification date.
     """
     mongodb = get_mongo_db(config_file)
-    subject_form_data = mongodb["upenn"]
+    subject_form_data = mongodb[collection]
 
     subject_form_data_count = subject_form_data.count_documents({"_id": subject_id})
     if subject_form_data_count > 0:
