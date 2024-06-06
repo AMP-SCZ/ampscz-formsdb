@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 """
 Infers the visit status of subjects based on the most recent visit form completed.
+(Visit Started)
 """
 
 import sys
@@ -22,12 +23,12 @@ except ValueError:
 
 import logging
 import multiprocessing
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Any
 
 import pandas as pd
 from rich.logging import RichHandler
 
-from formsdb import data
+from formsdb import constants, data
 from formsdb.helpers import db, utils
 
 MODULE_NAME = "formsdb.runners.compute.compute_visit_status"
@@ -187,6 +188,122 @@ def compute_recent_visit(config_file: Path) -> pd.DataFrame:
     df = pd.DataFrame(results)
 
     return df
+
+
+# superset cumulative charts (Visit Started)
+def subject_started_timepoint_fetch(
+    config_file: Path,
+    subject_id: str,
+    timepoint: str,
+) -> bool:
+    """
+    Checks if the subject has started the given timepoint.
+
+    Args:
+        config_file (Path): Path to the config file.
+        subject_id (str): The subject ID.
+        timepoint (str): The timepoint to check.
+
+    Returns:
+        bool: True if the subject has started the timepoint, False otherwise.
+    """
+    visit_order = constants.visit_order
+    timepoint_index = visit_order.index(timepoint)
+
+    current_visit = data.get_subject_latest_visit_started(
+        config_file=config_file, subject_id=subject_id
+    )
+    if current_visit is None:
+        return False
+    current_visit_index = visit_order.index(current_visit)
+
+    if current_visit_index >= timepoint_index:
+        return True
+    return False
+
+
+def process_subject_fetch(params: Tuple) -> Dict[str, Any]:
+    """
+    Wrapper function for the `subject_started_timepoint_fetch` function.
+
+    Args:
+        params (Tuple): A tuple containing the config file, subject ID, and timepoints.
+
+    Returns:
+        Dict[str, Any]: A dictionary containing the subject ID if each timepoint has started.
+    """
+    config_file, subject_id, timepoints = params
+
+    result = {}
+    result["subject_id"] = subject_id
+    for timepoint in timepoints:
+        subject_started = subject_started_timepoint_fetch(
+            config_file=config_file,
+            subject_id=subject_id,
+            timepoint=timepoint,
+        )
+        result[timepoint] = subject_started
+
+    return result
+
+
+def populate_cumulative_charts_data(config_file: Path) -> None:
+    """
+    Compute the cumulative data for each subject. Used for the Superset dashboard.
+
+    Args:
+        config_file (Path): Path to the config file.
+
+    Returns:
+        None
+    """
+    subject_ids = data.get_all_subjects(config_file=config_file)
+    timepoints = ["baseline", "month_1", "month_2", "month_6", "month_12", "month_18"]
+
+    params = [(config_file, subject_id, timepoints) for subject_id in subject_ids]
+    num_processes = 8
+    results = []
+
+    logger.info(f"Using {num_processes} processes.")
+    logger.info("Computing cumulative data...")
+    with multiprocessing.Pool(processes=int(num_processes)) as pool:
+        with utils.get_progress_bar() as progress:
+            task = progress.add_task("Processing subjects...", total=len(params))
+            for result in pool.imap_unordered(process_subject_fetch, params):  # type: ignore
+                results.append(result)
+                progress.update(task, advance=1)
+
+    results_df = pd.DataFrame(results)
+    reversed_timepoints = timepoints.copy()
+    reversed_timepoints.reverse()
+
+    overridden_df = results_df.copy()
+
+    # Override the values, so if a more recent visit has started,
+    # the previous visits are also marked as started
+    for idx, row in overridden_df.iterrows():
+        override = False
+        for timepoint in reversed_timepoints:
+            if row[timepoint]:
+                override = True
+
+            if override:
+                overridden_df.loc[idx, timepoint] = True  # type: ignore
+
+    logger.info("Writing cumulative data to the database...")
+    db.df_to_table(
+        df=results_df,
+        table_name="subject_started_timepoint",
+        config_file=config_file,
+        if_exists="replace",
+    )
+
+    db.df_to_table(
+        df=overridden_df,
+        table_name="subject_started_timepoint_cumulative",
+        config_file=config_file,
+        if_exists="replace",
+    )
 
 
 if __name__ == "__main__":
