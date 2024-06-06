@@ -182,9 +182,6 @@ def worker(params: Tuple[str, Path]) -> Dict[str, str | bool | None]:
     )
     included = data.subject_is_included(subject_id=subject_id, config_file=config_file)
     excluded = data.subject_is_excluded(subject_id=subject_id, config_file=config_file)
-    has_sociodemographics = subject_completed_sociodemographics(
-        subject_id=subject_id, config_file=config_file
-    )
     valid_baseline_form_data = subject_has_a_valid_baseline_form_data(
         subject_id=subject_id, config_file=config_file
     )
@@ -196,9 +193,8 @@ def worker(params: Tuple[str, Path]) -> Dict[str, str | bool | None]:
 
     # Recruited:
     #  - Positive screen
-    #  - Completed sociodemographics
     #  - Atleast 1 valid baseline form data
-    recruited = positive_screen and has_sociodemographics and valid_baseline_form_data
+    recruited = positive_screen and valid_baseline_form_data
 
     subject_status = None
     if consented:
