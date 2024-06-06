@@ -395,11 +395,12 @@ def get_upenn_event_date(
         ValueError: If the event is not found in the database.
     """
     query = f"""
-    SELECT form_data ->> 'session_date' as session_date
+    SELECT COALESCE(form_data ->> 'interview_date', form_data ->> 'session_date') AS session_date
     FROM upenn_forms
     WHERE subject_id = '{subject_id}' AND
         event_name LIKE '%%{event_name}%%' AND
-        form_data ? 'session_date';
+        (form_data ? 'session_date' OR form_data ? 'interview_date');
+
     """
 
     date = db.fetch_record(config_file=config_file, query=query)
@@ -408,7 +409,10 @@ def get_upenn_event_date(
         raise ValueError(
             f"No event {event_name} found in the database for subject {subject_id}."
         )
-    date = datetime.strptime(date, "%Y-%m-%dT%H:%M:%S")
+    try:
+        date = datetime.strptime(date, "%Y-%m-%dT%H:%M:%S")
+    except ValueError:  # Try for 6/19/23 format
+        date = datetime.strptime(date, "%m/%d/%y")
 
     return date
 
@@ -1048,7 +1052,10 @@ def get_subject_timepoints(subject_id: str, config_file: Path) -> List[str]:
         List of timepoints / events / visits.
     """
     forms_cohort_timepoint_map = get_forms_cohort_timepoint_map(config_file=config_file)
-    cohort = get_subject_cohort(config_file=config_file, subject_id=subject_id)
+    try:
+        cohort = get_subject_cohort(config_file=config_file, subject_id=subject_id)
+    except ValueError:
+        cohort = None
     if cohort is None:
         logger.warning(f"No cohort found for subject: {subject_id}")
         cohort = "CHR"  # Assume CHR if cohort is not found.

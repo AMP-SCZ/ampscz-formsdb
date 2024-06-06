@@ -162,6 +162,11 @@ def consolidate_data(config_file: Path, data_dir: Path, output_dir: Path) -> Non
                 and "NOSPLLT" in dp_dash_dict["optional_tags"]
             ):
                 event_type = "NOSPLLT"
+            elif (
+                dp_dash_dict["optional_tags"] is not None
+                and "nda" in dp_dash_dict["optional_tags"]
+            ):
+                event_type = "nda"
             else:
                 event_type = "UNKNOWN"
 

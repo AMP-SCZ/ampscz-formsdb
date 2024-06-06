@@ -113,7 +113,10 @@ def get_event_name_cognitive(
             raise ValueError("chrpenn_interview_date not found in form variables")
 
         date_str = form_data_r["chrpenn_interview_date"]
-        date_dt = datetime.strptime(date_str, "%Y-%m-%dT%H:%M:%S")
+        try:
+            date_dt = datetime.strptime(date_str, "%Y-%m-%dT%H:%M:%S")
+        except TypeError:
+            raise ValueError("chrpenn_interview_date not found in form variables")
 
         if date_dt.date() == date.date():
             return row["event_name"]
