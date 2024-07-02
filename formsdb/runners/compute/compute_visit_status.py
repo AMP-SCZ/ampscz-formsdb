@@ -327,4 +327,7 @@ if __name__ == "__main__":
         if_exists="replace",
     )
 
+    logger.info("Populating cumulative charts data...")
+    populate_cumulative_charts_data(config_file=config_file)
+
     logger.info("Done!")
