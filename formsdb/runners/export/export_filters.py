@@ -81,7 +81,7 @@ def generate_filter_filename(subject_id: str) -> str:
         subject=subject_id,
         data_type="form",
         category="filters",
-        optional_tag=["status"],
+        # optional_tag=["status"],
         time_range="day1to1",
     )
 
