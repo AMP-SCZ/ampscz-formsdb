@@ -86,6 +86,10 @@ subject_visit_status = Dataset(
     uri="file:///PHShome/dm1447/dev/ampscz-formsdb/data/postgresql/postgresql.conf:subject_visit_status"
 )
 
+subject_visit_completed = Dataset(
+    uri="file:///PHShome/dm1447/dev/ampscz-formsdb/data/postgresql/postgresql.conf:subject_visit_completed"
+)
+
 blood_metrics = Dataset(
     uri="file:///PHShome/dm1447/dev/ampscz-formsdb/data/postgresql/postgresql.conf:blood_metrics"
 )
@@ -101,6 +105,7 @@ dpdash_csvs = Dataset(
 cognition_tg = TaskGroup("cognition", dag=dag)
 conversion_tg = TaskGroup("conversion", dag=dag)
 visit_status_tg = TaskGroup("visit_status", dag=dag)
+visit_competed_tg = TaskGroup("visit_completed", dag=dag)
 recruitment_status_tg = TaskGroup("recruitment_status", dag=dag)
 withdrawal_tg = TaskGroup("withdrawal", dag=dag)
 blood_metrics_tg = TaskGroup("blood_metrics", dag=dag)
@@ -164,6 +169,18 @@ compute_visit_status = BashOperator(
     cwd=REPO_ROOT,
     outlets=[subject_visit_status],
     task_group=visit_status_tg,
+)
+
+compute_visit_completed = BashOperator(
+    task_id="compute_visit_completed",
+    bash_command=PYTHON_PATH
+    + " "
+    + REPO_ROOT
+    + "/formsdb/runners/compute/compute_visit_completed.py",
+    dag=dag,
+    cwd=REPO_ROOT,
+    outlets=[subject_visit_completed],
+    task_group=visit_competed_tg,
 )
 
 compute_blood_metrics = BashOperator(
@@ -298,6 +315,7 @@ info.set_downstream(compute_converted)
 info.set_downstream(compute_removed)
 info.set_downstream(compute_visit_status)
 info.set_downstream(compute_blood_metrics)
+info.set_downstream(compute_visit_completed)
 
 compute_removed.set_downstream(compute_recruitment_status)
 compute_visit_status.set_downstream(compute_recruitment_status)
@@ -333,3 +351,10 @@ export_withdrawal.set_downstream(dpdash_merge_ready)
 export_blood_metrics.set_downstream(dpdash_merge_ready)
 
 dpdash_merge_ready.set_downstream(generate_dpdash_csv)
+
+all_done = EmptyOperator(task_id="all_done", dag=dag)
+
+generate_dpdash_csv.set_downstream(all_done)
+compute_visit_completed.set_downstream(all_done)
+
+# End DAG construction

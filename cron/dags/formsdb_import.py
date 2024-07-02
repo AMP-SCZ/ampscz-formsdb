@@ -37,7 +37,7 @@ dag = DAG(
     "ampscz_forms_db_import",
     default_args=default_args,
     description="DAG for AMPSCZ forms database Import",
-    schedule="@daily",
+    schedule="0 22 * * *",
 )
 
 info = BashOperator(
@@ -78,6 +78,7 @@ import_upenn_jsons = BashOperator(
     dag=dag,
     cwd=REPO_ROOT,
     task_group=upenn_task_group,
+    skip_on_exit_code=1
 )
 
 export_upenn_json = BashOperator(
@@ -170,7 +171,8 @@ all_imports_done = EmptyOperator(
     ),
     outlets=[
         postgresdb
-    ]
+    ],
+    trigger_rule="none_failed",
 )
 export_upenn_json.set_downstream(all_imports_done)
 export_harmonized_jsons.set_downstream(all_imports_done)

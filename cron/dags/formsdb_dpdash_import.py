@@ -146,6 +146,16 @@ dpimport_form_sociodemographics_staging = BashOperator(
     dag=dag,
     task_group=staging_tg,
 )
+
+dpimport_form_filters_staging = BashOperator(
+    task_id="dpimport_form_filters_staging",
+    bash_command=f'{PYTHON_PATH} \
+{STAGING_DPIMPORT_SCRIPT} \
+-c {STAGING_DPDASH_CONFIG} \
+"/PHShome/dm1447/dev/ampscz-formsdb/data/generated_outputs/filters/??-*-form_filters-*.csv"',
+    dag=dag,
+    task_group=staging_tg,
+)
 # Done Task Definitions
 
 info.set_downstream(dpimport_informed_consent_run_sheet)
@@ -155,6 +165,7 @@ info.set_downstream(dpimport_metadata_staging)
 info.set_downstream(dpimport_informed_consent_run_sheet_staging)
 info.set_downstream(dpimport_inclusionexclusion_criteria_review_staging)
 info.set_downstream(dpimport_form_sociodemographics_staging)
+info.set_downstream(dpimport_form_filters_staging)
 
 all_dpimport_done_staging = EmptyOperator(
     task_id="all_dpimport_done_staging_v2",
@@ -181,6 +192,7 @@ dpimport_inclusionexclusion_criteria_review_staging.set_downstream(
     all_dpimport_done_staging
 )
 dpimport_form_sociodemographics_staging.set_downstream(all_dpimport_done_staging)
+dpimport_form_filters_staging.set_downstream(all_dpimport_done_staging)
 
 all_dpimport_done_predict2 = EmptyOperator(
     task_id="all_dpimport_done_staging",
