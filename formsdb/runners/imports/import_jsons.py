@@ -1,6 +1,9 @@
 #!/usr/bin/env python
 """
 Import JSON data into MongoDB.
+
+Note: Only imports JSON files with a different hash from the existing data.
+    (unless force is set to True)
 """
 
 import sys
@@ -199,8 +202,30 @@ def upsert_form_data(
     )
 
 
+def delete_subject_form_data(config_file: Path, subject_id: str) -> None:
+    """
+    Deletes all form data for a subject.
+
+    Args:
+        config_file (Path): The path to the config file.
+        subject_id (str): The subject ID.
+
+    Returns:
+        None
+    """
+    mongodb = db.get_mongo_db(config_file)
+    subject_form_data = mongodb["forms"]
+
+    subject_form_data.delete_many({"_id": subject_id})
+    return
+
+
 def import_forms_by_network(
-    config_file: Path, network: str, data_root: Path, data_dictionary: Path
+    config_file: Path,
+    network: str,
+    data_root: Path,
+    data_dictionary: Path,
+    force: bool = False,
 ) -> None:
     """
     Import forms data by reading JSON files from the data root.
@@ -222,9 +247,7 @@ def import_forms_by_network(
     subjects_glob = sorted(subjects_glob, reverse=False)
     logger.info(f"Found {len(subjects_glob)} subjects for {network}")
 
-    data_dictionry_df = pd.read_csv(
-        data_dictionary, sep=",", index_col=False, low_memory=True
-    )
+    data_dictionry_df = pd.read_csv(data_dictionary, sep=",")
 
     skip_buffer: List[str] = []
     processed_buffer: List[str] = []
@@ -252,14 +275,17 @@ def import_forms_by_network(
             source_m_date = utils.get_file_mtime(Path(subject))
             source_hash = hash_helper.compute_hash(Path(subject))
 
-            if db.check_if_subject_form_data_exists(
-                config_file, subject_id, source_hash
-            ):
-                skip_buffer.append(subject_id)
-                continue
-            else:
-                skip_buffer = _empty_buffer(skip_buffer)
-                processed_buffer.append(subject_id)
+            if not force:
+                up_to_date = db.check_if_subject_form_data_exists(
+                    config_file, subject_id, source_hash
+                )
+
+                if up_to_date:
+                    skip_buffer.append(subject_id)
+                    continue
+                else:
+                    skip_buffer = _empty_buffer(skip_buffer)
+            processed_buffer.append(subject_id)
 
             try:
                 with open(subject, "r", encoding="utf-8") as f:
@@ -296,6 +322,7 @@ def import_forms_by_network(
             form_data["_source_mdate"] = source_m_date
 
             try:
+                delete_subject_form_data(config_file, subject_id)
                 upsert_form_data(config_file, subject_id, form_data)
             except Exception as e:
                 logger.error(f"Error: {e}")
@@ -332,6 +359,9 @@ if __name__ == "__main__":
     logger.info(f"Using data dictionary: {data_dictionary_f}")
     data_root = Path(config_params["data_root"])
 
+    FORCE = False
+    logger.info(f"Force: {FORCE}")
+
     for network in constants.networks:
         logger.info(f"Importing {network} data...")
         import_forms_by_network(
@@ -339,6 +369,7 @@ if __name__ == "__main__":
             network=network,
             data_root=data_root,
             data_dictionary=data_dictionary_f,
+            force=FORCE,
         )
 
     logger.info("Done!")
