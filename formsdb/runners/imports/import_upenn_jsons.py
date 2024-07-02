@@ -115,8 +115,10 @@ def get_event_name_cognitive(
         date_str = form_data_r["chrpenn_interview_date"]
         try:
             date_dt = datetime.strptime(date_str, "%Y-%m-%dT%H:%M:%S")
-        except TypeError:
-            raise ValueError("chrpenn_interview_date not found in form variables")
+        except TypeError as exc:
+            raise ValueError(
+                "chrpenn_interview_date not found in form variables"
+            ) from exc
 
         if date_dt.date() == date.date():
             return row["event_name"]
@@ -214,7 +216,14 @@ def generate_upenn_form(
                 session_id = "SPLLT"
         elif collection == "upenn_nda":
             session_date = row["interview_date"]  # 1/20/23
-            session_date_dt = datetime.strptime(session_date, "%m/%d/%y")
+            try:
+                session_date_dt = datetime.strptime(session_date, "%m/%d/%y")
+            except ValueError:
+                logger.warning(
+                    f"Could not parse date interview_date: {session_date} for {subject_id}. Skipping."
+                )
+                logger.warning("Expected format: m/d/y")
+                raise
 
         try:
             visit = get_event_name_cognitive(
@@ -321,6 +330,8 @@ def import_forms_by_network(
         source_process = progress.add_task(
             "[red]Processing source...", total=len(upenn_sources)
         )
+        skipped_count = 0
+        imported_count = 0
         for source in upenn_sources:
             progress.update(
                 source_process,
@@ -360,6 +371,7 @@ def import_forms_by_network(
                     and not force_import
                 ):
                     skip_buffer.append(subject_id)
+                    skipped_count += 1
                     continue
                 else:
                     if len(skip_buffer) > 0:
@@ -382,13 +394,18 @@ def import_forms_by_network(
                     config_file=config_file, subject_id=subject_id
                 )
 
-                form_data: Dict[str, Any] = generate_upenn_form(
-                    subject_id=subject_id,
-                    df_upenn=sub_data_all,
-                    all_forms_df=all_forms_df,
-                    config_file=config_file,
-                    collection=mongo_collection  # type: ignore
-                )
+                try:
+                    form_data: Dict[str, Any] = generate_upenn_form(
+                        subject_id=subject_id,
+                        df_upenn=sub_data_all,
+                        all_forms_df=all_forms_df,
+                        config_file=config_file,
+                        collection=mongo_collection,  # type: ignore
+                    )
+                except Exception as e:
+                    logger.error(f"Error: {e}")
+                    logger.error(f"JSON file: {subject}")
+                    raise
 
                 # Label form data with subject ID
                 form_data["_id"] = subject_id
@@ -403,6 +420,7 @@ def import_forms_by_network(
                         form_data=form_data,
                         collection=mongo_collection,  # type: ignore
                     )
+                    imported_count += 1
                 except Exception as e:
                     logger.error(f"Error: {e}")
                     logger.error(f"Subject: {subject_id}")
@@ -411,6 +429,12 @@ def import_forms_by_network(
                         json.dump(form_data, f, indent=4, default=str)
                     logger.error(f"Dumped subject data to {f_name}")
                     raise e
+
+        logger.info(f"Skipped {skipped_count} subjects")
+        logger.info(f"Imported {imported_count} subjects")
+
+        if imported_count < 1:
+            logger.warning(f"No subjects imported for {network}")
 
 
 if __name__ == "__main__":
@@ -427,7 +451,7 @@ if __name__ == "__main__":
     data_params = utils.config(config_file, "data")
     data_root = Path(config_params["data_root"])
 
-    FORCE_IMPORT = True
+    FORCE_IMPORT = False
     logger.info(f"Force import: {FORCE_IMPORT}")
 
     for network in constants.networks:
