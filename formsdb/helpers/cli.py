@@ -35,7 +35,7 @@ def clear_directory(
             except FileNotFoundError:
                 logger.warning(f"File {file} not found. Skipping.")
 
-    logger.info(f"Deleted {files_deleted} files from {directory}")
+    logger.info(f"Deleted {files_deleted} files from {directory} matching pattern '{pattern}'.")
 
 
 def get_repo_root() -> Path:
