@@ -270,7 +270,7 @@ def generate_csv(
             )
 
         try:
-            interview_date = pd.to_datetime(combined_df["chrpenn_interview_date"])
+            interview_date = pd.to_datetime(combined_df["chrpenn_interview_date"], errors="coerce")
             combined_df["weekday"] = interview_date.apply(dpdash.get_week_day)
         except KeyError:
             try:

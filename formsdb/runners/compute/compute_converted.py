@@ -64,7 +64,7 @@ def count_converted(config_file: Path) -> int:
     return converted_count
 
 
-def check_if_converted(subject_id: str, config_file: Path) -> bool:
+def check_if_converted_conversion_form(subject_id: str, config_file: Path) -> bool:
     """
     Checks subject's conversion forms for conversion status.
 
@@ -170,7 +170,7 @@ def get_converted_date_rpms(subject_id: str, config_file: Path) -> Optional[date
     return None
 
 
-def get_converted_visit(
+def get_converted_visit_psychs(
     df: pd.DataFrame, visit_order: List[str], debug: bool = False
 ) -> Optional[str]:
     """
@@ -273,7 +273,7 @@ def compute_converted(
             progress.update(task, advance=1, description=f"Processing {subject_id}...")
             converted = False
             converted_visit = None
-            conversion_info_source = None
+            conversion_info_source: Optional[str] = None
 
             if subject_id in overidden_subjects:
                 converted = True
@@ -284,12 +284,12 @@ def compute_converted(
             df = data.get_all_subject_forms(
                 config_file=config_file, subject_id=subject_id
             )
-            converted_visit = get_converted_visit(
+            converted_visit_psychs = get_converted_visit_psychs(
                 df=df, visit_order=visit_order, debug=debug
             )
-            if converted_visit is None:
+            if converted_visit_psychs is None:
                 converted_visit = np.nan
-                converted = check_if_converted(
+                converted = check_if_converted_conversion_form(
                     subject_id=subject_id, config_file=config_file
                 )
                 if converted:
@@ -305,7 +305,10 @@ def compute_converted(
                 if converted_visit_rpms is not None:
                     converted_visit = converted_visit_rpms
                     converted = True
-                    conversion_info_source = "client_status"
+                    if conversion_info_source is None:
+                        conversion_info_source = "client_status"
+                    else:
+                        conversion_info_source += ", client_status"
                 conversion_date = get_converted_date_rpms(
                     subject_id=subject_id, config_file=config_file
                 )
@@ -318,6 +321,12 @@ def compute_converted(
                         subject_id=subject_id,
                         date=conversion_date,
                         config_file=config_file,
+                    )
+                if conversion_date is not None and "conversion_form" not in str(
+                    conversion_info_source
+                ):
+                    conversion_info_source = (
+                        str(conversion_info_source) + ", conversion_form"
                     )
 
             visit_status_df = pd.concat(

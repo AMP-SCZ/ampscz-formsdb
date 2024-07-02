@@ -67,6 +67,7 @@ def get_network(config_file: Path, site: str) -> str:
 def get_all_subjects(
     config_file: Path,
     network: Optional[str] = None,
+    site: Optional[str] = None,
 ) -> List[str]:
     """
     Get all subjects from the database.
@@ -75,23 +76,33 @@ def get_all_subjects(
         config_file (Path): The path to the configuration file.
         network (Optional[str], optional): The network to filter by.
             Defaults to None.
+        site (Optional[str], optional): The site to filter by.
+            Defaults to None.
 
     Returns:
         List[str]: A list of all subjects.
     """
 
+    if network and site:
+        raise ValueError("Cannot filter by both network and site.")
+
+    query = """
+    SELECT subjects.id FROM subjects
+    INNER JOIN site ON subjects.site_id = site.id
+    """
+
     if network:
-        query = f"""
-        SELECT subjects.id FROM subjects
-        INNER JOIN site ON subjects.site_id = site.id
+        query = f"""{query}
         WHERE site.network_id = '{network}'
-        ORDER BY id;
         """
-    else:
-        query = """
-        SELECT id FROM subjects
-        ORDER BY id;
+    if site:
+        query = f"""{query}
+        WHERE site.id = '{site}'
         """
+
+    query = f"""{query}
+    ORDER BY id
+    """
 
     subjects = db.execute_sql(config_file=config_file, query=query)
 
@@ -355,6 +366,72 @@ def get_all_subject_forms(config_file: Path, subject_id: str) -> pd.DataFrame:
     return df
 
 
+def get_variable(
+    config_file: Path,
+    subject_id: str,
+    form_name: str,
+    event_name: str,
+    variable_name: str,
+) -> Optional[str]:
+    """
+    Get a variable for a subject from the database.
+
+    Args:
+        config_file (Path): The path to the configuration file.
+        subject_id (str): The subject ID.
+        form_name (str): The form name.
+        event_name (str): The event name.
+        variable_name (str): The variable name.
+
+    Returns:
+        Optional[str]: The value of the variable, if found.
+    """
+    query = f"""
+SELECT value
+FROM forms,
+    jsonb_each_text(form_data)
+WHERE subject_id = '{subject_id}' AND
+    form_name = '{form_name}' AND
+    event_name LIKE '%%{event_name}%%' and
+    key = '{variable_name}'
+"""
+
+    result = db.fetch_record(
+        config_file=config_file,
+        query=query,
+    )
+
+    return result
+
+
+@lru_cache()
+def get_form_by_event(
+    config_file: Path, subject_id: str, form_name: str, event_name: str
+) -> pd.DataFrame:
+    """
+    Get a form for a subject by event name.
+
+    Args:
+        config_file (Path): The path to the configuration file.
+        subject_id (str): The subject ID.
+        form_name (str): The form name.
+        event_name (str): The event name.
+
+    Returns:
+        pd.DataFrame: A DataFrame containing the form for the subject.
+    """
+    query = f"""
+    SELECT * FROM forms
+    WHERE subject_id = '{subject_id}' AND
+        form_name = '{form_name}' AND
+        event_name LIKE '%%{event_name}%%';
+    """
+
+    df = db.execute_sql(config_file=config_file, query=query)
+
+    return df
+
+
 def get_days_since_consent(
     config_file: Path, subject_id: str, event_date: datetime
 ) -> int:
@@ -566,7 +643,7 @@ def rpms_form_has_missing_data(
 
     if event_name:
         status_form_df = status_form_df[
-            status_form_df["redcap_event_name"].str.contains(event_name)
+            status_form_df["redcap_event_name"].str.contains(event_name, na=False)
         ]
 
     if status_form_df.empty:
@@ -663,9 +740,7 @@ def get_all_rpms_form_status_for_event(
         config_file=config_file, subject_id=subject_id
     )
 
-    status_form_df = status_form_df[
-        status_form_df["redcap_event_name"] == event_name
-    ]
+    status_form_df = status_form_df[status_form_df["redcap_event_name"] == event_name]
 
     if status_form_df.empty:
         return {}
@@ -780,6 +855,7 @@ def form_is_complete(
         return False
 
 
+@lru_cache(maxsize=None)
 def get_subject_gender(config_file: Path, subject_id: str) -> Optional[str]:
     """
     Get the sex assigned at birth for the subject.
@@ -815,6 +891,7 @@ WHERE
 
 # Cohort specific functions
 
+
 @lru_cache(maxsize=None)
 def get_subject_cohort(
     config_file: Path,
@@ -845,6 +922,9 @@ def get_subject_cohort(
     try:
         cohort = icr_df["chrcrit_part"].iloc[0]
     except KeyError:
+        cohort = None
+
+    if cohort is None or cohort not in [1, 2]:
         # Try looking for arm information in event_name column
         event_names = form_df["event_name"].unique()
         for event_name in event_names:
@@ -1061,6 +1141,33 @@ def get_subject_timepoints(subject_id: str, config_file: Path) -> List[str]:
         cohort = "CHR"  # Assume CHR if cohort is not found.
     timepoints = forms_cohort_timepoint_map[cohort.lower()].keys()
     return list(timepoints)
+
+
+def get_form_timepoints(
+    config_file: Path, form_name: str, cohort: str = "CHR"
+) -> List[str]:
+    """
+    Returns all the timepoints for when a form is expected to be filled out.
+
+    Args:
+        config_file (Path): Path to the config file.
+        form_name (str): Name of the form.
+        cohort (str, optional): Cohort to use. Defaults to "CHR".
+
+    Returns:
+        List[str]: List of timepoints.
+    """
+
+    cohort_timepoint_map = get_forms_cohort_timepoint_map(config_file=config_file)
+    timepoints = cohort_timepoint_map[cohort.lower()]
+
+    form_timepoints = []
+
+    for timepoint, forms in timepoints.items():
+        if form_name in forms:
+            form_timepoints.append(timepoint)
+
+    return form_timepoints
 
 
 def get_subject_visit_date_map(
