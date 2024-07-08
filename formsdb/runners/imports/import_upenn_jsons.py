@@ -215,9 +215,9 @@ def generate_upenn_form(
             else:
                 session_id = "SPLLT"
         elif collection == "upenn_nda":
-            session_date = row["interview_date"]  # 1/20/23
+            session_date = row["interview_date"]  # 2023-06-19
             try:
-                session_date_dt = datetime.strptime(session_date, "%m/%d/%y")
+                session_date_dt = datetime.strptime(session_date, "%Y-%m-%d")
             except ValueError:
                 logger.warning(
                     f"Could not parse date interview_date: {session_date} for {subject_id}. Skipping."
