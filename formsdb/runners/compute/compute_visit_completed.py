@@ -51,7 +51,7 @@ def subject_completed_timepoint(
     subject_id: str,
     forms_cohort_timepoint_map: Dict[str, Dict[str, List[str]]],
     timepoint: str,
-) -> Tuple[bool, Dict[str, bool]]:
+) -> Tuple[bool, Dict[str, bool], Dict[str, bool]]:
     """
     Returns the timepoint of the most recent visit form completed by the subject.
 
@@ -106,6 +106,7 @@ def subject_completed_timepoint(
             forms.append("psychs_p9ac32_fu")
 
     forms_completed_map = {}
+    forms_missing_map = {}
     completed = True
 
     try:
@@ -131,7 +132,7 @@ def subject_completed_timepoint(
 
             forms_completed_map[form] = is_complete and not is_missing
     except ValueError:
-        return False, forms_completed_map
+        return False, forms_completed_map, forms_missing_map
 
     if completed:
         missing: bool = True
@@ -145,16 +146,18 @@ def subject_completed_timepoint(
                 form_name=form,
                 event_name=timepoint,
             )
+
+            forms_missing_map[form] = is_missing
             if not is_missing:
                 missing = False
-                # If any form is not missing, then
-                # the timepoint is completed
-                break
+                # # If any form is not missing, then
+                # # the timepoint is completed
+                # break
 
         if missing:
             completed = False
 
-    return completed, forms_completed_map
+    return completed, forms_completed_map, forms_missing_map
 
 
 def process_subject(params: Tuple[Path, str]) -> List[Dict[str, Any]]:
@@ -175,7 +178,7 @@ def process_subject(params: Tuple[Path, str]) -> List[Dict[str, Any]]:
 
     results = []
     for timepoint in timepoints:
-        is_timepoint_completed, all_form_map = subject_completed_timepoint(
+        is_timepoint_completed, all_form_map, missing_forms_map = subject_completed_timepoint(
             config_file=config_file,
             subject_id=subject_id,
             forms_cohort_timepoint_map=forms_cohort_timepoint_map,
@@ -188,6 +191,8 @@ def process_subject(params: Tuple[Path, str]) -> List[Dict[str, Any]]:
         completed_forms = [
             form for form in all_form_map.keys() if form not in not_completed_forms
         ]
+        missing_forms_map = {k: v for k, v in missing_forms_map.items() if v}
+        missing_forms = list(missing_forms_map.keys())
 
         result = {
             "subject_id": subject_id,
@@ -196,6 +201,7 @@ def process_subject(params: Tuple[Path, str]) -> List[Dict[str, Any]]:
             # "forms_completed_map": all_form_map,
             "completed_forms": completed_forms,
             "not_completed_forms": not_completed_forms,
+            "missing_forms": missing_forms,
         }
         results.append(result)
 
@@ -216,7 +222,7 @@ def compute_visit_completed_data(config_file: Path) -> pd.DataFrame:
     params = [(config_file, subject) for subject in subject_ids]
     results = []
 
-    num_processes = 8
+    num_processes = multiprocessing.cpu_count() // 2
     logger.info(f"Using {num_processes} processes")
     with multiprocessing.Pool(processes=int(num_processes)) as pool:
         with utils.get_progress_bar() as progress:
@@ -226,6 +232,14 @@ def compute_visit_completed_data(config_file: Path) -> pd.DataFrame:
                 progress.update(task, advance=1)
 
     completed_forms_df = pd.DataFrame(results)
+
+    completed_forms_df["completed_not_missing"] = None
+    for idx, row in completed_forms_df.iterrows():
+        completed_forms = row["completed_forms"][1:-1].split(",")
+        missing_forms = row["missing_forms"][1:-1].split(",")
+        completed_not_missing = [form for form in completed_forms if form not in missing_forms]
+        completed_forms_df["completed_not_missing"][idx] = completed_not_missing
+
     return completed_forms_df
 
 
@@ -343,7 +357,7 @@ def compute_visit_completed(config_file: Path) -> pd.DataFrame:
     params = [(config_file, subject) for subject in subject_ids]
     completed_results: List[Dict[str, Any]] = []
 
-    num_processes = 8
+    num_processes = multiprocessing.cpu_count() // 2
     logger.info(f"Using {num_processes} processes")
     with multiprocessing.Pool(processes=int(num_processes)) as pool:
         with utils.get_progress_bar() as progress:

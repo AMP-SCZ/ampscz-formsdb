@@ -53,8 +53,8 @@ conn = duckdb.connect(database=":memory:")
 additional_cols = [
     {
         "table": "subject_visit_status",
-        "name": ["visit_started"],
-        "column": ["timepoint"],
+        "name": ["visit_started", "visit_status"],
+        "column": ["timepoint", "timepoint"],
     },
     {
         "table": "subject_visit_completed",
@@ -76,11 +76,17 @@ additional_cols = [
         "name": ["recruited", "recruitment_status", "recruitment_status_v2"],
         "column": ["recruited", "recruitment_status", "recruitment_status_v2"],
     },
-    {"table": "filters", "name": ["gender", "cohort"], "column": ["gender", "cohort"]},
+    {
+        "table": "filters",
+        "name": ["gender", "cohort", "age_as_consent"],
+        "column": ["gender", "cohort", "age"],
+    },
 ]
 
 
-def add_additional_cols(df: pd.DataFrame, config_file: Path) -> duckdb.DuckDBPyRelation:
+def add_additional_cols(
+    df: pd.DataFrame, config_file: Path  # noqa # pylint: disable=unused-argument
+) -> duckdb.DuckDBPyRelation:
     """
     Adds additional columns to the master table.
 
@@ -92,7 +98,7 @@ def add_additional_cols(df: pd.DataFrame, config_file: Path) -> duckdb.DuckDBPyR
     Returns:
         None
     """
-    master_df = pd.DataFrame(df)
+    master_df = pd.DataFrame(df)  # noqa # pylint: disable=unused-variable
     logger.info("Adding additional columns to the master table...")
     for col in additional_cols:
         names = col["name"]
@@ -113,7 +119,9 @@ def add_additional_cols(df: pd.DataFrame, config_file: Path) -> duckdb.DuckDBPyR
         if table == "filters":
             query = query.replace("subject_id", "subject as subject_id")
 
-        exec(f"{table}_df = db.execute_sql(config_file=config_file, query=query)")
+        exec(  # pylint: disable=exec-used
+            f"{table}_df = db.execute_sql(config_file=config_file, query=query)"
+        )
 
         duckdb_query = "SELECT * FROM master_df"
 
@@ -129,17 +137,38 @@ def add_additional_cols(df: pd.DataFrame, config_file: Path) -> duckdb.DuckDBPyR
     return ddb_rel
 
 
-def export_data_to_csv(config_file: Path, event_name: str, df: pd.DataFrame) -> None:
+def get_combined_csvs_output_dir(config_file: Path) -> Path:
+    """
+    Get the output directory for the combined CSVs.
+    """
+    output_params = utils.config(config_file, "outputs")
+
+    output_dir = Path(output_params["combined_csvs"])
+    return output_dir
+
+
+def export_data_to_csv(
+    config_file: Path,
+    network: str,
+    event_name: str,
+    df: pd.DataFrame,
+    output_dir: Path,
+) -> None:
     """
     Exports the data from DuckDB to a CSV file.
 
     Args:
         config_file (Path): Path to the config file.
+        network (str): Network name.
+        event_name (str): Event name.
+        df (pd.DataFrame): Dataframe to export.
 
     Returns:
         None
     """
-    ddb_rel = add_additional_cols(df=df, config_file=config_file)
+    ddb_rel = add_additional_cols(  # noqa # pylint: disable=unused-variable
+        df=df, config_file=config_file
+    )  # noqa # pylint: disable=unused-variable
     query = """
     SELECT
         *
@@ -161,12 +190,13 @@ def export_data_to_csv(config_file: Path, event_name: str, df: pd.DataFrame) -> 
     output_name = dpdash.get_dpdash_name(
         study="AMPSCZ",
         subject="combined",
-        data_type="form",
+        data_type="redcap",
         category=event_name,
+        optional_tag=[network],
         time_range="day1to1",
     )
 
-    output_path = Path(f"{output_name}.csv")
+    output_path = output_dir / f"{output_name}.csv"
     df.to_csv(output_path, index=False)
     logger.debug(f"Data exported to: {output_path}")
     return
@@ -240,6 +270,17 @@ def fetch_vial_count(
 def get_subject_visit_combined_df(
     config_file: Path, subject_id: str, event_name: str
 ) -> Dict[str, Any]:
+    """
+    Fetches the data for a specific subject and event.
+
+    Args:
+        config_file (Path): Path to the config file.
+        subject_id (str): Subject ID.
+        event_name (str): Event name.
+
+    Returns:
+        Dict[str, Any]: Data for the subject and event.
+    """
     query = f"""
     SELECT
         subject_id,
@@ -288,6 +329,16 @@ def get_subject_visit_combined_df(
 
 
 def process_subject_visit(params: Tuple[Path, str, str]) -> Dict[str, Any]:
+    """
+    Wrapper function to process a subject visit.
+
+    Args:
+        params (Tuple[Path, str, str]): Tuple containing the
+            config file, subject ID, and event name.
+
+    Returns:
+        Dict[str, Any]: Data for the subject and event.
+    """
     config_file, subject_id, event_name = params
     return get_subject_visit_combined_df(
         config_file=config_file, subject_id=subject_id, event_name=event_name
@@ -295,19 +346,20 @@ def process_subject_visit(params: Tuple[Path, str, str]) -> Dict[str, Any]:
 
 
 def get_visit_df(
-    config_file: Path, event_name: str, progress: Progress
+    config_file: Path, network: str, event_name: str, progress: Progress
 ) -> pd.DataFrame:
     """
     Fetches the data for a specific event.
 
     Args:
         config_file (Path): Path to the config file.
+        network (str): Network name.
         event_name (str): Name of the event.
 
     Returns:
         pd.DataFrame: Data for the event.
     """
-    subject_ids = data.get_all_subjects(config_file=config_file)
+    subject_ids = data.get_all_subjects(config_file=config_file, network=network)
     task_subjects = progress.add_task(
         f"Processing subjects for visit {event_name}...", total=len(subject_ids)
     )
@@ -341,20 +393,45 @@ if __name__ == "__main__":
         config_file=config_file, module_name=MODULE_NAME, logger=logger
     )
 
+    output_dir = get_combined_csvs_output_dir(config_file=config_file)
+    logger.info(f"Output directory: {output_dir}")
+    output_dir.mkdir(parents=True, exist_ok=True)
+
     visits = constants.visit_order
+    networks = constants.networks_legacy
 
     # duckdb.execute("SET GLOBAL pandas_analyze_sample=1000000")  # type: ignore
 
     with utils.get_progress_bar() as progress:
-        task_visits = progress.add_task("Processing visits...", total=len(visits))
-        for visit in visits:
-            progress.update(task_visits, description=f"Processing visit {visit}...")
-            visit_df = get_visit_df(
-                config_file=config_file, event_name=visit, progress=progress
+        task_networks = progress.add_task("Processing networks...", total=len(networks))
+        for network in networks:
+            progress.update(
+                task_networks, description=f"Processing network {network}..."
             )
+            task_visits = progress.add_task("Processing visits...", total=len(visits))
+            for visit in visits:
+                progress.update(task_visits, description=f"Processing visit {visit}...")
+                visit_df = get_visit_df(
+                    config_file=config_file,
+                    event_name=visit,
+                    network=network,
+                    progress=progress,
+                )
 
-            # export data to csv
-            logger.info("Exporting data to CSV...")
-            export_data_to_csv(config_file=config_file, event_name=visit, df=visit_df)
+                # export data to csv
+                logger.info("Exporting data to CSV...")
+                export_task = progress.add_task(
+                    f"Exporting {visit} data...", total=None
+                )
+                export_data_to_csv(
+                    config_file=config_file,
+                    network=network,
+                    event_name=visit,
+                    df=visit_df,
+                    output_dir=output_dir,
+                )
+                progress.remove_task(export_task)
+                progress.update(task_visits, advance=1)
+            progress.update(task_networks, advance=1)
 
     logger.info("Done.")

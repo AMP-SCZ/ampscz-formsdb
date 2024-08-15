@@ -17,6 +17,11 @@ CONDA_ENV_PATH = "/PHShome/dm1447/mambaforge/envs/jupyter/bin"
 PYTHON_PATH = f"{CONDA_ENV_PATH}/python"
 REPO_ROOT = "/PHShome/dm1447/dev/ampscz-formsdb"
 
+METADATA_PATTERN = (
+    "/data/predict1/data_from_nda/Pr*/PHOENIX/PROTECTED/P*/P*_metadata.csv"
+)
+METADATA_TEMP = "/data/predict1/home/dm1447/data"
+
 # Define variables
 default_args = {
     "owner": "admin",
@@ -107,12 +112,24 @@ dpimport_form_sociodemographics = BashOperator(
 )
 
 # Staging DPDash
+dpimport_prepate_metadata_staging = BashOperator(
+    task_id="dpimport_prepare_metadata_staging",
+    bash_command=PYTHON_PATH
+    + " "
+    + REPO_ROOT
+    + "/formsdb/scripts/prepare_dpdash_metadata.py"
+    + f" -m '{METADATA_PATTERN}'"
+    + f" -o '{METADATA_TEMP}'",
+    dag=dag,
+    task_group=staging_tg,
+)
+
 dpimport_metadata_staging = BashOperator(
     task_id="dpimport_metadata_staging",
     bash_command=f'{PYTHON_PATH} \
 {STAGING_DPIMPORT_SCRIPT} \
 -c {STAGING_DPDASH_CONFIG} \
-"/data/predict1/data_from_nda/Pr*/PHOENIX/PROTECTED/P*/P*_metadata.csv"',
+"{METADATA_TEMP}/*_metadata.csv"',
     dag=dag,
     task_group=staging_tg,
 )
@@ -161,11 +178,13 @@ dpimport_form_filters_staging = BashOperator(
 info.set_downstream(dpimport_informed_consent_run_sheet)
 info.set_downstream(dpimport_inclusionexclusion_criteria_review)
 info.set_downstream(dpimport_form_sociodemographics)
-info.set_downstream(dpimport_metadata_staging)
+info.set_downstream(dpimport_prepate_metadata_staging)
 info.set_downstream(dpimport_informed_consent_run_sheet_staging)
 info.set_downstream(dpimport_inclusionexclusion_criteria_review_staging)
 info.set_downstream(dpimport_form_sociodemographics_staging)
 info.set_downstream(dpimport_form_filters_staging)
+
+dpimport_prepate_metadata_staging.set_downstream(dpimport_metadata_staging)
 
 all_dpimport_done_staging = EmptyOperator(
     task_id="all_dpimport_done_staging_v2",

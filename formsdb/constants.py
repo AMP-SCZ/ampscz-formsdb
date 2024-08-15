@@ -5,6 +5,7 @@ This module contains constants for the AMPSCZ project.
 from typing import Dict, List, Union
 
 networks: List[str] = ["Pronet", "Prescient"]
+networks_legacy: List[str] = ["ProNET", "PRESCIENT"]
 # networks: List[str] = ["Prescient"]
 # networks: List[str] = ["Pronet"]
 

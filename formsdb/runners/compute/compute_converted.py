@@ -284,19 +284,22 @@ def compute_converted(
             df = data.get_all_subject_forms(
                 config_file=config_file, subject_id=subject_id
             )
+            converted = check_if_converted_conversion_form(
+                subject_id=subject_id, config_file=config_file
+            )
+            if converted:
+                conversion_info_source = "conversion_form"
+
             converted_visit_psychs = get_converted_visit_psychs(
                 df=df, visit_order=visit_order, debug=debug
             )
             if converted_visit_psychs is None:
                 converted_visit = np.nan
-                converted = check_if_converted_conversion_form(
-                    subject_id=subject_id, config_file=config_file
-                )
-                if converted:
-                    conversion_info_source = "conversion_form"
             else:
-                converted = True
-                conversion_info_source = "psychs_p9ac32_fu_form"
+                if conversion_info_source is None:
+                    conversion_info_source = "psychs_p9ac32_fu"
+                else:
+                    conversion_info_source += ", psychs_p9ac32_fu"
 
             if data.subject_uses_rpms(subject_id=subject_id, config_file=config_file):
                 converted_visit_rpms = get_converted_visit_rpms(
@@ -328,6 +331,7 @@ def compute_converted(
                     conversion_info_source = (
                         str(conversion_info_source) + ", conversion_form"
                     )
+                    converted = True
 
             visit_status_df = pd.concat(
                 [
