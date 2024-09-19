@@ -235,8 +235,8 @@ def compute_visit_completed_data(config_file: Path) -> pd.DataFrame:
 
     completed_forms_df["completed_not_missing"] = None
     for idx, row in completed_forms_df.iterrows():
-        completed_forms = row["completed_forms"][1:-1].split(",")
-        missing_forms = row["missing_forms"][1:-1].split(",")
+        completed_forms = str(row["completed_forms"])[1:-1].split(",")
+        missing_forms = str(row["missing_forms"])[1:-1].split(",")
         completed_not_missing = [form for form in completed_forms if form not in missing_forms]
         completed_forms_df["completed_not_missing"][idx] = completed_not_missing
 

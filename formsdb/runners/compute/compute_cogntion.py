@@ -150,6 +150,22 @@ def get_upenn_redcap_data(config_file: Path, subject_id: str) -> pd.DataFrame:
     return upenn_form
 
 
+def remove_nan_values(values: List[Any]) -> List[Any]:
+    # remove nan values
+    non_nan_values = []
+    # values = [item for item in values if not pd.isna(item)]
+    for value in values:
+        if isinstance(value, list):
+            for v in value:
+                if not pd.isna(v):
+                    non_nan_values.append(v)
+        else:
+            if not pd.isna(value):
+                non_nan_values.append(value)
+
+    return non_nan_values
+
+
 def get_visit_system_status(
     visit_data: pd.DataFrame,
     tests: List[str],
@@ -178,7 +194,8 @@ def get_visit_system_status(
         values = [item for sublist in values for item in sublist]
 
         # remove nan values
-        values = [item for item in values if not pd.isna(item)]
+        values = remove_nan_values(values)
+        # values = [item for item in values if not pd.isna(item)]
 
         if len(values) == 0:
             value = "Not Available"
@@ -221,7 +238,7 @@ def get_visit_status(
         values = [item for sublist in values for item in sublist]
 
         # remove nan values
-        values = [item for item in values if not pd.isna(item)]
+        values = remove_nan_values(values)
 
         if len(values) == 0:
             value = "Not Available"
@@ -550,6 +567,9 @@ def process_data(config_file: Path) -> None:
                 )
                 continue
 
+    logger.info("Re-initializing database...")
+    init_db(config_file=config_file, required_variables=required_variables)
+
     db.execute_queries(
         config_file=config_file,
         queries=sql_queries,
@@ -568,9 +588,6 @@ if __name__ == "__main__":
     utils.configure_logging(
         config_file=config_file, module_name=MODULE_NAME, logger=logger
     )
-
-    logger.info("Initializing database...")
-    init_db(config_file=config_file, required_variables=required_variables)
 
     logger.info("Processing data...")
     process_data(config_file=config_file)

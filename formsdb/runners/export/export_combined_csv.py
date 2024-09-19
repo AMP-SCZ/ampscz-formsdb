@@ -53,8 +53,8 @@ conn = duckdb.connect(database=":memory:")
 additional_cols = [
     {
         "table": "subject_visit_status",
-        "name": ["visit_started", "visit_status"],
-        "column": ["timepoint", "timepoint"],
+        "name": ["visit_started", "visit_status", "visit_status_string"],
+        "column": ["timepoint", "timepoint", "timepoint"],
     },
     {
         "table": "subject_visit_completed",
@@ -78,10 +78,68 @@ additional_cols = [
     },
     {
         "table": "filters",
-        "name": ["gender", "cohort", "age_as_consent"],
+        "name": ["gender", "cohort", "age_at_consent"],
         "column": ["gender", "cohort", "age"],
     },
 ]
+
+
+def legacy_add_additional_cols(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Adds additional columns to the master table to match the legacy export.
+
+    Adds the following columns:
+    - visit_status_string
+    - subjectid
+
+    Args:
+        df (pd.DataFrame): Dataframe to add additional columns to.
+        config_file (Path): Path to the config file.
+
+    Returns:
+        pd.DataFrame: Dataframe with additional columns added.
+    """
+
+    df = df.copy()
+
+    # Copy subject_id to subjectid column
+    df["subjectid"] = df["subject_id"]
+
+    # Add visit_status_string column based on the visit_status column, from the following mapping:
+    # screening = screen
+    # baseline = baseln
+    # month_1 = month1
+    # ...
+    # month_24 = month24
+
+    visit_status_mapping = {
+        "screening": "screen",
+        "baseline": "baseln",
+        "month_1": "month1",
+        "month_2": "month2",
+        "month_3": "month3",
+        "month_4": "month4",
+        "month_5": "month5",
+        "month_6": "month6",
+        "month_7": "month7",
+        "month_8": "month8",
+        "month_9": "month9",
+        "month_10": "month10",
+        "month_11": "month11",
+        "month_12": "month12",
+        "month_18": "month18",
+        "month_24": "month24",
+    }
+
+    df["visit_status_string"] = df["visit_status"].map(visit_status_mapping)
+
+    # replace visit_status_string with 'removed' if removed is True
+    df.loc[df["removed"] == "True", "visit_status_string"] = "removed"
+
+    # replace visit_status_string with 'converted' if converted is True
+    df.loc[df["converted"] == "True", "visit_status_string"] = "converted"
+
+    return df
 
 
 def add_additional_cols(
@@ -147,15 +205,15 @@ def get_combined_csvs_output_dir(config_file: Path) -> Path:
     return output_dir
 
 
-def export_data_to_csv(
+def combine_data_from_formsdb(
     config_file: Path,
     network: str,
     event_name: str,
     df: pd.DataFrame,
     output_dir: Path,
-) -> None:
+) -> pd.DataFrame:
     """
-    Exports the data from DuckDB to a CSV file.
+    Combine the data from the formsdb database.
 
     Args:
         config_file (Path): Path to the config file.
@@ -164,7 +222,7 @@ def export_data_to_csv(
         df (pd.DataFrame): Dataframe to export.
 
     Returns:
-        None
+        pd.DataFrame: Dataframe with additional columns added.
     """
     ddb_rel = add_additional_cols(  # noqa # pylint: disable=unused-variable
         df=df, config_file=config_file
@@ -187,19 +245,7 @@ def export_data_to_csv(
     # replace None with pd.NA
     df = df.astype(str).replace("None", pd.NA)
 
-    output_name = dpdash.get_dpdash_name(
-        study="AMPSCZ",
-        subject="combined",
-        data_type="redcap",
-        category=event_name,
-        optional_tag=[network],
-        time_range="day1to1",
-    )
-
-    output_path = output_dir / f"{output_name}.csv"
-    df.to_csv(output_path, index=False)
-    logger.debug(f"Data exported to: {output_path}")
-    return
+    return df
 
 
 def fetch_fasting_time(
@@ -400,6 +446,8 @@ if __name__ == "__main__":
     visits = constants.visit_order
     networks = constants.networks_legacy
 
+    visits = ["conversion", "floating_forms"] + visits
+
     # duckdb.execute("SET GLOBAL pandas_analyze_sample=1000000")  # type: ignore
 
     with utils.get_progress_bar() as progress:
@@ -423,13 +471,30 @@ if __name__ == "__main__":
                 export_task = progress.add_task(
                     f"Exporting {visit} data...", total=None
                 )
-                export_data_to_csv(
+                visit_df = combine_data_from_formsdb(
                     config_file=config_file,
                     network=network,
                     event_name=visit,
                     df=visit_df,
                     output_dir=output_dir,
                 )
+
+                # legacy
+                visit_df = legacy_add_additional_cols(df=visit_df)
+
+                output_name = dpdash.get_dpdash_name(
+                    study="AMPSCZ",
+                    subject="combined",
+                    data_type="redcap",
+                    category=visit,
+                    optional_tag=[network],
+                    time_range="day1to1",
+                )
+
+                output_path = output_dir / f"{output_name}.csv"
+                visit_df.to_csv(output_path, index=False)
+                logger.debug(f"Data exported to: {output_path}")
+
                 progress.remove_task(export_task)
                 progress.update(task_visits, advance=1)
             progress.update(task_networks, advance=1)

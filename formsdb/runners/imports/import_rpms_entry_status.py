@@ -63,6 +63,10 @@ def import_data(config_file: Path) -> None:
     )
     logger.info(f"Found {len(entry_status_files)} RPMS Entry Status files.")
 
+    if len(entry_status_files) == 0:
+        logger.error("No RPMS Entry Status files found. Exiting...")
+        sys.exit(1)
+
     entry_status_files = sorted(entry_status_files)
 
     entry_status_df = pd.DataFrame()

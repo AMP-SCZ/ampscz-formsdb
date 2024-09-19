@@ -59,7 +59,7 @@ def export_forms(config_file: Path) -> None:
     forms_data: List[upenn_forms_model.UpennForms] = []
     sql_queries: List[str] = []
 
-    for collection in ["upenn_nda", "upenn"]:
+    for collection in ["upenn_nda"]:
         logger.info(f"Exporting {collection} forms...")
         forms = mongodb[collection]
         f_count = 0
@@ -114,31 +114,38 @@ def export_forms(config_file: Path) -> None:
 
     logger.info("Constructing SQL queries...")
     purged_subjects: Set[str] = set()
-    for form in forms_data:
-        if not data.check_if_subject_exists(
-            config_file=config_file, subject_id=form.subject_id
-        ):
-            logger.warning(f"Subject {form.subject_id} does not exist in the database, skipping...")
-            continue
 
-        if form.subject_id not in purged_subjects:
-            sql_query = (
-                f"""DELETE FROM upenn_forms WHERE subject_id = '{form.subject_id}';"""
-            )
-            sql_queries.append(sql_query)
-            purged_subjects.add(form.subject_id)
+    with utils.get_progress_bar() as progress:
+        task = progress.add_task("Constructing SQL queries...", total=len(forms_data))
+        for form in forms_data:
+            if not data.check_if_subject_exists(
+                config_file=config_file, subject_id=form.subject_id
+            ):
+                logger.warning(
+                    f"Subject {form.subject_id} does not exist in the database, skipping..."
+                )
+                continue
 
-        sql_query = f"""
-            INSERT INTO upenn_forms (subject_id, event_name, event_type,
-                form_data, source_mdate)
-            VALUES ('{form.subject_id}', '{form.event_name}', '{form.event_type}',
-                '{db.sanitize_json(form.form_data)}', '{form.source_m_date}');
-            """
+            if form.subject_id not in purged_subjects:
+                sql_query = f"""DELETE FROM upenn_forms WHERE subject_id = '{form.subject_id}';"""
+                sql_queries.append(sql_query)
+                purged_subjects.add(form.subject_id)
 
-        sql_queries.append(db.handle_null(sql_query))
+            sql_query = f"""
+                INSERT INTO upenn_forms (subject_id, event_name, event_type,
+                    form_data, source_mdate)
+                VALUES ('{form.subject_id}', '{form.event_name}', '{form.event_type}',
+                    '{db.sanitize_json(form.form_data)}', '{form.source_m_date}');
+                """
+
+            sql_queries.append(db.handle_null(sql_query))
+            progress.update(task, advance=1)
 
     db.execute_queries(
-        config_file=config_file, queries=sql_queries, show_commands=False, show_progress=True
+        config_file=config_file,
+        queries=sql_queries,
+        show_commands=False,
+        show_progress=True,
     )
 
 

@@ -74,7 +74,10 @@ def check_if_subject_form_data_exists(
 
 
 def check_if_subject_upenn_data_exists(
-    config_file: Path, subject_id: str, source_m_date: datetime, collection: Literal["upenn", "upenn_nda"]
+    config_file: Path,
+    subject_id: str,
+    source_m_date: datetime,
+    collection: Literal["upenn", "upenn_nda"],
 ):
     """
     Checks if a subject's UPenn data exists in the MongoDB database.
@@ -154,7 +157,14 @@ def sanitize_json(json_dict: dict) -> str:
     for key, value in json_dict.items():
         if isinstance(value, str):
             json_dict[key] = santize_string(value)
-    return json.dumps(json_dict)
+        if isinstance(value, datetime):
+            json_dict[key] = value.isoformat()
+    try:
+        json_str = json.dumps(json_dict)
+    except TypeError:
+        json_str = json.dumps(json_dict, default=str)
+
+    return json_str
 
 
 def execute_queries(
@@ -268,7 +278,9 @@ def get_db_connection(config_file: Path) -> sqlalchemy.engine.base.Engine:
     return engine  # type: ignore
 
 
-def execute_sql(config_file: Path, query: str, silence_logs: bool = True) -> pd.DataFrame:
+def execute_sql(
+    config_file: Path, query: str, silence_logs: bool = True
+) -> pd.DataFrame:
     """
     Executes a SQL query on a PostgreSQL database and returns the result as a
     pandas DataFrame.
@@ -293,7 +305,9 @@ def execute_sql(config_file: Path, query: str, silence_logs: bool = True) -> pd.
             if timeout > timedelta(seconds=300):
                 raise e
 
-            sleep_time = timeout.total_seconds() + random.uniform(1, timeout.total_seconds() / 2)
+            sleep_time = timeout.total_seconds() + random.uniform(
+                1, timeout.total_seconds() / 2
+            )
             if not silence_logs:
                 logging.warning(f"OperationalError: Retrying after {sleep_time}s...")
             time.sleep(sleep_time)

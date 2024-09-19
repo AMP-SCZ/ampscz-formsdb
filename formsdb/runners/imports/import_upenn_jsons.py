@@ -24,7 +24,8 @@ import json
 import logging
 from datetime import datetime
 from glob import glob
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, Dict, List, Literal, Optional, Tuple
+import multiprocessing
 
 import numpy as np
 import pandas as pd
@@ -152,7 +153,7 @@ def compute_visit_date_map(
 
 def get_closest_visit(
     visit_date_map: Dict[str, datetime], date: datetime
-) -> Optional[str]:
+) -> Tuple[Optional[str], Optional[datetime]]:
     """
     Returns the closest visit name to the provided date.
 
@@ -161,7 +162,7 @@ def get_closest_visit(
         date (datetime): The date to find the closest visit to.
 
     Returns:
-        Optional[str]: The closest visit name to the provided date, or
+        Tuple[Optional[str], datetime]: The closest visit name and date.
             None if no visit is close enough.
     """
     closest_visit: Optional[str] = None
@@ -178,7 +179,52 @@ def get_closest_visit(
             closest_visit = visit_name
             closest_visit_diff = diff
 
-    return closest_visit
+    closest_visit_date = visit_date_map.get(closest_visit, None)  # type: ignore
+    return closest_visit, closest_visit_date  # type: ignore
+
+
+def merge_dicts(d1: Dict[str, Any], d2: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Merge two dictionaries.
+
+    Results in a dictionary like {
+        key1: value1, # if value1 == value2
+        key2: [value2, value3], # if value2 != value3
+    }
+
+    Args:
+        d1 (Dict[str, Any]): The first dictionary.
+        d2 (Dict[str, Any]): The second dictionary.
+
+    Returns:
+        Dict[str, Any]: The merged dictionary.
+    """
+    merged_dict = {}
+
+    for key, value in d1.items():
+        merged_dict[key] = value
+
+    for key, value in d2.items():
+        if key in merged_dict:
+            if merged_dict[key] != value:
+                if isinstance(merged_dict[key], list):
+                    merged_dict[key].append(value)
+                else:
+                    merged_dict[key] = [merged_dict[key], value]
+        else:
+            merged_dict[key] = value
+
+    # if "records" in d1:
+    #     merged_dict["records"] = d1["records"]
+    # else:
+    #     merged_dict["records"] = [d1]
+
+    # if "records" in d2:
+    #     merged_dict["records"].extend(d2["records"])
+    # else:
+    #     merged_dict["records"].append(d2)
+
+    return merged_dict
 
 
 def generate_upenn_form(
@@ -204,38 +250,39 @@ def generate_upenn_form(
     form_data: Dict[str, Dict[str, Any]] = {}
 
     for _, row in df_upenn.iterrows():
-        if collection == "upenn":
-            session_date = row["session_date"]  # 2023-1-20
-            session_id = row["session_battery"]
+        # if collection == "upenn":
+        #     session_date = row["session_date"]  # 2023-1-20
+        #     session_id = row["session_battery"]
 
+        #     session_date_dt = datetime.strptime(session_date, "%Y-%m-%d")
+
+        #     if "NOSPLLT" in session_id:
+        #         session_id = "NOSPLLT"
+        #     else:
+        #         session_id = "SPLLT"
+        # elif collection == "upenn_nda":
+        session_date = row["interview_date"]  # 2023-06-19
+        try:
             session_date_dt = datetime.strptime(session_date, "%Y-%m-%d")
-
-            if "NOSPLLT" in session_id:
-                session_id = "NOSPLLT"
-            else:
-                session_id = "SPLLT"
-        elif collection == "upenn_nda":
-            session_date = row["interview_date"]  # 2023-06-19
-            try:
-                session_date_dt = datetime.strptime(session_date, "%Y-%m-%d")
-            except ValueError:
-                logger.warning(
-                    f"Could not parse date interview_date: {session_date} for {subject_id}. Skipping."
-                )
-                logger.warning("Expected format: m/d/y")
-                raise
+        except ValueError:
+            logger.warning(
+                f"Could not parse date interview_date: {session_date} for {subject_id}. Skipping."
+            )
+            logger.warning("Expected format: m/d/y")
+            raise
 
         try:
             visit = get_event_name_cognitive(
                 all_forms_df=all_forms_df, date=session_date_dt
             )
+            visit_date = session_date_dt
         except ValueError:
             logger.warning(f"Falling back to visit date map for {subject_id}")
             visit_date_map = compute_visit_date_map(
                 all_forms_df=all_forms_df, visits=constants.upenn_visit_order
             )
 
-            visit = get_closest_visit(
+            visit, visit_date = get_closest_visit(
                 visit_date_map=visit_date_map, date=pd.to_datetime(session_date)
             )
 
@@ -247,7 +294,7 @@ def generate_upenn_form(
                 all_forms_df=all_forms_df, visits=constants.upenn_visit_order
             )
 
-            visit = get_closest_visit(
+            visit, visit_date = get_closest_visit(
                 visit_date_map=visit_date_map, date=pd.to_datetime(session_date)
             )
 
@@ -261,15 +308,21 @@ def generate_upenn_form(
                     config_file=config_file, subject_id=subject_id
                 )
                 match cohort:
+                    # case "CHR":
+                    #     visit = f"{visit}_arm_1_i"
+                    # case "HC":
+                    #     visit = f"{visit}_arm_2_i"
+                    # case _:
+                    #     visit = f"{visit}_arm_x_i"
                     case "CHR":
-                        visit = f"{visit}_arm_1_i"
+                        visit = f"{visit}_arm_1"
                     case "HC":
-                        visit = f"{visit}_arm_2_i"
+                        visit = f"{visit}_arm_2"
                     case _:
-                        visit = f"{visit}_arm_x_i"
+                        visit = f"{visit}_arm_x"
 
-        if visit not in form_data:
-            form_data[visit] = {}
+        # if visit not in form_data:
+        #     form_data[visit] = {}
 
         session_data: Dict[str, Any] = {}
         for variable in row.index:
@@ -280,10 +333,21 @@ def generate_upenn_form(
             value = utils.str_to_typed(value)  # type: ignore
             session_data[variable] = value
 
-        if collection == "upenn":
-            form_data[visit][session_id] = session_data
-        elif collection == "upenn_nda":
+        if visit_date is not None:
+            session_data["penncnb_interview_date"] = visit_date.strftime("%Y-%m-%d")
+
+        # if collection == "upenn":
+        #     if session_id not in form_data[visit]:
+        #         form_data[visit][session_id] = session_data
+        #     else:
+        #         form_data[visit][session_id] = merge_dicts(
+        #             form_data[visit][session_id], session_data
+        #         )
+        # elif collection == "upenn_nda":
+        if visit not in form_data:
             form_data[visit] = session_data
+        else:
+            form_data[visit] = merge_dicts(form_data[visit], session_data)
     return form_data
 
 
@@ -310,6 +374,77 @@ def upsert_form_data(
     subject_form_data.replace_one({"_id": subject_id}, form_data, upsert=True)
 
 
+def process_subject(params: Tuple[Path, str, str, bool]) -> Tuple[str, bool]:
+    """
+    A function to process a subject's UPENN JSON file.
+
+    Args:
+        params (Tuple[Path, Path, str, bool]): A tuple containing the config file, subject JSON file,
+            the source, and whether to force import the data.
+    """
+    config_file, subject_json, source, force_import = params
+
+    subject_id = subject_json.split("/")[-1].split(".")[0]
+    source_m_date = utils.get_file_mtime(Path(subject_json))
+    mongo_collection = source.lower()
+    if (
+        db.check_if_subject_upenn_data_exists(
+            config_file,
+            subject_id,
+            source_m_date,
+            collection=mongo_collection,  # type: ignore
+        )
+        and not force_import
+    ):
+        return subject_id, False
+
+    with open(subject_json, "r", encoding="utf-8") as f:
+        json_data = json.load(f)
+
+    sub_data_all = pd.DataFrame.from_dict(json_data, orient="columns")
+    sub_data_all = sub_data_all.apply(lambda x: x.str.strip()).replace("", np.nan)
+    sub_data_all.dropna(axis=1, how="all", inplace=True)
+
+    all_forms_df = data.get_all_subject_forms(
+        config_file=config_file, subject_id=subject_id
+    )
+
+    # try:
+    form_data: Dict[str, Any] = generate_upenn_form(
+        subject_id=subject_id,
+        df_upenn=sub_data_all,
+        all_forms_df=all_forms_df,
+        config_file=config_file,
+        collection=mongo_collection,  # type: ignore
+    )
+    # except Exception as e:
+    #     logger.error(f"Error: {e}")
+    #     logger.error(f"JSON file: {subject_json}")
+
+    # Label form data with subject ID
+    form_data["_id"] = subject_id
+    form_data["_date_imported"] = utils.get_curent_datetime()
+    form_data["_source"] = subject_json
+    form_data["_source_mdate"] = source_m_date
+
+    try:
+        upsert_form_data(
+            config_file=config_file,
+            subject_id=subject_id,
+            form_data=form_data,
+            collection=mongo_collection,  # type: ignore
+        )
+        return subject_id, True
+    except Exception as e:
+        logger.error(f"Error: {e}")
+        logger.error(f"Subject: {subject_id}")
+        f_name = f"{subject_id}_UPENN_DEBUG.json"
+        with open(f_name, "w", encoding="utf-8") as f:
+            json.dump(form_data, f, indent=4, default=str)
+        logger.error(f"Dumped subject data to {f_name}")
+        raise e
+
+
 def import_forms_by_network(
     config_file: Path, network: str, data_root: Path, force_import: bool = False
 ) -> None:
@@ -325,19 +460,19 @@ def import_forms_by_network(
     Returns:
         None
     """
-    upenn_sources: List[str] = ["UPENN_nda", "UPENN"]
+    upenn_sources: List[str] = ["UPENN_nda"]
     with utils.get_progress_bar() as progress:
-        source_process = progress.add_task(
-            "[red]Processing source...", total=len(upenn_sources)
-        )
+        # source_process = progress.add_task(
+        #     "[red]Processing source...", total=len(upenn_sources)
+        # )
         skipped_count = 0
         imported_count = 0
         for source in upenn_sources:
-            progress.update(
-                source_process,
-                advance=1,
-                description=f"Importing UPENN JSONs for {network} ({source})...",
-            )
+            # progress.update(
+            #     source_process,
+            #     advance=1,
+            #     description=f"Importing UPENN JSONs for {network} ({source})...",
+            # )
 
             subjects_glob = glob(
                 f"{data_root}/{network}/PHOENIX/PROTECTED/*/raw/*/surveys/*.{source}.json"
@@ -347,88 +482,27 @@ def import_forms_by_network(
             # Sort subjects by subject ID
             subjects_glob = sorted(subjects_glob)
 
+            num_processes = 8
+            logger.info(f"Using {num_processes} processes.")
+
             skip_buffer = []
+            params = [
+                (config_file, subject_json, source, force_import)
+                for subject_json in subjects_glob
+            ]
 
-            subject_process = progress.add_task(
-                "[red]Processing subjects...", total=len(subjects_glob)
-            )
-            for subject in subjects_glob:
-                subject_id = subject.split("/")[-1].split(".")[0]
-                progress.update(
-                    subject_process,
-                    advance=1,
-                    description=f"Processing UPENN JSON for subject ({subject_id})...",
+            with multiprocessing.Pool(processes=int(num_processes)) as pool:
+                task = progress.add_task(
+                    f"Processing {network} ({source})...", total=len(params)
                 )
-                source_m_date = utils.get_file_mtime(Path(subject))
-                mongo_collection = source.lower()
-                if (
-                    db.check_if_subject_upenn_data_exists(
-                        config_file,
-                        subject_id,
-                        source_m_date,
-                        collection=mongo_collection,  # type: ignore
-                    )
-                    and not force_import
-                ):
-                    skip_buffer.append(subject_id)
-                    skipped_count += 1
-                    continue
-                else:
-                    if len(skip_buffer) > 0:
-                        temp_str = ", ".join(skip_buffer)
-                        logger.info(
-                            f"Skipping {temp_str} as data already exists, and is up to date"
-                        )
-                        skip_buffer = []
-
-                with open(subject, "r", encoding="utf-8") as f:
-                    json_data = json.load(f)
-
-                sub_data_all = pd.DataFrame.from_dict(json_data, orient="columns")
-                sub_data_all = sub_data_all.apply(lambda x: x.str.strip()).replace(
-                    "", np.nan
-                )
-                sub_data_all.dropna(axis=1, how="all", inplace=True)
-
-                all_forms_df = data.get_all_subject_forms(
-                    config_file=config_file, subject_id=subject_id
-                )
-
-                try:
-                    form_data: Dict[str, Any] = generate_upenn_form(
-                        subject_id=subject_id,
-                        df_upenn=sub_data_all,
-                        all_forms_df=all_forms_df,
-                        config_file=config_file,
-                        collection=mongo_collection,  # type: ignore
-                    )
-                except Exception as e:
-                    logger.error(f"Error: {e}")
-                    logger.error(f"JSON file: {subject}")
-                    raise
-
-                # Label form data with subject ID
-                form_data["_id"] = subject_id
-                form_data["_date_imported"] = utils.get_curent_datetime()
-                form_data["_source"] = subject
-                form_data["_source_mdate"] = source_m_date
-
-                try:
-                    upsert_form_data(
-                        config_file=config_file,
-                        subject_id=subject_id,
-                        form_data=form_data,
-                        collection=mongo_collection,  # type: ignore
-                    )
-                    imported_count += 1
-                except Exception as e:
-                    logger.error(f"Error: {e}")
-                    logger.error(f"Subject: {subject_id}")
-                    f_name = f"{subject_id}_UPENN_DEBUG.json"
-                    with open(f_name, "w", encoding="utf-8") as f:
-                        json.dump(form_data, f, indent=4, default=str)
-                    logger.error(f"Dumped subject data to {f_name}")
-                    raise e
+                for result in pool.imap_unordered(process_subject, params):
+                    subject_id, imported = result
+                    if imported:
+                        imported_count += 1
+                    else:
+                        skipped_count += 1
+                        skip_buffer.append(subject_id)
+                    progress.update(task, advance=1)
 
         logger.info(f"Skipped {skipped_count} subjects")
         logger.info(f"Imported {imported_count} subjects")
@@ -451,7 +525,7 @@ if __name__ == "__main__":
     data_params = utils.config(config_file, "data")
     data_root = Path(config_params["data_root"])
 
-    FORCE_IMPORT = False
+    FORCE_IMPORT = True
     logger.info(f"Force import: {FORCE_IMPORT}")
 
     for network in constants.networks:

@@ -76,12 +76,12 @@ skip_adding_nr: List[str] = [
 upenn_tests: List[str] = [
     "mpract",  # Motor Praxis Test
     "spcptn90",  # Short Penn Continuous Performance Test
-    "er40_d",  # Penn Emotion Recognition Task
+    "er40",  # Penn Emotion Recognition Task
     "sfnb2",  # Short Fractal N-back
     "digsym",  # Digit Symbol Test
-    "svolt",  # Short Visual Object Learning and Memory
+    "volt",  # Short Visual Object Learning and Memory
     "sctap",  # Short Computerized Finger Tapping Test
-    "spllt",  # Short Penn List Learning Test
+    "pllt",  # Short Penn List Learning Test
 ]
 
 

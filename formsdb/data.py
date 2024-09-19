@@ -487,9 +487,21 @@ def get_upenn_event_date(
             f"No event {event_name} found in the database for subject {subject_id}."
         )
     try:
-        date = datetime.strptime(date, "%Y-%m-%dT%H:%M:%S")
+        # check if mulpiple dates are present  - '["2024-06-14 00:00:00", "2024-07-25 00:00:00"]'
+        if "[" in date:
+            # logger.warning(f"Multiple dates found for subject {subject_id} and event {event_name}")
+            date = json.loads(date)
+            date = date[0]
+
+        if "T" in date:
+            date = datetime.strptime(date, "%Y-%m-%dT%H:%M:%S")
+        else:
+            date = datetime.strptime(date, "%Y-%m-%d %H:%M:%S")
     except ValueError:  # Try for 6/19/23 format
         date = datetime.strptime(date, "%m/%d/%y")
+    except TypeError:
+        logger.error(f"Error parsing date {date} for subject {subject_id}")
+        raise
 
     return date
 
