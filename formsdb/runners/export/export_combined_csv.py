@@ -68,8 +68,8 @@ additional_cols = [
     },
     {
         "table": "subject_removed",
-        "name": ["removed", "removed_visit"],
-        "column": ["removed", "removed_event"],
+        "name": ["removed", "removed_visit", "removed_date", "removed_info_source"],
+        "column": ["removed", "removed_event", "removed_date", "removed_info_source"],
     },
     {
         "table": "recruitment_status",

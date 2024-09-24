@@ -55,6 +55,7 @@ def fetch_visit_data(config_file: Path, subject_id: str) -> pd.DataFrame:
     """
     query = f"""
         SELECT * FROM subject_visit_status
+        LEFT JOIN subject_visit_completed USING(subject_id)
         WHERE subject_id='{subject_id}'
         """
 
