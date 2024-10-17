@@ -25,7 +25,8 @@ except ValueError:
 
 import logging
 import multiprocessing
-from typing import Any, Dict, List, Tuple, Optional
+from datetime import datetime
+from typing import Any, Dict, List, Optional, Tuple
 
 import duckdb
 import pandas as pd
@@ -205,12 +206,78 @@ def get_combined_csvs_output_dir(config_file: Path) -> Path:
     return output_dir
 
 
+def cast_dates_to_str(data_df: pd.DataFrame, config_file: Path) -> pd.DataFrame:
+    """
+    Casts date columns to string.
+
+    date_ymd - date in YYYY-MM-DD format
+    datetime_ymd - datetime in YYYY-MM-DD HH:MM format
+
+    Args:
+        df (pd.DataFrame): Dataframe to cast date columns to string.
+        config_file (Path): Path to the config file.
+
+    Returns:
+        pd.DataFrame: Dataframe with date columns cast to string.
+    """
+
+    data_dictionary_df = data.get_data_dictionary(config_file=config_file)
+
+    dates_df = data_dictionary_df[data_dictionary_df["text_validation"] == "date_ymd"]
+    datetime_df = data_dictionary_df[
+        data_dictionary_df["text_validation"] == "datetime_ymd"
+    ]
+
+    date_variables = dates_df["variable_name"].tolist()
+
+    logger.debug("Casting dates to REDCap native format...")
+    for date_variable in date_variables:
+        if date_variable not in data_df.columns:
+            continue
+        # data_df[date_variable] = pd.to_datetime(data_df[date_variable], errors="ignore")
+        # cast to string "YYYY-MM-DD"
+        for idx, row in data_df.iterrows():
+            date_val = row[date_variable]
+            if not pd.isnull(date_val) and date_val is not None:
+                try:
+                    date_val = datetime.fromisoformat(date_val)
+                    date_str = date_val.strftime("%Y-%m-%d")
+                    data_df.at[idx, date_variable] = date_str
+                except TypeError:
+                    logger.error(f"date cast failed: {date_val}")
+                except ValueError:
+                    pass
+
+    datetime_variables = datetime_df["variable_name"].tolist()
+
+    for datetime_variable in datetime_variables:
+        if datetime_variable not in data_df.columns:
+            continue
+        # data_df[datetime_variable] = pd.to_datetime(
+        #     data_df[datetime_variable], errors="ignore"
+        # )
+        # cast to string "YYYY-MM-DD HH:MM"
+        for idx, row in data_df.iterrows():
+            datetime_val = row[datetime_variable]
+            if not pd.isnull(datetime_val) and datetime_val is not None:
+                try:
+                    datetime_val = datetime.fromisoformat(datetime_val)
+                    datetime_str = datetime_val.strftime("%Y-%m-%d %H:%M")
+                    data_df.at[idx, datetime_variable] = datetime_str
+                except TypeError:
+                    logger.error(f"datetime cast failed: {datetime_val}")
+                except ValueError:
+                    pass
+        # data_df[datetime_variable] = data_df[datetime_variable].dt.strftime("%Y-%m-%d %H:%M")
+
+    return data_df
+
+
 def combine_data_from_formsdb(
     config_file: Path,
     network: str,
     event_name: str,
     df: pd.DataFrame,
-    output_dir: Path,
 ) -> pd.DataFrame:
     """
     Combine the data from the formsdb database.
@@ -236,14 +303,20 @@ def combine_data_from_formsdb(
 
     df = duckdb.execute(query, connection=conn).fetch_df()
 
+    # Cast date columns to string
+    df = cast_dates_to_str(data_df=df, config_file=config_file)
+
+    # replace None with ''
+    df = df.astype(str).replace("NaT", "")
+
     # Drop columns with all NaN values
     df.dropna(axis=1, how="all", inplace=True)
 
     # replace all occurrences of '.0' in values with ''
     df = df.astype(str).replace(r"\.0", "", regex=True)
 
-    # replace None with pd.NA
-    df = df.astype(str).replace("None", pd.NA)
+    # replace None with ''
+    df = df.astype(str).replace("None", "")
 
     return df
 
@@ -476,7 +549,6 @@ if __name__ == "__main__":
                     network=network,
                     event_name=visit,
                     df=visit_df,
-                    output_dir=output_dir,
                 )
 
                 # legacy
