@@ -29,6 +29,7 @@ import duckdb
 import pandas as pd
 from rich.logging import RichHandler
 
+from formsdb import data
 from formsdb.helpers import cli, dpdash, utils
 
 MODULE_NAME = "formsdb.runners.export.export_combined_date_shifted_csv"
@@ -111,20 +112,7 @@ def get_date_cols(config_file: Path) -> List[str]:
         List[str]: List of date columns
     """
 
-    data_params = utils.config(config_file, "data")
-    data_dictionary_f = Path(data_params["data_dictionary"])
-
-    data_dictionary_df = pd.read_csv(data_dictionary_f)
-    data_dictionary_df = data_dictionary_df.rename(
-        columns={
-            "Variable / Field Name": "variable_name",
-            "Form Name": "form_name",
-            "Field Type": "field_type",
-            "Field Label": "field_label",
-            "Choices, Calculations, OR Slider Labels": "choices_labels",
-            "Text Validation Type OR Show Slider Number": "text_validation",
-        }
-    )
+    data_dictionary_df = data.get_data_dictionary(config_file=config_file)
 
     duckdb_query = """
     SELECT * FROM data_dictionary_df
@@ -205,11 +193,13 @@ def process_file(params: Tuple[Path, pd.DataFrame, List[str], Path]) -> None:
                     pd.to_datetime(subject_df[date_col]) + days_offset_td
                 )
             except ValueError as e:
-                if '-3' in str(e):
+                if "-3" in str(e):
                     continue
-                if '-9' in str(e):
+                if "-9" in str(e):
                     continue
-                logger.error(f"Error: {e} : {subject_id} : {date_col} : {csv_file.name} ")
+                logger.error(
+                    f"Error: {e} : {subject_id} : {date_col} : {csv_file.name} "
+                )
 
         date_shifted_df = pd.concat([date_shifted_df, subject_df])
 

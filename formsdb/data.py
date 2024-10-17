@@ -17,6 +17,36 @@ from formsdb.helpers import db, utils
 logger = logging.getLogger(__name__)
 
 
+def get_data_dictionary(config_file: Path) -> pd.DataFrame:
+    """
+    Get the data dictionary DataFrame.
+
+    Args:
+        config_file (Path): Path to config file
+
+    Returns:
+        pd.DataFrame: Data Dictionary DataFrame
+    """
+    data_params = utils.config(config_file, "data")
+    data_dictionary_f = Path(data_params["data_dictionary"])
+
+    required_col_map = {
+        "Variable / Field Name": "variable_name",
+        "Form Name": "form_name",
+        "Field Type": "field_type",
+        "Field Label": "field_label",
+        "Choices, Calculations, OR Slider Labels": "choices_labels_calculations",
+        "Text Validation Type OR Show Slider Number": "text_validation",
+        "Branching Logic (Show field only if...)": "branching_logic",
+        "Field Annotation": "field_annotation",
+    }
+
+    data_dictionary_df = pd.read_csv(data_dictionary_f)
+    data_dictionary_df = data_dictionary_df.rename(columns=required_col_map)
+
+    return data_dictionary_df
+
+
 def get_overrides(config_file: Path, measure: str) -> List[str]:
     """
     Get the subject IDs that have been overridden for a measure.
