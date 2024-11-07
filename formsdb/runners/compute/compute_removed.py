@@ -211,27 +211,31 @@ def check_if_removed_redcap(
     """
     variable = "statusform_withdrawal"
     variable_name = "withdrawal_date"
-    form_name = "uncategorized"
+    form_names = ["status_form", "uncategorized"]
     event_name = "floating_forms"
 
-    query = f"""
-    SELECT
-        CASE
-            WHEN LENGTH(form_data ->> '{variable}') >= 10 THEN
-                TO_DATE(form_data ->> '{variable}', 'YYYY-MM-DD')
-            ELSE
-                NULL
-        END AS {variable_name}
-    FROM
-        forms
-    WHERE
-        subject_id = '{subject_id}'
-        AND form_name = '{form_name}'
-        AND event_name LIKE '%%{event_name}%%'
-        AND form_data ? '{variable}';
-    """
+    for form_name in form_names:
+        query = f"""
+        SELECT
+            CASE
+                WHEN LENGTH(form_data ->> '{variable}') >= 10 THEN
+                    TO_DATE(form_data ->> '{variable}', 'YYYY-MM-DD')
+                ELSE
+                    NULL
+            END AS {variable_name}
+        FROM
+            forms
+        WHERE
+            subject_id = '{subject_id}'
+            AND form_name = '{form_name}'
+            AND event_name LIKE '%%{event_name}%%'
+            AND form_data ? '{variable}';
+        """
 
-    result = db.fetch_record(config_file=config_file, query=query)
+        result = db.fetch_record(config_file=config_file, query=query)
+
+        if result is not None:
+            break
 
     if result is None:
         return None
@@ -412,3 +416,4 @@ if __name__ == "__main__":
     logger.info(f"Added {UPDATED_REMOVED_COUNT - REMOVED_COUNT} subjects.")
 
     logger.info("Done!")
+
