@@ -97,7 +97,7 @@ if __name__ == "__main__":
     logger.debug(f"Metadata pattern: {metadata_pattern}")
     logger.debug(f"Output directory: {output_directory_path}")
 
-    cli.clear_directory(directory=output_directory_path, logger=logger, pattern="*_metadata.csv")
+    cli.clear_directory(directory=output_directory_path, pattern="*_metadata.csv")
 
     metadata_files = list(glob.glob(str(metadata_pattern)))
     logger.info(f"Found {len(metadata_files)} metadata files")

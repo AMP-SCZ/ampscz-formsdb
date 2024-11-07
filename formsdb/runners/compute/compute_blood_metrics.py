@@ -98,7 +98,7 @@ def get_subject_blood_status(
             if variable_value is None:
                 binned_variable_value = None
             else:
-                variable_value = int(variable_value)
+                variable_value = float(variable_value)
                 if variable_value < 30:
                     binned_variable_value = "lt30"
                 elif variable_value < 60:

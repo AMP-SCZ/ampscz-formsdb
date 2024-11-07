@@ -362,7 +362,11 @@ if __name__ == "__main__":
     FORCE = False
     logger.info(f"Force: {FORCE}")
 
-    for network in constants.networks:
+    networks = constants.networks
+    # remove 'Prescient' network (use RPMS imported, not JSON)
+    networks.remove("Prescient")
+
+    for network in networks:
         logger.info(f"Importing {network} data...")
         import_forms_by_network(
             config_file=config_file,

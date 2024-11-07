@@ -37,7 +37,7 @@ dag = DAG(
     "ampscz_forms_db_import",
     default_args=default_args,
     description="DAG for AMPSCZ forms database Import",
-    schedule="0 22 * * *",
+    schedule="0 18 * * *",
 )
 
 info = BashOperator(
@@ -118,6 +118,18 @@ export_harmonized_jsons = BashOperator(
 
 # RPMS SPecific Imports
 rpms_imports_task_group = TaskGroup("rpms_csvs", dag=dag)
+
+import_rpms_csvs = BashOperator(
+    task_id="import_rpms_csvs",
+    bash_command=PYTHON_PATH
+    + " "
+    + REPO_ROOT
+    + "/formsdb/runners/imports/import_rpms_csvs.py",
+    dag=dag,
+    cwd=REPO_ROOT,
+    task_group=rpms_imports_task_group,
+)
+
 import_rpms_entry_status = BashOperator(
     task_id="import_rpms_entry_status",
     bash_command=PYTHON_PATH
@@ -144,10 +156,12 @@ import_client_status = BashOperator(
 # Start DAG construction
 info.set_downstream(start_mongo)
 
+info.set_downstream(import_rpms_csvs)
+info.set_downstream(import_rpms_entry_status)
+info.set_downstream(import_client_status)
+
 start_mongo.set_downstream(import_upenn_jsons)
 start_mongo.set_downstream(import_harmonized_jsons)
-start_mongo.set_downstream(import_rpms_entry_status)
-start_mongo.set_downstream(import_client_status)
 
 import_upenn_jsons.set_downstream(export_upenn_json)
 import_harmonized_jsons.set_downstream(export_harmonized_jsons)
@@ -176,6 +190,7 @@ all_imports_done = EmptyOperator(
 )
 export_upenn_json.set_downstream(all_imports_done)
 export_harmonized_jsons.set_downstream(all_imports_done)
+import_rpms_csvs.set_downstream(all_imports_done)
 import_rpms_entry_status.set_downstream(all_imports_done)
 import_client_status.set_downstream(all_imports_done)
 

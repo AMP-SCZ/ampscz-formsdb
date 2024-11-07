@@ -9,6 +9,7 @@ from airflow import DAG
 from airflow.datasets import Dataset
 from airflow.operators.bash import BashOperator
 from airflow.operators.empty import EmptyOperator
+from airflow.operators.trigger_dagrun import TriggerDagRunOperator
 from airflow.providers.apprise.notifications import apprise
 from airflow.utils.task_group import TaskGroup
 from apprise import NotifyType
@@ -296,16 +297,11 @@ export_blood_metrics = BashOperator(
     outlets=[blood_metrics_csvs],
 )
 
-# Generate DPDash CSV
-generate_dpdash_csv = BashOperator(
-    task_id="generate_dpdash_csv",
-    bash_command=PYTHON_PATH
-    + " "
-    + REPO_ROOT
-    + "/formsdb/runners/dpdash/merge_metrics.py",
+# Trigger CSV generation
+trigger_combined_csv_generation = TriggerDagRunOperator(
+    task_id="trigger_export_csvs",
+    trigger_dag_id="ampscz_forms_db_export_individual_csv",
     dag=dag,
-    cwd=REPO_ROOT,
-    outlets=[dpdash_csvs],
 )
 # Done Task Definitions
 
@@ -350,11 +346,11 @@ export_converted.set_downstream(dpdash_merge_ready)
 export_withdrawal.set_downstream(dpdash_merge_ready)
 export_blood_metrics.set_downstream(dpdash_merge_ready)
 
-dpdash_merge_ready.set_downstream(generate_dpdash_csv)
+dpdash_merge_ready.set_downstream(trigger_combined_csv_generation)
 
 all_done = EmptyOperator(task_id="all_done", dag=dag)
 
-generate_dpdash_csv.set_downstream(all_done)
+trigger_combined_csv_generation.set_downstream(all_done)
 compute_visit_completed.set_downstream(all_done)
 
 # End DAG construction

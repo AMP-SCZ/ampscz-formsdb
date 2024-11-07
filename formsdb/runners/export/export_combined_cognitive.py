@@ -308,7 +308,10 @@ def generate_csv(
         try:
             interview_dates = combined_df["chrpenn_interview_date"].tolist()
             for idx, interview_date in enumerate(interview_dates):
-                event_date = datetime.strptime(interview_date, "%Y-%m-%dT%H:%M:%S")
+                try:
+                    event_date = datetime.strptime(interview_date, "%Y-%m-%dT%H:%M:%S")
+                except ValueError:
+                    event_date = datetime.strptime(interview_date, "%m/%d/%Y")
                 days_from_consent = data.get_days_since_consent(
                     config_file=config_file,
                     subject_id=subject_id,
@@ -320,7 +323,10 @@ def generate_csv(
             try:
                 entry_dates = combined_df["chrpenn_entry_date"].tolist()
                 for idx, entry_date in enumerate(entry_dates):
-                    event_date = datetime.strptime(entry_date, "%Y-%m-%dT%H:%M:%S")
+                    try:
+                        event_date = datetime.strptime(entry_date, "%Y-%m-%dT%H:%M:%S")
+                    except ValueError:
+                        event_date = datetime.strptime(entry_date, "%m/%d/%Y")
                     days_from_consent = data.get_days_since_consent(
                         config_file=config_file,
                         subject_id=subject_id,

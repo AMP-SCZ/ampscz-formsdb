@@ -340,6 +340,9 @@ def fetch_record(config_file: Path, query: str) -> Optional[str]:
 
     value = df.iloc[0, 0]
 
+    if value is None:
+        return None
+
     return str(value)
 
 

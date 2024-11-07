@@ -8,24 +8,17 @@ from datetime import datetime, timedelta
 from airflow import DAG
 from airflow.datasets import Dataset
 from airflow.operators.bash import BashOperator
-from airflow.operators.empty import EmptyOperator
-from airflow.providers.apprise.notifications import apprise
-from apprise import NotifyType
 
 CONDA_ENV_PATH = "/PHShome/dm1447/mambaforge/envs/jupyter/bin"
 PYTHON_PATH = f"{CONDA_ENV_PATH}/python"
 REPO_ROOT = "/PHShome/dm1447/dev/ampscz-formsdb"
-
-dpdash_csvs = Dataset(
-    uri="file:///data/predict1/data_from_nda/formqc/??-*-form_dpdash_charts-*.csv"
-)
 
 
 # Define variables
 default_args = {
     "owner": "admin",
     "depends_on_past": False,
-    "start_date": datetime(2024, 8, 15),
+    "start_date": datetime(2024, 10, 23),
     "email_on_failure": True,
     "email_on_retry": False,
     "retries": 3,
@@ -33,11 +26,15 @@ default_args = {
     "catchup": False,
 }
 
+# Outputs
+dpdash_csvs = Dataset(
+    uri="file:///data/predict1/data_from_nda/formqc/??-*-form_dpdash_charts-*.csv"
+)
+
 dag = DAG(
-    "ampscz_forms_db_export_combined_csv",
+    "ampscz_forms_db_export_individual_csv",
     default_args=default_args,
-    description="DAG for AMPSCZ formsdb - Export combined CSV",
-    schedule=[dpdash_csvs],
+    description="DAG for AMPSCZ formsdb - Export Individual CSV",
     schedule_interval=None,
 )
 
@@ -58,47 +55,33 @@ echo "$(date) - Uptime: $(uptime)"''',
     cwd=REPO_ROOT,
 )
 
-# Generate combined CSV
-generate_combined_csv = BashOperator(
-    task_id="generate_combined_csv",
+# Generate individual CSV
+generate_individual_csv = BashOperator(
+    task_id="generate_individual_csv",
     bash_command=PYTHON_PATH
     + " "
     + REPO_ROOT
-    + "/formsdb/runners/export/export_combined_csv.py",
+    + "/formsdb/runners/export/export_individual_csvs.py",
     dag=dag,
     cwd=REPO_ROOT,
     pool_slots=16,
 )
 
-# Generate date-shifted combined CSV
-generate_date_shifted_combined_csv = BashOperator(
-    task_id="generate_date_shifted_combined_csv",
+
+# Generate DPDash CSV
+generate_dpdash_csv = BashOperator(
+    task_id="generate_dpdash_csv",
     bash_command=PYTHON_PATH
     + " "
     + REPO_ROOT
-    + "/formsdb/runners/export/export_date_offset_combined_csv.py",
+    + "/formsdb/runners/dpdash/merge_metrics.py",
     dag=dag,
     cwd=REPO_ROOT,
+    outlets=[dpdash_csvs],
     pool_slots=16,
 )
 
-# Start DAG construction
-
-info.set_downstream(generate_combined_csv)
-generate_combined_csv.set_downstream(generate_date_shifted_combined_csv)
-
-csvs_generated = EmptyOperator(
-    task_id="comvined_csvs_generated",
-    dag=dag,
-    on_success_callback=apprise.send_apprise_notification(
-        title="AMPSCZ Forms DB",
-        body="Combined CSVs generated successfully",
-        notify_type=NotifyType.SUCCESS,
-        apprise_conn_id="teams",
-        tag="alerts",
-    ),
-)
-
-generate_date_shifted_combined_csv.set_downstream(csvs_generated)
-
-# End DAG construction
+# Define DAG
+info.set_downstream(generate_individual_csv)
+generate_individual_csv.set_downstream(generate_dpdash_csv)
+# End of DAG

@@ -280,3 +280,40 @@ def explode_col(df: pd.DataFrame, col: str = "form_data") -> pd.DataFrame:
     )
 
     return df
+
+
+def clean_df(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Cleans the DataFrame.
+
+    - Removes '\n' from columns
+    - replace all occurrences of '.0' in values with ''
+    - replace None with ''
+
+    Args:
+        df (pd.DataFrame): The DataFrame to clean.
+
+    Returns:
+        pd.DataFrame: The cleaned DataFrame.
+    """
+    # replace None with ''
+    df = df.astype(str).replace("NaT", "")
+
+    # replace all occurrences of '.00' in values with ''
+    df = df.astype(str).replace(r"\.0+$", "", regex=True)
+
+    # replace None with ''
+    df = df.astype(str).replace("None", "")
+
+    # replace all '/n', '/r', '/t' with '' to prevent line breaks
+    df = df.replace(r"\n", "", regex=True)
+    df = df.replace(r"\r", "", regex=True)
+    df = df.replace(r"\t", "", regex=True)
+
+    # replace nan with ''
+    df = df.astype(str).replace("nan", "")
+
+    # replace '<NA>' with ''
+    df = df.replace("<NA>", "")
+
+    return df

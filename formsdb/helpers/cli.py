@@ -14,9 +14,7 @@ from typing import Callable, List, Optional
 logger = logging.getLogger(__name__)
 
 
-def clear_directory(
-    directory: Path, logger: Optional[logging.Logger] = None, pattern: str = "*"
-):
+def clear_directory(directory: Path, pattern: str = "*", silence_logs: bool = False):
     """
     Clears the contents of a directory.
 
@@ -25,9 +23,6 @@ def clear_directory(
     directory : Path
         The directory to clear.
     """
-    if logger is None:
-        logger = logging.getLogger(__name__)
-
     files_deleted = 0
 
     for file in directory.glob(pattern):
@@ -41,9 +36,36 @@ def clear_directory(
             except FileNotFoundError:
                 logger.warning(f"File {file} not found. Skipping.")
 
-    logger.info(
-        f"Deleted {files_deleted} files from {directory} matching pattern '{pattern}'."
-    )
+    if not silence_logs:
+        logger.info(
+            f"Deleted {files_deleted} files from {directory} matching pattern '{pattern}'."
+        )
+
+
+def set_permissions(
+    path: Path,
+    permissions: str,
+    recursive: bool = False,
+    silence_logs: bool = False,
+) -> None:
+    """
+    Sets the permissions of a file or directory.
+
+    Args:
+        path (Path): The file or directory to set permissions for.
+        permissions (str): The permissions to set.
+        recursive (bool, optional): Whether to set the permissions recursively.
+            Defaults to False.
+
+    Returns:
+        None
+    """
+    if recursive:
+        command_array = ["chmod", "-R", permissions, str(path)]
+    else:
+        command_array = ["chmod", permissions, str(path)]
+
+    execute_commands(command_array=command_array, silence_logs=silence_logs)
 
 
 def get_repo_root() -> Path:
@@ -66,6 +88,7 @@ def execute_commands(
     command_array: list,
     shell: bool = False,
     on_fail: Callable = lambda: sys.exit(1),
+    silence_logs: bool = False,
 ) -> subprocess.CompletedProcess:
     """
     Executes a command and returns the result.
@@ -82,11 +105,11 @@ def execute_commands(
         subprocess.CompletedProcess: The result of the command execution.
 
     """
-    logger.debug("Executing command:")
     # cast to str to avoid error when command_array is a list of Path objects
     command_array = [str(x) for x in command_array]
 
-    if logger:
+    if not silence_logs:
+        logger.debug("Executing command:")
         logger.debug(" ".join(command_array))
 
     if shell:

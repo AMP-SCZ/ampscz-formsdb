@@ -26,7 +26,7 @@ from typing import Dict, List
 import pandas as pd
 from rich.logging import RichHandler
 
-from formsdb import constants
+from formsdb import constants, data
 from formsdb.helpers import cli, db, dpdash, utils
 
 MODULE_NAME = "formsdb.runners.dpdash.merge_metrics"
@@ -214,47 +214,68 @@ def append_nr_to_non_recruited_subjects(master_df: pd.DataFrame) -> pd.DataFrame
     return master_df
 
 
-def generate_dpdash_imported_csvs(master_df: pd.DataFrame, output_root: Path) -> None:
+def generate_dpdash_imported_csvs(
+    master_df: pd.DataFrame, data_root: Path, config_file: Path
+) -> None:
     """
     Generate the DPDash imported csvs.
 
     Args:
         master_df (pd.DataFrame): Master dataframe.
-        output_root (Path): Output directory.
     """
-
-    logger.info(f"Clearing data from {output_root}")
-    cli.clear_directory(directory=output_root, pattern="*dpdash_charts*.csv")
-
-    logger.info(f"Exporting data to {output_root}")
     with utils.get_progress_bar() as progress:
         export_task = progress.add_task("Exporting data", total=len(master_df))
         for _, row in master_df.iterrows():
+            subject_id = row["subject_id"]
             progress.update(
                 export_task,
                 advance=1,
-                description=f"Exporting data for {row['subject_id']}",
+                description=f"Exporting data for {subject_id}",
             )
-            subject_id = row["subject_id"]
+            subject_network = data.get_subject_network(
+                subject_id=subject_id, config_file=config_file
+            )
+            subject_site = subject_id[:2]
+            output_root: Path = (
+                data_root
+                / subject_network.capitalize()
+                / "PHOENIX"
+                / "PROTECTED"
+                / f"{subject_network.capitalize()}{subject_site}"
+                / "processed"
+                / subject_id
+                / "surveys"
+            )
 
-            site = subject_id[:2]
+            if not output_root.exists():
+                try:
+                    output_root.mkdir(parents=True)
+                    cli.set_permissions(
+                        path=output_root, permissions="775", silence_logs=True
+                    )
+                except PermissionError:
+                    logger.error(f"Could not create directory: {output_root}")
+                    continue
 
             dpdash_name = dpdash.get_dpdash_name(
                 subject=subject_id,
-                study=site,
+                study=subject_site,
                 data_type="form",
                 category="dpdash",
                 optional_tag=["charts"],
                 time_range="day1to1",
             )
 
+            cli.clear_directory(
+                directory=output_root, pattern="*dpdash_charts*.csv", silence_logs=True
+            )
             export_path = Path(output_root) / f"{dpdash_name}.csv"
 
             df_part = row.to_frame().T
             df_part.to_csv(export_path, index=False)
-
-    exported_files_count = len(list(output_root.glob("*dpdash_charts*.csv")))
-    logger.info(f"Exported {exported_files_count} files to {output_root}")
+            cli.set_permissions(
+                path=export_path, permissions="664", silence_logs=True
+            )
 
 
 def main(config_file: Path) -> None:
@@ -293,7 +314,9 @@ def main(config_file: Path) -> None:
     logger.info("Appending _n_r to non-recruited subjects")
     master_df = append_nr_to_non_recruited_subjects(master_df=master_df)
 
-    generate_dpdash_imported_csvs(master_df=master_df, output_root=output_root)
+    generate_dpdash_imported_csvs(
+        master_df=master_df, data_root=data_root, config_file=config_file
+    )
 
     master_df_dpdash_name = dpdash.get_dpdash_name(
         subject="combined",

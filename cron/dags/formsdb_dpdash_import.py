@@ -82,7 +82,7 @@ dpimport_informed_consent_run_sheet = BashOperator(
     task_id="dpimport_informed_consent_run_sheet",
     bash_command=f'{DPIMPORT_SCRIPT} \
 -c {dpimport_dev_env["CONFIG"]} \
-"/data/predict1/data_from_nda/formqc/??-*-form_informed_consent_run_sheet-*.csv" \
+"/data/predict1/data_from_nda/Pr*/PHOENIX/PROTECTED/Pr*/processed/*/surveys/??-*-form_informed_consent_run_sheet-*.csv" \
 -n {NUM_PARALLEL_IMPORT}',
     env=dpimport_dev_env,
     dag=dag,
@@ -93,7 +93,7 @@ dpimport_inclusionexclusion_criteria_review = BashOperator(
     task_id="dpimport_inclusionexclusion_criteria_review",
     bash_command=f'{DPIMPORT_SCRIPT} \
 -c {dpimport_dev_env["CONFIG"]} \
-"/data/predict1/data_from_nda/formqc/??-*-form_inclusionexclusion_criteria_review-*.csv" \
+"/data/predict1/data_from_nda/Pr*/PHOENIX/PROTECTED/Pr*/processed/*/surveys/??-*-form_inclusionexclusion_criteria_review-*.csv" \
 -n {NUM_PARALLEL_IMPORT}',
     env=dpimport_dev_env,
     dag=dag,
@@ -104,7 +104,7 @@ dpimport_form_sociodemographics = BashOperator(
     task_id="dpimport_form_sociodemographics",
     bash_command=f'{DPIMPORT_SCRIPT} \
 -c {dpimport_dev_env["CONFIG"]} \
-"/data/predict1/data_from_nda/formqc/??-*-form_sociodemographics-*.csv" \
+"/data/predict1/data_from_nda/Pr*/PHOENIX/PROTECTED/Pr*/processed/*/surveys/??-*-form_sociodemographics-*.csv" \
 -n {NUM_PARALLEL_IMPORT}',
     env=dpimport_dev_env,
     dag=dag,
@@ -139,7 +139,7 @@ dpimport_informed_consent_run_sheet_staging = BashOperator(
     bash_command=f'{PYTHON_PATH} \
 {STAGING_DPIMPORT_SCRIPT} \
 -c {STAGING_DPDASH_CONFIG} \
-"/data/predict1/data_from_nda/formqc/??-*-form_informed_consent_run_sheet-*.csv"',
+"/data/predict1/data_from_nda/Pr*/PHOENIX/PROTECTED/Pr*/processed/*/surveys/??-*-form_informed_consent_run_sheet-*.csv"',
     dag=dag,
     task_group=staging_tg,
 )
@@ -149,7 +149,7 @@ dpimport_inclusionexclusion_criteria_review_staging = BashOperator(
     bash_command=f'{PYTHON_PATH} \
 {STAGING_DPIMPORT_SCRIPT} \
 -c {STAGING_DPDASH_CONFIG} \
-"/data/predict1/data_from_nda/formqc/??-*-form_inclusionexclusion_criteria_review-*.csv"',
+"/data/predict1/data_from_nda/Pr*/PHOENIX/PROTECTED/Pr*/processed/*/surveys/??-*-form_inclusionexclusion_criteria_review-*.csv"',
     dag=dag,
     task_group=staging_tg,
 )
@@ -159,7 +159,7 @@ dpimport_form_sociodemographics_staging = BashOperator(
     bash_command=f'{PYTHON_PATH} \
 {STAGING_DPIMPORT_SCRIPT} \
 -c {STAGING_DPDASH_CONFIG} \
-"/data/predict1/data_from_nda/formqc/??-*-form_sociodemographics-*.csv"',
+"/data/predict1/data_from_nda/Pr*/PHOENIX/PROTECTED/Pr*/processed/*/surveys/??-*-form_sociodemographics-*.csv"',
     dag=dag,
     task_group=staging_tg,
 )

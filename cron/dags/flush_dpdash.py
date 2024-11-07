@@ -8,7 +8,7 @@ from typing import Dict
 
 from airflow import DAG
 from airflow.operators.bash import BashOperator
-from airflow.operators.trigger_dagrun import TriggerDagRunOperator
+# from airflow.operators.trigger_dagrun import TriggerDagRunOperator
 from airflow.operators.empty import EmptyOperator
 from airflow.models import Variable
 from airflow.providers.apprise.notifications import apprise
@@ -64,7 +64,8 @@ dag = DAG(
     "flush_dpdash",
     default_args=default_args,
     description="DAG for flushing DPDash data",
-    schedule="0 0 * * 6",  # Run only on Saturdays at midnight
+    # schedule="0 0 * * 6",  # Run only on Saturdays at midnight
+    schedule_interval=None,
 )
 
 
@@ -127,11 +128,11 @@ flush_dpdash_charts = BashOperator(
     env=mongo_env,
 )
 
-trigger_reimport = TriggerDagRunOperator(
-    task_id="trigger_import",
-    trigger_dag_id="ampscz_forms_db",
-    dag=dag,
-)
+# trigger_reimport = TriggerDagRunOperator(
+#     task_id="trigger_import",
+#     trigger_dag_id="ampscz_forms_db",
+#     dag=dag,
+# )
 
 info.set_downstream(flush_informed_consent)
 info.set_downstream(flush_inclusionexclusion)
@@ -156,4 +157,4 @@ flush_sociodemographics.set_downstream(all_flushed)
 flush_recruitment_status.set_downstream(all_flushed)
 flush_dpdash_charts.set_downstream(all_flushed)
 
-all_flushed.set_downstream(trigger_reimport)
+# all_flushed.set_downstream(trigger_reimport)

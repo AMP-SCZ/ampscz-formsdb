@@ -82,7 +82,7 @@ dpimport_dpdash_charts = BashOperator(
     task_id="dpimport_dpdash_charts",
     bash_command=f'{DPIMPORT_SCRIPT} \
 -c {dpimport_dev_env["CONFIG"]} \
-"/data/predict1/data_from_nda/formqc/??-*-form_dpdash_charts-*.csv" \
+"/data/predict1/data_from_nda/Pr*/PHOENIX/PROTECTED/Pr*/processed/*/surveys/??-*-form_dpdash_charts-*.csv" \
 -n {NUM_PARALLEL_IMPORT}',
     env=dpimport_dev_env,
     dag=dag,
@@ -94,7 +94,7 @@ dpimport_dpdash_charts_staging = BashOperator(
     bash_command=f'{PYTHON_PATH} \
 {STAGING_DPIMPORT_SCRIPT} \
 -c {STAGING_DPDASH_CONFIG} \
-"/data/predict1/data_from_nda/formqc/??-*-form_dpdash_charts-*.csv"',
+"/data/predict1/data_from_nda/Pr*/PHOENIX/PROTECTED/Pr*/processed/*/surveys/??-*-form_dpdash_charts-*.csv"',
     dag=dag,
 )
 # Done Task Definitions

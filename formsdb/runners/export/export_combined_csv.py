@@ -26,7 +26,7 @@ except ValueError:
 import logging
 import multiprocessing
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 import duckdb
 import pandas as pd
@@ -36,9 +36,13 @@ from rich.progress import Progress
 from formsdb import constants, data
 from formsdb.helpers import db, dpdash, utils
 
+pd.options.mode.chained_assignment = None  # default='warn'
+
 MODULE_NAME = "formsdb.runners.export.export_combined_csv"
 
 console = utils.get_console()
+
+error_cache: Set[str] = set()
 
 logger = logging.getLogger(MODULE_NAME)
 logargs = {
@@ -206,7 +210,9 @@ def get_combined_csvs_output_dir(config_file: Path) -> Path:
     return output_dir
 
 
-def cast_dates_to_str(data_df: pd.DataFrame, config_file: Path) -> pd.DataFrame:
+def cast_dates_to_str(
+    data_df: pd.DataFrame, config_file: Path, network: str
+) -> pd.DataFrame:
     """
     Casts date columns to string.
 
@@ -227,24 +233,34 @@ def cast_dates_to_str(data_df: pd.DataFrame, config_file: Path) -> pd.DataFrame:
     datetime_df = data_dictionary_df[
         data_dictionary_df["text_validation"] == "datetime_ymd"
     ]
+    time_df = data_dictionary_df[data_dictionary_df["text_validation"] == "time"]
 
     date_variables = dates_df["variable_name"].tolist()
 
-    logger.debug("Casting dates to REDCap native format...")
+    logger.debug("Casting dates/times/datetimes to REDCap native format...")
     for date_variable in date_variables:
         if date_variable not in data_df.columns:
             continue
         # data_df[date_variable] = pd.to_datetime(data_df[date_variable], errors="ignore")
         # cast to string "YYYY-MM-DD"
         for idx, row in data_df.iterrows():
-            date_val = row[date_variable]
-            if not pd.isnull(date_val) and date_val is not None:
+            date_raw_val = row[date_variable]
+            if not pd.isnull(date_raw_val) and date_raw_val is not None:
                 try:
-                    date_val = datetime.fromisoformat(date_val)
+                    if network == "PRESCIENT":
+                        date_val_pd: pd.Timestamp = pd.to_datetime(date_raw_val, errors="ignore")  # type: ignore
+                        date_val = date_val_pd.to_pydatetime()
+                    else:
+                        date_val = datetime.fromisoformat(date_raw_val)  # type: ignore
                     date_str = date_val.strftime("%Y-%m-%d")
                     data_df.at[idx, date_variable] = date_str
-                except TypeError:
-                    logger.error(f"date cast failed: {date_val}")
+                except (TypeError, AttributeError):
+                    error_message = (
+                        f"date cast failed ({date_variable}): {date_raw_val}"
+                    )
+                    if error_message not in error_cache:
+                        logger.error(error_message)
+                        error_cache.add(error_message)
                 except ValueError:
                     pass
 
@@ -261,14 +277,45 @@ def cast_dates_to_str(data_df: pd.DataFrame, config_file: Path) -> pd.DataFrame:
             datetime_val = row[datetime_variable]
             if not pd.isnull(datetime_val) and datetime_val is not None:
                 try:
-                    datetime_val = datetime.fromisoformat(datetime_val)
+                    if network == "PRESCIENT":
+                        datetime_val_pd: pd.Timestamp = pd.to_datetime(datetime_val, errors="ignore", dayfirst=True)  # type: ignore
+                        datetime_val = datetime_val_pd.to_pydatetime()
+                    else:
+                        datetime_val = datetime.fromisoformat(datetime_val)  # type: ignore
                     datetime_str = datetime_val.strftime("%Y-%m-%d %H:%M")
                     data_df.at[idx, datetime_variable] = datetime_str
-                except TypeError:
-                    logger.error(f"datetime cast failed: {datetime_val}")
+                except (TypeError, AttributeError):
+                    error_message = (
+                        f"datetime cast failed ({datetime_variable}): {datetime_val}"
+                    )
+                    if error_message not in error_cache:
+                        logger.error(error_message)
+                        error_cache.add(error_message)
                 except ValueError:
                     pass
         # data_df[datetime_variable] = data_df[datetime_variable].dt.strftime("%Y-%m-%d %H:%M")
+
+    time_variables = time_df["variable_name"].tolist()
+
+    for time_variable in time_variables:
+        if time_variable not in data_df.columns:
+            continue
+
+        # cast to string "HH:MM"
+        for idx, row in data_df.iterrows():
+            time_val = row[time_variable]
+            if not pd.isnull(time_val) and time_val is not None:
+                try:
+                    if network == "PRESCIENT":
+                        time_val = datetime.strptime(time_val, "%H:%M:%S")
+                    else:
+                        time_val = datetime.fromisoformat(time_val)  # type: ignore
+                    time_str = time_val.strftime("%H:%M")
+                    data_df.at[idx, time_variable] = time_str
+                except TypeError:
+                    logger.error(f"time cast failed: {time_val}")
+                except ValueError:
+                    pass
 
     return data_df
 
@@ -304,7 +351,9 @@ def combine_data_from_formsdb(
     df = duckdb.execute(query, connection=conn).fetch_df()
 
     # Cast date columns to string
-    df = cast_dates_to_str(data_df=df, config_file=config_file)
+    # if network != 'PRESCIENT':
+    #     df = cast_dates_to_str(data_df=df, config_file=config_file)
+    df = cast_dates_to_str(data_df=df, config_file=config_file, network=network)
 
     # replace None with ''
     df = df.astype(str).replace("NaT", "")
@@ -313,10 +362,14 @@ def combine_data_from_formsdb(
     df.dropna(axis=1, how="all", inplace=True)
 
     # replace all occurrences of '.0' in values with ''
-    df = df.astype(str).replace(r"\.0", "", regex=True)
+    df = df.astype(str).replace(r"\.0+$", "", regex=True)
 
-    # replace None with ''
-    df = df.astype(str).replace("None", "")
+    # # replace None with ''
+    # df = df.astype(str).replace("None", "")
+
+    # Replace 'True' and 'False' with '1' and '0'
+    df = df.astype(str).replace("True", "1")
+    df = df.astype(str).replace("False", "0")
 
     return df
 
@@ -409,7 +462,7 @@ def get_subject_visit_combined_df(
         forms
     WHERE
         subject_id = '{subject_id}' AND
-        event_name LIKE '%%{event_name}%%'
+        event_name LIKE '%%{event_name}_arm%%'
     """
 
     subject_df = db.execute_sql(config_file=config_file, query=query)
@@ -439,6 +492,7 @@ def get_subject_visit_combined_df(
                 fluid_type=fluid,
             )
 
+            # SettingWithCopyWarning: A value is trying to be set on a copy of a slice from a DataFrame.
             merged_row[f"{fluid}_vial_count"] = vial_count
 
     # result_df = pd.DataFrame([merged_row])
@@ -518,6 +572,8 @@ if __name__ == "__main__":
 
     visits = constants.visit_order
     networks = constants.networks_legacy
+    # reverse the order of networks
+    networks = networks[::-1]
 
     visits = ["conversion", "floating_forms"] + visits
 

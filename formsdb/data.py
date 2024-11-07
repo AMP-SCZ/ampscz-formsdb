@@ -241,7 +241,12 @@ def get_subject_consent_dates(config_file: Path, subject_id: str) -> datetime:
 
     if date is None:
         raise NoSubjectConsentDateException("No consent date found in the database.")
-    date = datetime.strptime(date, "%Y-%m-%dT%H:%M:%S")
+    
+    try:
+        date = datetime.strptime(date, "%Y-%m-%dT%H:%M:%S")
+    except ValueError:
+        date = pd.to_datetime(date, dayfirst=True)
+        date = date.to_pydatetime()
 
     return date
 
@@ -333,7 +338,7 @@ def subject_is_included(subject_id: str, config_file: Path) -> bool:
     except KeyError:
         included = False
 
-    if included == 1:
+    if int(included) == 1:
         return True
     else:
         return False
@@ -369,7 +374,7 @@ def subject_is_excluded(subject_id: str, config_file: Path) -> bool:
     except KeyError:
         return False
 
-    if included == 0:
+    if int(included) == 0:
         return True
     else:
         return False
@@ -588,8 +593,8 @@ def make_df_dpdash_ready(df: pd.DataFrame, subject_id: str) -> pd.DataFrame:
     # replace empty strings with NA
     df.replace("", pd.NA, inplace=True)
     if df["day"].isnull().values.any():  # type: ignore
-        df["day"] = df["day"].ffill()
-        df["day"] = df["day"].bfill()
+        # df["day"] = df["day"].ffill()
+        # df["day"] = df["day"].bfill()
 
         # Fill na with 1 to n
         if df["day"].isnull().values.any():  # type: ignore
