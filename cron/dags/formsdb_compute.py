@@ -313,6 +313,7 @@ info.set_downstream(compute_visit_status)
 info.set_downstream(compute_blood_metrics)
 info.set_downstream(compute_visit_completed)
 
+compute_converted.set_downstream(compute_recruitment_status)
 compute_removed.set_downstream(compute_recruitment_status)
 compute_visit_status.set_downstream(compute_recruitment_status)
 

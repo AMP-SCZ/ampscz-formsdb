@@ -21,12 +21,13 @@ except ValueError:
 
 import logging
 import multiprocessing
-from typing import Any, Dict, List, Union, Optional
+from datetime import datetime
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import pandas as pd
 from rich.logging import RichHandler
 
-from formsdb import constants
+from formsdb import constants, data
 from formsdb.helpers import db, utils
 
 MODULE_NAME = "formsdb.runners.imports.import_rpms_csvs"
@@ -114,8 +115,97 @@ def get_form_visit_metadata(visit_data: Dict[str, str]) -> Dict[str, Any]:
     return form_metadata
 
 
+# Referece:
+# https://github.com/AMP-SCZ/utility/blob/15a5ef5b49d1e081ee0a549375f78bb26160d958/rpms_to_redcap.py#L152-L173
+def rpms_to_redcap_entry_status_map(
+    rpms_status: str,
+) -> str:
+    """
+    RPMS policy
+    status color  meaning
+    0      Red    No data entered
+    1      Orange Data partially entered
+    2      Green  All data entered
+    """
+
+    status = int(rpms_status)
+    if status == 0:
+        return ""
+    elif status == 1:
+        return "0"
+    elif status >= 2 and status <= 4:
+        return "2"
+
+    return ""
+
+
+def get_subject_form_completion_variables(
+    subject_id: str,
+    config_file: Path,
+) -> List[str]:
+    """
+    Generates SQL queries with form completion variables for a subject.
+
+    Args:
+        subject_id (str): The subject id.
+        config_file (Path): The config file.
+
+    Returns:
+        List[str]: The SQL queries.
+    """
+    cohort = data.get_subject_cohort(
+        subject_id=subject_id,
+        config_file=config_file,
+    )
+    entry_status_df = data.get_all_rpms_entry_status(
+        subject_id=subject_id, config_file=config_file
+    )
+
+    visits = entry_status_df["redcap_event_name"].unique().tolist()
+    visits = sorted(visits)
+
+    sql_queries: List[str] = []
+    for visit in visits:
+        event_name = visit
+        visit_df = entry_status_df[entry_status_df["redcap_event_name"] == visit]
+
+        if cohort == "HC":
+            redcap_event_name = f"{event_name}_arm_2"
+        elif cohort == "CHR":
+            redcap_event_name = f"{event_name}_arm_1"
+        else:
+            raise ValueError(f"Invalid cohort: {cohort}")
+
+        visit_data: Dict[str, int] = {}
+        for _, row in visit_df.iterrows():
+            redcap_form_name = row["redcap_form_name"]
+            rpms_status = row["CompletionStatus"]
+            redcap_status = rpms_to_redcap_entry_status_map(rpms_status)
+
+            if redcap_status == "":
+                continue
+
+            redcap_variable = f"{redcap_form_name}_complete"
+            visit_data[redcap_variable] = int(redcap_status)
+
+        if len(visit_data) > 0:
+            insert_query = f"""
+            INSERT INTO forms (subject_id, form_name, event_name,
+                form_data, source_mdate,
+                variables_with_data
+            ) VALUES ('{subject_id}', 'uncategorized', '{redcap_event_name}',
+                '{db.sanitize_json(visit_data)}', '{datetime.now().date()}',
+                {len(visit_data)}
+            );
+            """
+            sql_queries.append(insert_query)
+
+    return sql_queries
+
+
 def process_subject(
     subject_path: Path,
+    config_file: Path,
 ) -> Dict[str, Union[str, List[str]]]:
     """
     Generates SQL queries for a subject, to update the forms table.
@@ -189,6 +279,8 @@ def process_subject(
             else:
                 raise ValueError(f"Unknown cohort: {subject_cohort}")
 
+            form_data["chric_record_id"] = subject_id
+
         if form_name == "sociodemographics":
             if subject_cohort == "CHR":
                 form_data["chrdemo_age_mos_chr"] = form_data["interview_age"]
@@ -232,6 +324,17 @@ def process_subject(
             )
             """
             subject_queries.append(insert_query.strip())
+    try:
+        uncategorized_queries = get_subject_form_completion_variables(
+            subject_id=subject_id, config_file=config_file
+        )
+    except ValueError as e:
+        logger.error(f"Error processing subject {subject_id}: {e}")
+        return {
+            "subject_id": subject_id,
+            "queries": [],
+        }
+    subject_queries.extend(uncategorized_queries)
 
     result = {
         "subject_id": subject_id,
@@ -239,6 +342,22 @@ def process_subject(
     }
 
     return result
+
+
+def process_subject_wrapper(
+    params: Tuple[Path, Path]
+) -> Dict[str, Union[str, List[str]]]:
+    """
+    Wrapper function for process_subject.
+
+    Args:
+        params (Tuple[Path, Path]): The parameters.
+
+    Returns:
+        Dict[str, Union[str, List[str]]]: The result.
+    """
+    subject_path, config_file = params
+    return process_subject(subject_path=subject_path, config_file=config_file)
 
 
 def import_forms_by_network(
@@ -264,10 +383,11 @@ def import_forms_by_network(
     skipped_subjects: List[str] = []
 
     num_processes = multiprocessing.cpu_count() // 2
+    params = [(subject_path, config_file) for subject_path in subjects_glob]
     with multiprocessing.Pool(processes=int(num_processes)) as pool:
         with utils.get_progress_bar() as progress:
             task = progress.add_task("Processing subjects...", total=len(subjects_glob))
-            for result in pool.imap_unordered(process_subject, subjects_glob):  # type: ignore
+            for result in pool.imap_unordered(process_subject_wrapper, params):
                 subject_id = result["subject_id"]
                 subject_queries = result["queries"]
 

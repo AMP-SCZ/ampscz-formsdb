@@ -71,7 +71,12 @@ def check_if_removed(
     """
     Check if a subject has been removed.
 
-    Looks for 'chrmiss_withdrawn' and 'chrmiss_discon' in the missing_data forms.
+    Looks in the missing_data forms for:
+    - chrmiss_withdrawn
+    - chrmiss_discon
+    - chrmiss_time_spec (A9, A10)
+    - chrmiss_withdrawn_spec (withdrawn reason)
+    - chrmiss_discon_spec (discontinued reason)
 
     Args:
         subject_id (str): Subject ID.
@@ -125,6 +130,41 @@ def check_if_removed(
         else:
             if debug:
                 print(f"{discontinued_variable} not found in {visit}.")
+
+        missing_assesment_variable = "chrmiss_time_spec"
+        if missing_assesment_variable in form_variables:
+            if form_data[missing_assesment_variable] == "A9":
+                withdrawn_date = data.estimate_event_date(
+                    subject_id=subject_id, event=visit, config_file=config_file
+                )
+                return visit, "withdrawn", withdrawn_date
+            if form_data[missing_assesment_variable] == "A10":
+                withdrawn_date = data.estimate_event_date(
+                    subject_id=subject_id, event=visit, config_file=config_file
+                )
+                return visit, "discontinued", withdrawn_date
+
+        withdrawn_reason_variable = "chrmiss_withdrawn_spec"
+        if withdrawn_reason_variable in form_variables:
+            withdrawn_reason = form_data[withdrawn_reason_variable]
+            if not pd.isna(withdrawn_reason):
+                withdrawn_date = data.estimate_event_date(
+                    subject_id=subject_id, event=visit, config_file=config_file
+                )
+                if debug:
+                    print(f"Subject withdrew at {visit} on {withdrawn_date}.")
+                return visit, withdrawn_reason, withdrawn_date
+
+        discontinued_reason_variable = "chrmiss_discon_spec"
+        if discontinued_reason_variable in form_variables:
+            discontinued_reason = form_data[discontinued_reason_variable]
+            if not pd.isna(discontinued_reason):
+                withdrawn_date = data.estimate_event_date(
+                    subject_id=subject_id, event=visit, config_file=config_file
+                )
+                if debug:
+                    print(f"Subject discontinued at {visit} on {withdrawn_date}.")
+                return visit, discontinued_reason, withdrawn_date
 
     return None
 
@@ -416,4 +456,3 @@ if __name__ == "__main__":
     logger.info(f"Added {UPDATED_REMOVED_COUNT - REMOVED_COUNT} subjects.")
 
     logger.info("Done!")
-

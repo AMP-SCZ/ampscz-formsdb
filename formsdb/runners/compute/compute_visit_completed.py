@@ -381,7 +381,7 @@ if __name__ == "__main__":
     )
     logger.info(f"Using config file: {config_file}")
 
-    logger.info("Aggregating all forms comleted for each subject...")
+    logger.info("Aggregating all forms completed for each subject...")
     visit_completed_df = compute_visit_completed_data(config_file=config_file)
     db.df_to_table(
         df=visit_completed_df,

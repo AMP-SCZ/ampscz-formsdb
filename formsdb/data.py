@@ -8,6 +8,7 @@ from datetime import datetime
 from functools import lru_cache
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+import ast
 
 import pandas as pd
 
@@ -241,7 +242,7 @@ def get_subject_consent_dates(config_file: Path, subject_id: str) -> datetime:
 
     if date is None:
         raise NoSubjectConsentDateException("No consent date found in the database.")
-    
+
     try:
         date = datetime.strptime(date, "%Y-%m-%dT%H:%M:%S")
     except ValueError:
@@ -378,6 +379,29 @@ def subject_is_excluded(subject_id: str, config_file: Path) -> bool:
         return True
     else:
         return False
+
+
+def fetch_subject_converted(subject_id: str, config_file: Path) -> bool:
+    """
+    Return if the subject has converted (Psychosis Conversion).
+
+    Args:
+        subject_id: The subject ID
+        config_file: The path to the config file
+    """
+    query = f"""
+    SELECT converted
+    FROM conversion_status
+    WHERE subject_id = '{subject_id}'
+    """
+
+    converted = db.fetch_record(config_file=config_file, query=query)
+
+    if converted is None:
+        return False
+
+    converted_bool = ast.literal_eval(converted)
+    return converted_bool
 
 
 @lru_cache(maxsize=128)
@@ -833,10 +857,10 @@ def get_all_form_status_for_event(
             - 2: Completed
     """
 
-    if subject_uses_rpms(config_file=config_file, subject_id=subject_id):
-        return get_all_rpms_form_status_for_event(
-            config_file=config_file, subject_id=subject_id, event_name=event_name
-        )
+    # if subject_uses_rpms(config_file=config_file, subject_id=subject_id):
+    #     return get_all_rpms_form_status_for_event(
+    #         config_file=config_file, subject_id=subject_id, event_name=event_name
+    #     )
 
     form_df = get_all_subject_forms(config_file=config_file, subject_id=subject_id)
 

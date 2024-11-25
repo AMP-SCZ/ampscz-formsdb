@@ -182,6 +182,7 @@ def worker(params: Tuple[str, Path]) -> Dict[str, str | bool | None]:
     )
     included = data.subject_is_included(subject_id=subject_id, config_file=config_file)
     excluded = data.subject_is_excluded(subject_id=subject_id, config_file=config_file)
+    converted = data.fetch_subject_converted(subject_id=subject_id, config_file=config_file)
     valid_baseline_form_data = subject_has_a_valid_baseline_form_data(
         subject_id=subject_id, config_file=config_file
     )
@@ -192,9 +193,14 @@ def worker(params: Tuple[str, Path]) -> Dict[str, str | bool | None]:
     negative_screen = consented and excluded
 
     # Recruited:
+    #  - Converted
+    #  OR
     #  - Positive screen
     #  - Atleast 1 valid baseline form data
-    recruited = positive_screen and valid_baseline_form_data
+    if converted:
+        recruited = True
+    else:
+        recruited = positive_screen and valid_baseline_form_data
 
     subject_status = None
     if consented:
@@ -216,7 +222,9 @@ def worker(params: Tuple[str, Path]) -> Dict[str, str | bool | None]:
         config_file=config_file, subject_id=subject_id
     )
 
-    if withdrawal_status:
+    if converted:
+        recruitmest_status_v2 = "C5"
+    elif withdrawal_status:
         if withdrawal_status == "not_withdrawn":
             match subject_status:
                 case "consented":

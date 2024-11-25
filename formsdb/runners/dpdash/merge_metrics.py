@@ -314,6 +314,7 @@ def main(config_file: Path) -> None:
     logger.info("Appending _n_r to non-recruited subjects")
     master_df = append_nr_to_non_recruited_subjects(master_df=master_df)
 
+    logger.info(f"Generating DPDash CSVs at {data_root}/*/PHOENIX/PROTECTED/*/processed/*/surveys")
     generate_dpdash_imported_csvs(
         master_df=master_df, data_root=data_root, config_file=config_file
     )

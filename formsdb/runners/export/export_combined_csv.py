@@ -210,6 +210,36 @@ def get_combined_csvs_output_dir(config_file: Path) -> Path:
     return output_dir
 
 
+# Reference:
+# https://github.com/AMP-SCZ/utility/blob/15a5ef5b49d1e081ee0a549375f78bb26160d958/rpms_to_redcap.py#L55C1-L71C21
+def handle_datetime(time_value: str) -> datetime:
+    """
+    Handles different time formats from RPMS.
+
+    This helps standardize the time formats to be used in the exported CSVs.
+
+    Args:
+        time_value (str): Time value to handle.
+
+    Returns:
+        datetime: Time value in datetime format.
+    """
+    if len(time_value) == 10:
+        try:
+            # interview_date e.g. 11/30/2022
+            datetime_val = datetime.strptime(time_value, "%m/%d/%Y")
+        except ValueError:
+            # psychs form e.g. 03/03/1903
+            datetime_val = datetime.strptime(time_value, "%d/%m/%Y")
+    elif len(time_value) > 10:
+        # all other forms e.g. 1/05/2022 12:00:00 AM
+        datetime_val = datetime.strptime(time_value, "%d/%m/%Y %I:%M:%S %p")
+    else:
+        raise ValueError(f"Unknown time format: {time_value}")
+
+    return datetime_val
+
+
 def cast_dates_to_str(
     data_df: pd.DataFrame, config_file: Path, network: str
 ) -> pd.DataFrame:
@@ -248,8 +278,7 @@ def cast_dates_to_str(
             if not pd.isnull(date_raw_val) and date_raw_val is not None:
                 try:
                     if network == "PRESCIENT":
-                        date_val_pd: pd.Timestamp = pd.to_datetime(date_raw_val, errors="ignore")  # type: ignore
-                        date_val = date_val_pd.to_pydatetime()
+                        date_val = handle_datetime(date_raw_val)  # type: ignore
                     else:
                         date_val = datetime.fromisoformat(date_raw_val)  # type: ignore
                     date_str = date_val.strftime("%Y-%m-%d")
@@ -278,8 +307,7 @@ def cast_dates_to_str(
             if not pd.isnull(datetime_val) and datetime_val is not None:
                 try:
                     if network == "PRESCIENT":
-                        datetime_val_pd: pd.Timestamp = pd.to_datetime(datetime_val, errors="ignore", dayfirst=True)  # type: ignore
-                        datetime_val = datetime_val_pd.to_pydatetime()
+                        datetime_val = handle_datetime(datetime_val)  # type: ignore
                     else:
                         datetime_val = datetime.fromisoformat(datetime_val)  # type: ignore
                     datetime_str = datetime_val.strftime("%Y-%m-%d %H:%M")
@@ -307,7 +335,7 @@ def cast_dates_to_str(
             if not pd.isnull(time_val) and time_val is not None:
                 try:
                     if network == "PRESCIENT":
-                        time_val = datetime.strptime(time_val, "%H:%M:%S")
+                        time_val = handle_datetime(time_val)  # type: ignore
                     else:
                         time_val = datetime.fromisoformat(time_val)  # type: ignore
                     time_str = time_val.strftime("%H:%M")
@@ -355,17 +383,48 @@ def combine_data_from_formsdb(
     #     df = cast_dates_to_str(data_df=df, config_file=config_file)
     df = cast_dates_to_str(data_df=df, config_file=config_file, network=network)
 
-    # replace None with ''
+    # replace NaT with ''
     df = df.astype(str).replace("NaT", "")
 
-    # Drop columns with all NaN values
+    # Drop columns with all NaN values in data columns
+    mandatory_cols = [
+        "subject_id"
+        "visit_started",
+        "visit_status",
+        "visit_status_string",
+        "visit_completed",
+        "converted",
+        "converted_visit",
+        "removed",
+        "removed_visit",
+        "removed_date",
+        "removed_info_source",
+        "recruited",
+        "recruitment_status",
+        "recruitment_status_v2",
+        "gender",
+        "cohort",
+        "age_at_consent",
+        "subjectid"
+    ]
+
+    data_cols = list(set(df.columns) - set(mandatory_cols))
+    df.dropna(axis=0, how="all", subset=data_cols, inplace=True)
     df.dropna(axis=1, how="all", inplace=True)
 
     # replace all occurrences of '.0' in values with ''
     df = df.astype(str).replace(r"\.0+$", "", regex=True)
 
-    # # replace None with ''
-    # df = df.astype(str).replace("None", "")
+    # replace None with ''
+    df = df.astype(str).replace("None", "")
+    # df = df.replace(
+    #     to_replace=[None],
+    #     value=""
+    # )
+    # df = df.replace(
+    #     to_replace=[pd.NA],
+    #     value=""
+    # )
 
     # Replace 'True' and 'False' with '1' and '0'
     df = df.astype(str).replace("True", "1")
