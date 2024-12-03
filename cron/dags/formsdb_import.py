@@ -67,6 +67,17 @@ start_mongo = BashOperator(
 )
 
 # Import
+# Data Dictionary
+import_data_dictionary = BashOperator(
+    task_id="import_data_dictionary",
+    bash_command=PYTHON_PATH
+    + " "
+    + REPO_ROOT
+    + "/formsdb/runners/imports/import_data_dictionary.py",
+    dag=dag,
+    cwd=REPO_ROOT,
+)
+
 # UPENN JSONs
 upenn_task_group = TaskGroup("upenn_jsons", dag=dag)
 import_upenn_jsons = BashOperator(
@@ -78,7 +89,7 @@ import_upenn_jsons = BashOperator(
     dag=dag,
     cwd=REPO_ROOT,
     task_group=upenn_task_group,
-    skip_on_exit_code=1
+    skip_on_exit_code=1,
 )
 
 export_upenn_json = BashOperator(
@@ -156,6 +167,8 @@ import_client_status = BashOperator(
 # Start DAG construction
 info.set_downstream(start_mongo)
 
+start_mongo.set_downstream(import_data_dictionary)
+
 info.set_downstream(import_rpms_csvs)
 info.set_downstream(import_rpms_entry_status)
 info.set_downstream(import_client_status)
@@ -183,9 +196,7 @@ all_imports_done = EmptyOperator(
         apprise_conn_id="teams",
         tag="alerts",
     ),
-    outlets=[
-        postgresdb
-    ],
+    outlets=[postgresdb],
     trigger_rule="none_failed",
 )
 export_upenn_json.set_downstream(all_imports_done)
