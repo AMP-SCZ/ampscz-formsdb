@@ -116,13 +116,13 @@ def get_date_cols(config_file: Path) -> List[str]:
 
     duckdb_query = """
     SELECT * FROM data_dictionary_df
-    WHERE text_validation LIKE '%date%'
+    WHERE text_validation_type_or_show_slider_number LIKE '%date%'
     """
 
     ddb_rel = duckdb.sql(duckdb_query, connection=conn)
     ddb_df = ddb_rel.df()
 
-    date_cols = ddb_df["variable_name"].tolist()
+    date_cols = ddb_df["field_name"].tolist()
     return date_cols
 
 

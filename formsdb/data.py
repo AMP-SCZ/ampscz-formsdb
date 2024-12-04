@@ -2,13 +2,13 @@
 Module contain helper functions specific to this data pipeline
 """
 
+import ast
 import json
 import logging
 from datetime import datetime
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Dict, List, Optional
-import ast
+from typing import Any, Dict, List, Optional, Union
 
 import pandas as pd
 
@@ -18,6 +18,8 @@ from formsdb.helpers import db, utils
 logger = logging.getLogger(__name__)
 
 
+# Data Dictionary
+@lru_cache(maxsize=1)
 def get_data_dictionary(config_file: Path) -> pd.DataFrame:
     """
     Get the data dictionary DataFrame.
@@ -28,24 +30,164 @@ def get_data_dictionary(config_file: Path) -> pd.DataFrame:
     Returns:
         pd.DataFrame: Data Dictionary DataFrame
     """
-    data_params = utils.config(config_file, "data")
-    data_dictionary_f = Path(data_params["data_dictionary"])
+    # data_params = utils.config(config_file, "data")
+    # data_dictionary_f = Path(data_params["data_dictionary"])
 
-    required_col_map = {
-        "Variable / Field Name": "variable_name",
-        "Form Name": "form_name",
-        "Field Type": "field_type",
-        "Field Label": "field_label",
-        "Choices, Calculations, OR Slider Labels": "choices_labels_calculations",
-        "Text Validation Type OR Show Slider Number": "text_validation",
-        "Branching Logic (Show field only if...)": "branching_logic",
-        "Field Annotation": "field_annotation",
-    }
+    # required_col_map = {
+    #     "Variable / Field Name": "variable_name",
+    #     "Form Name": "form_name",
+    #     "Field Type": "field_type",
+    #     "Field Label": "field_label",
+    #     "Choices, Calculations, OR Slider Labels": "choices_labels_calculations",
+    #     "Text Validation Type OR Show Slider Number": "text_validation",
+    #     "Branching Logic (Show field only if...)": "branching_logic",
+    #     "Field Annotation": "field_annotation",
+    # }
 
-    data_dictionary_df = pd.read_csv(data_dictionary_f)
-    data_dictionary_df = data_dictionary_df.rename(columns=required_col_map)
+    # data_dictionary_df = pd.read_csv(data_dictionary_f)
+    # data_dictionary_df = data_dictionary_df.rename(columns=required_col_map)
+
+    # return data_dictionary_df
+    query = "SELECT * FROM data_dictionary"
+
+    data_dictionary_df = db.execute_sql(
+        config_file=config_file,
+        query=query,
+    )
 
     return data_dictionary_df
+
+
+@lru_cache(maxsize=None)
+def get_dictionary_choices(
+    config_file: Path, variable_name: str
+) -> Optional[Dict[str, str]]:
+    """
+    Get the choices for a variable from the data dictionary.
+
+    Args:
+        config_file (Path): The path to the configuration file.
+        variable_name (str): The variable name.
+
+    Returns:
+        Optional[Dict[str, str]]: A dictionary of choices for the variable.
+            None if the variable is not found in the data dictionary.
+    """
+    query = f"""
+    SELECT select_choices_or_calculations FROM data_dictionary WHERE field_name = '{variable_name}'
+    """
+    results = db.fetch_record(
+        config_file=config_file,
+        query=query,
+    )
+    if results is None:
+        return None
+
+    # Sample results: "1, Yes|0, No"
+    choices = results.split("|")
+    choices = [choice.split(",", maxsplit=1) for choice in choices]
+    choices = {choice[0].strip(): choice[1].strip() for choice in choices}
+    return choices
+
+
+def get_dictionary_choice(
+    config_file: Path, variable_name: str, choice: Union[int, str]
+) -> Optional[str]:
+    """
+    Get the choice label for a variable from the data dictionary.
+
+    Args:
+        config_file (Path): The path to the configuration file.
+        variable_name (str): The variable name.
+        choice (Union[int, str]): The choice value.
+
+    Returns:
+        Optional[str]: The choice label.
+            None if the variable is not found in the data dictionary.
+    """
+    choices = get_dictionary_choices(config_file, variable_name)
+    if choices is None:
+        return None
+    return choices.get(str(choice), None)
+
+
+# Medication
+@lru_cache(maxsize=1)
+def get_all_medication_info(
+    config_file: Path,
+) -> Dict[int, Dict[str, Any]]:
+    """
+    Get all medication information from the data dictionary.
+
+    Args:
+        config_file (Path): The path to the configuration file.
+
+    Returns:
+        Dict[int, Dict[str, Any]]: A dictionary containing all medication information.
+    """
+    source = "chrpharm_med1_name"
+    results_raw = get_dictionary_choices(config_file=config_file, variable_name=source)
+
+    if results_raw is None:
+        raise ValueError(
+            f"No medication information found for {source} in data dictionary"
+        )
+
+    med_data: Dict[int, Dict[str, Any]] = {}
+    for med_id, value in results_raw.items():
+        try:
+            med_name, med_class, _ = value.split("_")
+        except ValueError:
+            med_name, _ = value.split("_")
+            med_class = "UNCATEGORIZED"
+
+        med_data[int(med_id)] = {
+            "med_id": med_id,
+            "med_name": med_name,
+            "med_class": med_class,
+        }
+
+    return med_data
+
+
+def get_medication_info_by_id(
+    config_file: Path, med_id: int
+) -> Optional[Dict[str, Any]]:
+    """
+    Get medication information by ID.
+
+    Args:
+        config_file (Path): The path to the configuration file.
+        med_id (int): The medication ID.
+
+    Returns:
+        Optional[Dict[str, Any]]: The medication information.
+            None if the medication ID is not found.
+    """
+    med_data = get_all_medication_info(config_file)
+    return med_data.get(med_id, None)
+
+
+def get_subject_medication_info(config_file: Path, subject_id: str) -> pd.DataFrame:
+    """
+    Get the medication information for a subject.
+
+    Args:
+        config_file (Path): The path to the configuration file.
+        subject_id (str): The subject ID.
+
+    Returns:
+        pd.DataFrame: A DataFrame containing the medication information for the subject.
+    """
+
+    query = f"""
+    SELECT * FROM medication_data
+    WHERE subject_id = '{subject_id}';
+    """
+
+    df = db.execute_sql(config_file=config_file, query=query)
+
+    return df
 
 
 def get_overrides(config_file: Path, measure: str) -> List[str]:

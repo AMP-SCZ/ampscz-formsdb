@@ -259,13 +259,13 @@ def cast_dates_to_str(
 
     data_dictionary_df = data.get_data_dictionary(config_file=config_file)
 
-    dates_df = data_dictionary_df[data_dictionary_df["text_validation"] == "date_ymd"]
+    dates_df = data_dictionary_df[data_dictionary_df["text_validation_type_or_show_slider_number"] == "date_ymd"]
     datetime_df = data_dictionary_df[
-        data_dictionary_df["text_validation"] == "datetime_ymd"
+        data_dictionary_df["text_validation_type_or_show_slider_number"] == "datetime_ymd"
     ]
-    time_df = data_dictionary_df[data_dictionary_df["text_validation"] == "time"]
+    time_df = data_dictionary_df[data_dictionary_df["text_validation_type_or_show_slider_number"] == "time"]
 
-    date_variables = dates_df["variable_name"].tolist()
+    date_variables = dates_df["field_name"].tolist()
 
     logger.debug("Casting dates/times/datetimes to REDCap native format...")
     for date_variable in date_variables:
@@ -293,7 +293,7 @@ def cast_dates_to_str(
                 except ValueError:
                     pass
 
-    datetime_variables = datetime_df["variable_name"].tolist()
+    datetime_variables = datetime_df["field_name"].tolist()
 
     for datetime_variable in datetime_variables:
         if datetime_variable not in data_df.columns:
@@ -323,7 +323,7 @@ def cast_dates_to_str(
                     pass
         # data_df[datetime_variable] = data_df[datetime_variable].dt.strftime("%Y-%m-%d %H:%M")
 
-    time_variables = time_df["variable_name"].tolist()
+    time_variables = time_df["field_name"].tolist()
 
     for time_variable in time_variables:
         if time_variable not in data_df.columns:
