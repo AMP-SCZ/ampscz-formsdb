@@ -215,11 +215,11 @@ def get_subject_medication_info(
             # similarly, prioritize last use date over offset date for end date
             last_use_date_variable = f"chrpharm_lastuse_med{med_idx}"
             offset_date_variable = f"chrpharm_med{med_idx}_offset"
-            form_modified_date_variable = "chrpharm_date_mod"
+            # form_modified_date_variable = "chrpharm_date_mod"
             if medication_form == "past_pharmaceutical_treatment":
                 last_use_date_variable = f"{last_use_date_variable}_past"
                 offset_date_variable = f"{offset_date_variable}_past"
-                form_modified_date_variable = f"{form_modified_date_variable}_past"
+                # form_modified_date_variable = f"{form_modified_date_variable}_past"
 
             end_date = None
             if last_use_date_variable in form_df.columns:
@@ -232,14 +232,22 @@ def get_subject_medication_info(
                 end_date = remove_missing_codes(end_date)
                 if end_date is not None:
                     end_date = handle_datetime(end_date)
-            if end_date is None and form_modified_date_variable in form_df.columns:
-                end_date = form_df[form_modified_date_variable].iloc[0]
-                end_date = remove_missing_codes(end_date)
-                if end_date is not None:
-                    end_date = handle_datetime(end_date)
+            # if end_date is None and form_modified_date_variable in form_df.columns:
+            #     end_date = form_df[form_modified_date_variable].iloc[0]
+            #     end_date = remove_missing_codes(end_date)
+            #     if end_date is not None:
+            #         end_date = handle_datetime(end_date)
             else:
                 # print(f"Missing end date for med {med_idx}: {subject_id}@{medication_form}")
                 pass
+
+            dosage_variable = f"chrpharm_med{med_idx}_dosage"
+            if medication_form == "past_pharmaceutical_treatment":
+                dosage_variable = f"{dosage_variable}_past"
+            if dosage_variable in form_df.columns:
+                med_dosage = form_df[dosage_variable].iloc[0]
+            else:
+                med_dosage = None
 
             med_compliance_variable = f"chrpharm_med{med_idx}_comp"
             if medication_form == "past_pharmaceutical_treatment":
@@ -283,6 +291,7 @@ def get_subject_medication_info(
             else:
                 med_indication_str = None
 
+            med_dosage = remove_missing_codes(med_dosage)
             med_use = remove_missing_codes(med_use)
             med_compliance = remove_missing_codes(med_compliance)
 
@@ -298,6 +307,7 @@ def get_subject_medication_info(
                 "med_name": med_info["med_name"],
                 "med_class": med_info["med_class"],
                 "med_indication": med_indication_str,
+                "med_dosage": med_dosage,
                 "start_date": start_date,
                 "end_date": end_date,
                 "duration_days": duration_days,
@@ -345,6 +355,11 @@ def compile_medication_data(config_file: Path) -> pd.DataFrame:
     # Cast duration_days, med_use and med_compliance to Optional[int]
     # ValueError: invalid literal for int() with base 10: '2.0'
     # TypeError: cannot safely cast non-equivalent float64 to int64
+    medication_df["med_dosage"] = (
+        pd.to_numeric(medication_df["med_dosage"], errors="coerce")  # Convert valid strings to float
+        .round(0)  # Round to nearest integer (if needed)
+        .astype("Int64")  # Convert to nullable integer
+    )
     medication_df["med_use"] = (
         pd.to_numeric(medication_df["med_use"], errors="coerce")  # Convert valid strings to float
         .round(0)  # Round to nearest integer (if needed)

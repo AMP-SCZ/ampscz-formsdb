@@ -168,7 +168,7 @@ def get_medication_info_by_id(
     return med_data.get(med_id, None)
 
 
-def get_subject_medication_info(config_file: Path, subject_id: str) -> pd.DataFrame:
+def get_subject_medication_data(config_file: Path, subject_id: str) -> pd.DataFrame:
     """
     Get the medication information for a subject.
 
