@@ -254,6 +254,7 @@ def check_if_removed_redcap(
     form_names = ["status_form", "uncategorized"]
     event_name = "floating_forms"
 
+    # Legacy Form
     for form_name in form_names:
         query = f"""
         SELECT
@@ -276,6 +277,26 @@ def check_if_removed_redcap(
 
         if result is not None:
             break
+
+    # New Form
+    if result is None:
+        variable = "chr_subject_date_of_withdrawal"
+        form_name = "revised_status_form"
+        event_name = "floating_forms"
+
+        query = f"""
+        SELECT
+            TO_DATE(form_data ->> '{variable}', 'YYYY-MM-DD') AS {variable_name}
+        FROM
+            forms
+        WHERE
+            subject_id = '{subject_id}'
+            AND form_name = '{form_name}'
+            AND event_name LIKE '%%{event_name}%%'
+            AND form_data ? '{variable}';
+        """
+
+        result = db.fetch_record(config_file=config_file, query=query)
 
     if result is None:
         return None
