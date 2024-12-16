@@ -238,7 +238,7 @@ def process_subject(
         }
 
     inclusionexclusion_criteria_review_data = pd.read_csv(
-        inclusionexclusion_criteria_review_path, dtype=str
+        inclusionexclusion_criteria_review_path, dtype=str, keep_default_na=False
     )
     chrcrit_part = inclusionexclusion_criteria_review_data["chrcrit_part"].iloc[0]
     arm = f"arm_{chrcrit_part}"
@@ -255,7 +255,9 @@ def process_subject(
             # Form {form_name} not found for subject {subject_id}"
             continue
 
-        form_data = pd.read_csv(form_path, dtype=str)
+        form_data = pd.read_csv(form_path, dtype=str, keep_default_na=False)
+        # replace all empty strings with pd.NA
+        form_data = form_data.replace("", pd.NA)
 
         if form_name == "informed_consent_run_sheet":
             # Only insert row with earlest 'chric_consent_date', format: DD/MM/YYYY 12:00:00 AM
