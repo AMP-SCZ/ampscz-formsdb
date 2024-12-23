@@ -104,6 +104,7 @@ dpdash_csvs = Dataset(
 
 # Tash Groups
 cognition_tg = TaskGroup("cognition", dag=dag)
+medication_tg = TaskGroup("medication", dag=dag)
 conversion_tg = TaskGroup("conversion", dag=dag)
 visit_status_tg = TaskGroup("visit_status", dag=dag)
 visit_competed_tg = TaskGroup("visit_completed", dag=dag)
@@ -122,6 +123,17 @@ compute_cognition = BashOperator(
     cwd=REPO_ROOT,
     outlets=[cognitive_data_availability, cognitive_summary],
     task_group=cognition_tg,
+)
+
+compute_medication = BashOperator(
+    task_id="compute_medication",
+    bash_command=PYTHON_PATH
+    + " "
+    + REPO_ROOT
+    + "/formsdb/runners/compute/compute_medication.py",
+    dag=dag,
+    cwd=REPO_ROOT,
+    task_group=medication_tg,
 )
 
 compute_converted = BashOperator(
@@ -307,6 +319,7 @@ trigger_combined_csv_generation = TriggerDagRunOperator(
 
 # Start DAG construction
 info.set_downstream(compute_cognition)
+info.set_downstream(compute_medication)
 info.set_downstream(compute_converted)
 info.set_downstream(compute_removed)
 info.set_downstream(compute_visit_status)
@@ -353,5 +366,6 @@ all_done = EmptyOperator(task_id="all_done", dag=dag)
 
 trigger_combined_csv_generation.set_downstream(all_done)
 compute_visit_completed.set_downstream(all_done)
+compute_medication.set_downstream(all_done)
 
 # End DAG construction

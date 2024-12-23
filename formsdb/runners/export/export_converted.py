@@ -54,7 +54,7 @@ def fetch_conversion_data(config_file: Path, subject_id: str) -> pd.DataFrame:
         pd.DataFrame: DataFrame containing the conversion data for the subject.
     """
     query = f"""
-        SELECT * FROM conversion_status
+        SELECT * FROM forms_derived.conversion_status
         WHERE subject_id='{subject_id}'
         """
 

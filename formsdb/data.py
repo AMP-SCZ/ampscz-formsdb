@@ -48,7 +48,7 @@ def get_data_dictionary(config_file: Path) -> pd.DataFrame:
     # data_dictionary_df = data_dictionary_df.rename(columns=required_col_map)
 
     # return data_dictionary_df
-    query = "SELECT * FROM data_dictionary"
+    query = "SELECT * FROM forms.data_dictionary"
 
     data_dictionary_df = db.execute_sql(
         config_file=config_file,
@@ -74,7 +74,7 @@ def get_dictionary_choices(
             None if the variable is not found in the data dictionary.
     """
     query = f"""
-    SELECT select_choices_or_calculations FROM data_dictionary WHERE field_name = '{variable_name}'
+    SELECT select_choices_or_calculations FROM forms.data_dictionary WHERE field_name = '{variable_name}'
     """
     results = db.fetch_record(
         config_file=config_file,
@@ -181,7 +181,7 @@ def get_subject_medication_data(config_file: Path, subject_id: str) -> pd.DataFr
     """
 
     query = f"""
-    SELECT * FROM medication_data
+    SELECT * FROM forms_derived.medication_data
     WHERE subject_id = '{subject_id}';
     """
 
@@ -374,7 +374,7 @@ def get_subject_consent_dates(config_file: Path, subject_id: str) -> datetime:
     """
     query = f"""
     SELECT form_data ->> 'chric_consent_date' as consent_date
-    FROM forms
+    FROM forms.forms
     WHERE subject_id = '{subject_id}' AND
         form_name = 'informed_consent_run_sheet' AND
         form_data ? 'chric_consent_date';
@@ -413,7 +413,7 @@ def get_subject_age(config_file: Path, subject_id: str) -> Optional[int]:
     for variable in variables:
         query = f"""
         SELECT form_data ->> '{variable}' as age
-        FROM forms
+        FROM forms.forms
         WHERE subject_id = '{subject_id}' AND
             form_name = 'sociodemographics' AND
             form_data ? '{variable}';
@@ -533,7 +533,7 @@ def fetch_subject_converted(subject_id: str, config_file: Path) -> bool:
     """
     query = f"""
     SELECT converted
-    FROM conversion_status
+    FROM forms_derived.conversion_status
     WHERE subject_id = '{subject_id}'
     """
 
@@ -559,7 +559,7 @@ def get_all_subject_forms(config_file: Path, subject_id: str) -> pd.DataFrame:
         pd.DataFrame: A DataFrame containing all forms for the subject.
     """
     query = f"""
-    SELECT * FROM forms WHERE subject_id = '{subject_id}';
+    SELECT * FROM forms.forms WHERE subject_id = '{subject_id}';
     """
 
     df = db.execute_sql(config_file=config_file, query=query)
@@ -589,7 +589,7 @@ def get_variable(
     """
     query = f"""
 SELECT value
-FROM forms,
+FROM forms.forms,
     jsonb_each_text(form_data)
 WHERE subject_id = '{subject_id}' AND
     form_name = '{form_name}' AND
@@ -622,7 +622,7 @@ def get_form_by_event(
         pd.DataFrame: A DataFrame containing the form for the subject.
     """
     query = f"""
-    SELECT * FROM forms
+    SELECT * FROM forms.forms
     WHERE subject_id = '{subject_id}' AND
         form_name = '{form_name}' AND
         event_name LIKE '%%{event_name}%%';
@@ -674,7 +674,7 @@ def get_upenn_event_date(
     """
     query = f"""
     SELECT COALESCE(form_data ->> 'interview_date', form_data ->> 'session_date') AS session_date
-    FROM upenn_forms
+    FROM forms.upenn_forms
     WHERE subject_id = '{subject_id}' AND
         event_name LIKE '%%{event_name}%%' AND
         (form_data ? 'session_date' OR form_data ? 'interview_date');
@@ -820,7 +820,7 @@ def get_all_rpms_entry_status(
     """
 
     query = f"""
-    SELECT * FROM rpms_entry_status
+    SELECT * FROM forms.rpms_entry_status
     WHERE subject_id = '{subject_id}'
     """
 
@@ -1089,7 +1089,7 @@ SELECT
         ELSE 'Other'
     END AS sex
 FROM
-    forms
+    forms.forms
 WHERE
     form_name = 'sociodemographics'
     AND form_data ? 'chrdemo_sexassigned'
@@ -1219,7 +1219,7 @@ def get_subject_recruitment_status(config_file: Path, subject_id: str) -> Option
 
     query = f"""
     SELECT recruitment_status
-    FROM recruitment_status
+    FROM forms_derived.recruitment_status
     WHERE subject_id = '{subject_id}'
     """
 
@@ -1459,7 +1459,7 @@ def get_subject_latest_visit_started(
     """
 
     qurery = f"""
-        SELECT timepoint FROM subject_visit_status
+        SELECT timepoint FROM forms_derived.subject_visit_status
         WHERE subject_id = '{subject_id}';
     """
 

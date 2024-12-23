@@ -179,6 +179,7 @@ if __name__ == "__main__":
     vials_count_df = compute_time_fasting(config_file=config_file)
     db.df_to_table(
         df=vials_count_df,
+        schema="forms_derived",
         table_name="subject_time_fasting",
         config_file=config_file,
         if_exists="replace",

@@ -296,7 +296,7 @@ def get_subject_medication_info(
             med_compliance = remove_missing_codes(med_compliance)
 
             if start_date is not None and end_date is not None:
-                duration_days = (end_date - start_date).days
+                duration_days = (end_date - start_date).days + 1
             else:
                 duration_days = None
 

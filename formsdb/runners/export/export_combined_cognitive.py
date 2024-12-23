@@ -122,7 +122,7 @@ def get_penncnb_redcap_form(config_file: Path, subject_id: str) -> pd.DataFrame:
         pd.DataFrame: DataFrame containing the penncnb form data.
     """
     query = f"""
-    SELECT subject_id, event_name, form_data FROM forms
+    SELECT subject_id, event_name, form_data FROM forms.forms
         WHERE subject_id = '{subject_id}' AND
             form_name = 'penncnb';
     """
@@ -144,7 +144,7 @@ def get_upenn_redcap_data(config_file: Path, subject_id: str) -> pd.DataFrame:
         pd.DataFrame: DataFrame containing the upenn form data.
     """
     query = f"""
-    SELECT subject_id, event_name, event_type, form_data FROM upenn_forms
+    SELECT subject_id, event_name, event_type, form_data FROM forms.upenn_forms
         WHERE subject_id = '{subject_id}';
     """
 
@@ -224,8 +224,8 @@ def generate_csv(
     upenn_form = get_upenn_redcap_data(config_file=config_file, subject_id=subject_id)
     upenn_form = explode_formdata(upenn_form)
 
-    upenn_event_names = upenn_form["event_name"].unique().tolist()
-    penncnb_event_names = penncnb_form["event_name"].unique().tolist()
+    upenn_event_names: List[str] = upenn_form["event_name"].unique().tolist()  # type: ignore
+    penncnb_event_names: List[str] = penncnb_form["event_name"].unique().tolist()  # type: ignore
 
     upenn_event_names_map = map_event_names(upenn_event_names)
     penncnb_event_names_map = map_event_names(penncnb_event_names)

@@ -132,7 +132,7 @@ def export_forms(config_file: Path) -> None:
                 purged_subjects.add(form.subject_id)
 
             sql_query = f"""
-                INSERT INTO upenn_forms (subject_id, event_name, event_type,
+                INSERT INTO forms.upenn_forms (subject_id, event_name, event_type,
                     form_data, source_mdate)
                 VALUES ('{form.subject_id}', '{form.event_name}', '{form.event_type}',
                     '{db.sanitize_json(form.form_data)}', '{form.source_m_date}');

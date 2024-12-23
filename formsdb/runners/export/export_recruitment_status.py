@@ -54,7 +54,7 @@ def fetch_recruitment_data(config_file: Path, subject_id: str) -> pd.DataFrame:
         pd.DataFrame: DataFrame containing the recruitment data for the subject.
     """
     query = f"""
-        SELECT * FROM recruitment_status
+        SELECT * FROM forms_derived.recruitment_status
         WHERE subject_id='{subject_id}'
         """
 

@@ -134,7 +134,7 @@ def export_forms(config_file: Path):
                 percent_complete = "NULL"
 
             insert_query = f"""
-                INSERT INTO forms (subject_id, form_name, event_name,
+                INSERT INTO forms.forms (subject_id, form_name, event_name,
                     form_data, source_mdate, variables_with_data,
                     variables_without_data, total_variables, percent_complete)
                 VALUES ('{form.subject_id}', '{form.form_name}', '{form.event_name}',
@@ -147,7 +147,7 @@ def export_forms(config_file: Path):
 
     delete_queries: List[str] = []
     for subject in subjects:
-        delete_queries.append(f"DELETE FROM forms WHERE subject_id = '{subject}';")
+        delete_queries.append(f"DELETE FROM forms.forms WHERE subject_id = '{subject}';")
 
     db.execute_queries(
         config_file=config_file,

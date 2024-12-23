@@ -54,7 +54,7 @@ def fetch_withdrawal_data(config_file: Path, subject_id: str) -> pd.DataFrame:
         pd.DataFrame: DataFrame containing the withdrawal data for the subject.
     """
     query = f"""
-        SELECT * FROM subject_removed
+        SELECT * FROM forms_derived.subject_removed
         WHERE subject_id='{subject_id}'
         """
 

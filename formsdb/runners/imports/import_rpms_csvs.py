@@ -63,6 +63,36 @@ def export_subject(subject_id: str) -> str:
     return sql_query
 
 
+# Reference:
+# https://github.com/AMP-SCZ/utility/blob/15a5ef5b49d1e081ee0a549375f78bb26160d958/rpms_to_redcap.py#L55C1-L71C21
+def handle_datetime(time_value: str) -> datetime:
+    """
+    Handles different time formats from RPMS.
+
+    This helps standardize the time formats to be used in the exported CSVs.
+
+    Args:
+        time_value (str): Time value to handle.
+
+    Returns:
+        datetime: Time value in datetime format.
+    """
+    if len(time_value) == 10:
+        try:
+            # interview_date e.g. 11/30/2022
+            datetime_val = datetime.strptime(time_value, "%m/%d/%Y")
+        except ValueError:
+            # psychs form e.g. 03/03/1903
+            datetime_val = datetime.strptime(time_value, "%d/%m/%Y")
+    elif len(time_value) > 10:
+        # all other forms e.g. 1/05/2022 12:00:00 AM
+        datetime_val = datetime.strptime(time_value, "%d/%m/%Y %I:%M:%S %p")
+    else:
+        raise ValueError(f"Unknown time format: {time_value}")
+
+    return datetime_val
+
+
 def get_form_visit_metadata(visit_data: Dict[str, str]) -> Dict[str, Any]:
     """
     Compute metadata for a form visit.
@@ -190,7 +220,7 @@ def get_subject_form_completion_variables(
 
         if len(visit_data) > 0:
             insert_query = f"""
-            INSERT INTO forms (subject_id, form_name, event_name,
+            INSERT INTO forms.forms (subject_id, form_name, event_name,
                 form_data, source_mdate,
                 variables_with_data
             ) VALUES ('{subject_id}', 'uncategorized', '{redcap_event_name}',
@@ -243,7 +273,7 @@ def process_subject(
     chrcrit_part = inclusionexclusion_criteria_review_data["chrcrit_part"].iloc[0]
     arm = f"arm_{chrcrit_part}"
 
-    subject_drop_query = f"DELETE FROM forms WHERE subject_id = '{subject_id}'"
+    subject_drop_query = f"DELETE FROM forms.forms WHERE subject_id = '{subject_id}'"
     insert_subject_query = export_subject(subject_id)
     subject_queries.append(subject_drop_query.strip())
     subject_queries.append(insert_subject_query.strip())
@@ -305,13 +335,29 @@ def process_subject(
             # Remove blank columns
             slim_visit_data = {}
             for column in visit_data.keys():
-                if pd.notna(visit_data[column]):
-                    slim_visit_data[column] = visit_data[column]
+                value: str = visit_data[column]
+                if pd.notna(value):
+                    value = str(value).strip()
+                    if value.isdigit() or (
+                        value.startswith("-") and value[1:].isdigit()
+                    ):
+                        value = int(value)  # type: ignore
+                    elif value.replace(".", "", 1).isdigit() or (
+                        value.startswith("-")
+                        and value[1:].replace(".", "", 1).isdigit()
+                    ):
+                        value = float(value)  # type: ignore
+                    else:
+                        try:
+                            value = handle_datetime(value)  # type: ignore
+                        except ValueError:
+                            pass
+                    slim_visit_data[column] = value
 
             source_m_date = utils.get_file_mtime(form_path)
 
             insert_query = f"""
-            INSERT INTO forms (subject_id, form_name, event_name,
+            INSERT INTO forms.forms (subject_id, form_name, event_name,
                 form_data, source_mdate,
                 variables_with_data,
                 variables_without_data,

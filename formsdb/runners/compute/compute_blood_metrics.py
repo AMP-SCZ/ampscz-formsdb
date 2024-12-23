@@ -197,6 +197,7 @@ if __name__ == "__main__":
     db.df_to_table(
         config_file=config_file,
         df=consolidated_blood_metrics_df,
+        schema="forms_derived",
         table_name="blood_metrics",
     )
 

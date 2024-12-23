@@ -97,7 +97,7 @@ def import_client_status_files(config_file: Path) -> None:
     logger.info(f"Writing {len(master_df)} records to DB")
     db.df_to_table(
         df=master_df,
-        table_name="client_status",
+        table_name="rpms_client_status",
         if_exists="replace",
         config_file=config_file,
     )

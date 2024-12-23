@@ -20,6 +20,7 @@ except ValueError:
     pass
 
 import logging
+import re
 
 import pandas as pd
 from rich.logging import RichHandler
@@ -39,6 +40,24 @@ logargs = {
 }
 logging.basicConfig(**logargs)
 
+
+def remove_html_tags(input_string: str) -> str:
+    """
+    Remove HTML tags from a string
+
+    Args:
+        input_string (str): string with HTML tags
+
+    Returns:
+        str: string without HTML tags
+    """
+    if isinstance(input_string, str):
+        clean_text = re.sub(r"<[^>]*>", "", input_string)
+    else:
+        clean_text = input_string
+    return clean_text
+
+
 if __name__ == "__main__":
     console.rule(f"[bold red]{MODULE_NAME}")
 
@@ -55,6 +74,11 @@ if __name__ == "__main__":
     logger.info(f"Reading updated data dictionary from {updated_data_dictionary_path}")
 
     data_dictionary = pd.read_csv(updated_data_dictionary_path)
+
+    # Remove HTML tags from all columns
+    for col in data_dictionary.columns:
+        data_dictionary[col] = data_dictionary[col].apply(remove_html_tags)
+
     db.df_to_table(
         config_file=config_file,
         df=data_dictionary,

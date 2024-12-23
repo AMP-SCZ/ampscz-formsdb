@@ -54,10 +54,13 @@ def fetch_recruitment_data(config_file: Path, subject_id: str) -> pd.DataFrame:
         pd.DataFrame: DataFrame containing the recruitment data for the subject.
     """
     query = f"""
-        SELECT filters.subject AS subject_id, filters.gender, filters.cohort,
-            filters.chrcrit_included, recruitment_status.recruitment_status_v2 AS recruitment_status
-        FROM filters
-        LEFT JOIN recruitment_status ON filters.subject = recruitment_status.subject_id
+        SELECT forms_derived.filters.subject AS subject_id,
+            forms_derived.filters.gender,
+            forms_derived.filters.cohort,
+            forms_derived.filters.chrcrit_included,
+            forms_derived.recruitment_status.recruitment_status_v2 AS recruitment_status
+        FROM forms_derived.filters
+        LEFT JOIN forms_derived.recruitment_status ON filters.subject = forms_derived.recruitment_status.subject_id
         WHERE subject='{subject_id}'
         """
 

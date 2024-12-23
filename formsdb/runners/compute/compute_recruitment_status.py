@@ -370,6 +370,7 @@ def process_data(config_file: Path) -> None:
     db.df_to_table(
         config_file=config_file,
         df=master_df,
+        schema="forms_derived",
         table_name="recruitment_status",
         if_exists="replace",
     )
@@ -377,6 +378,7 @@ def process_data(config_file: Path) -> None:
     db.df_to_table(
         config_file=config_file,
         df=filters_df,
+        schema="forms_derived",
         table_name="filters",
         if_exists="replace",
     )

@@ -293,6 +293,7 @@ def populate_cumulative_charts_data(config_file: Path) -> None:
     logger.info("Writing cumulative data to the database...")
     db.df_to_table(
         df=results_df,
+        schema="forms_derived",
         table_name="subject_started_timepoint",
         config_file=config_file,
         if_exists="replace",
@@ -300,6 +301,7 @@ def populate_cumulative_charts_data(config_file: Path) -> None:
 
     db.df_to_table(
         df=overridden_df,
+        schema="forms_derived",
         table_name="subject_started_timepoint_cumulative",
         config_file=config_file,
         if_exists="replace",
@@ -322,6 +324,7 @@ if __name__ == "__main__":
     logger.info("Saving to the database...")
     db.df_to_table(
         df=visit_status_df,
+        schema="forms_derived",
         table_name="subject_visit_status",
         config_file=config_file,
         if_exists="replace",

@@ -56,7 +56,7 @@ def count_removed(config_file: Path) -> int:
     Returns:
         int: Number of subjects that have been removed.
     """
-    query = "SELECT COUNT(*) FROM subject_removed WHERE removed = 'True';"
+    query = "SELECT COUNT(*) FROM forms_derived.subject_removed WHERE removed = 'True';"
     removed_count_r = db.fetch_record(config_file=config_file, query=query)
     if removed_count_r is None:
         raise ValueError("No removed subjects found in the database.")
@@ -178,7 +178,8 @@ def check_if_removed_rpms(
     """
     Check if a subject has been removed.
 
-    Uses the client_status table to check if the subject has been withdrawn or discontinued.
+    Uses the rpms_client_status table to check if the subject has been withdrawn, discontinued or
+    Lost to Follow-up.
     Only applicable if the subject uses RPMS.
 
     Args:
@@ -192,7 +193,7 @@ def check_if_removed_rpms(
     """
 
     query = f"""
-        SELECT * FROM client_status WHERE subject_id = '{subject_id}'
+        SELECT * FROM forms.rpms_client_status WHERE subject_id = '{subject_id}'
     """
 
     df = db.execute_sql(config_file=config_file, query=query)
@@ -206,6 +207,9 @@ def check_if_removed_rpms(
     elif df["Discontinued"][0] is not None:
         withdrawn_reason = "discontinued"
         withdrawn_date = df["Discontinued"][0]
+    elif df["Lost to follow-up"][0] is not None:
+        withdrawn_reason = "lost_to_follow_up"
+        withdrawn_date = df["Lost to follow-up"][0]
     else:
         return None
 
@@ -265,7 +269,7 @@ def check_if_removed_redcap(
                     NULL
             END AS {variable_name}
         FROM
-            forms
+            forms.forms
         WHERE
             subject_id = '{subject_id}'
             AND form_name = '{form_name}'
@@ -288,7 +292,7 @@ def check_if_removed_redcap(
         SELECT
             TO_DATE(form_data ->> '{variable}', 'YYYY-MM-DD') AS {variable_name}
         FROM
-            forms
+            forms.forms
         WHERE
             subject_id = '{subject_id}'
             AND form_name = '{form_name}'
@@ -469,7 +473,10 @@ if __name__ == "__main__":
     # commit_removed_status_to_db(config_file, converted_status_df)
     logger.info("Committing subject_removed table to the database...")
     db.df_to_table(
-        config_file=config_file, df=converted_status_df, table_name="subject_removed"
+        config_file=config_file,
+        df=converted_status_df,
+        schema="forms_derived",
+        table_name="subject_removed",
     )
     UPDATED_REMOVED_COUNT = count_removed(config_file=config_file)
 
