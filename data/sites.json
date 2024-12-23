@@ -1,0 +1,275 @@
+[
+    {
+        "id": "ME",
+        "name": "Melbourne, Australia",
+        "country": "Australia",
+        "country_code": "AUS",
+        "network": "PRESCIENT"
+    },
+    {
+        "id": "CG",
+        "name": "Cologne, Germany",
+        "country": "Germany",
+        "country_code": "DEU",
+        "network": "PRESCIENT"
+    },
+    {
+        "id": "JE",
+        "name": "Jena, Germany",
+        "country": "Germany",
+        "country_code": "DEU",
+        "network": "PRESCIENT"
+    },
+    {
+        "id": "CP",
+        "name": "Copenhagen, Denmark",
+        "country": "Denmark",
+        "country_code": "DNK",
+        "network": "PRESCIENT"
+    },
+    {
+        "id": "BM",
+        "name": "Birmingham, UK",
+        "country": "UK",
+        "country_code": "GBR",
+        "network": "PRESCIENT"
+    },
+    {
+        "id": "ST",
+        "name": "Santiago, Chile",
+        "country": "Chile",
+        "country_code": "CHL",
+        "network": "PRESCIENT"
+    },
+    {
+        "id": "LS",
+        "name": "Lausanne, Switzerland",
+        "country": "Switzerland",
+        "country_code": "CHE",
+        "network": "PRESCIENT"
+    },
+    {
+        "id": "GW",
+        "name": "Gwangju, Korea",
+        "country": "S. Korea",
+        "country_code": "KOR",
+        "network": "PRESCIENT"
+    },
+    {
+        "id": "SG",
+        "name": "Singapore",
+        "country": "Singapore",
+        "country_code": "SGP",
+        "network": "PRESCIENT"
+    },
+    {
+        "id": "HK",
+        "name": "Hong Kong",
+        "country": "",
+        "country_code": "HKG",
+        "network": "PRESCIENT"
+    },
+    {
+        "id": "LA",
+        "name": "UCLA",
+        "country": "USA",
+        "country_code": "USA",
+        "network": "ProNET"
+    },
+    {
+        "id": "OR",
+        "name": "OREGON",
+        "country": "USA",
+        "country_code": "USA",
+        "network": "ProNET"
+    },
+    {
+        "id": "BI",
+        "name": "Harvard/BIDMC",
+        "country": "USA",
+        "country_code": "USA",
+        "network": "ProNET"
+    },
+    {
+        "id": "NL",
+        "name": "NORTHWELL",
+        "country": "USA",
+        "country_code": "USA",
+        "network": "ProNET"
+    },
+    {
+        "id": "NC",
+        "name": "UNC",
+        "country": "USA",
+        "country_code": "USA",
+        "network": "ProNET"
+    },
+    {
+        "id": "SD",
+        "name": "UCSD",
+        "country": "USA",
+        "country_code": "USA",
+        "network": "ProNET"
+    },
+    {
+        "id": "CA",
+        "name": "Calgary",
+        "country": "Canada",
+        "country_code": "USA",
+        "network": "ProNET"
+    },
+    {
+        "id": "YA",
+        "name": "YALE",
+        "country": "USA",
+        "country_code": "USA",
+        "network": "ProNET"
+    },
+    {
+        "id": "SF",
+        "name": "UCSF/Path",
+        "country": "USA",
+        "country_code": "USA",
+        "network": "ProNET"
+    },
+    {
+        "id": "PA",
+        "name": "Penn",
+        "country": "USA",
+        "country_code": "USA",
+        "network": "ProNET"
+    },
+    {
+        "id": "SI",
+        "name": "Mt.Sinai",
+        "country": "USA",
+        "country_code": "USA",
+        "network": "ProNET"
+    },
+    {
+        "id": "PI",
+        "name": "Pitt",
+        "country": "USA",
+        "country_code": "USA",
+        "network": "ProNET"
+    },
+    {
+        "id": "NN",
+        "name": "Northwestern",
+        "country": "USA",
+        "country_code": "USA",
+        "network": "ProNET"
+    },
+    {
+        "id": "IR",
+        "name": "UC Irvine",
+        "country": "USA",
+        "country_code": "USA",
+        "network": "ProNET"
+    },
+    {
+        "id": "TE",
+        "name": "Temple",
+        "country": "USA",
+        "country_code": "USA",
+        "network": "ProNET"
+    },
+    {
+        "id": "GA",
+        "name": "Georgia",
+        "country": "USA",
+        "country_code": "USA",
+        "network": "ProNET"
+    },
+    {
+        "id": "WU",
+        "name": "WashU",
+        "country": "USA",
+        "country_code": "USA",
+        "network": "ProNET"
+    },
+    {
+        "id": "HA",
+        "name": "Hartford",
+        "country": "USA",
+        "country_code": "USA",
+        "network": "ProNET"
+    },
+    {
+        "id": "MT",
+        "name": "Montreal",
+        "country": "Canada",
+        "country_code": "CAN",
+        "network": "ProNET"
+    },
+    {
+        "id": "KC",
+        "name": "King's College London",
+        "country": "UK",
+        "country_code": "GBR",
+        "network": "ProNET"
+    },
+    {
+        "id": "PV",
+        "name": "Pavia, Italy",
+        "country": "Italy",
+        "country_code": "ITA",
+        "network": "ProNET"
+    },
+    {
+        "id": "MA",
+        "name": "Madrid",
+        "country": "Spain",
+        "country_code": "ESP",
+        "network": "ProNET"
+    },
+    {
+        "id": "CM",
+        "name": "Cambridge UK",
+        "country": "UK",
+        "country_code": "GBR",
+        "network": "ProNET"
+    },
+    {
+        "id": "MU",
+        "name": "LMU Munich",
+        "country": "Germany",
+        "country_code": "DEU",
+        "network": "ProNET"
+    },
+    {
+        "id": "SH",
+        "name": "Shanghai",
+        "country": "China",
+        "country_code": "CHN",
+        "network": "ProNET"
+    },
+    {
+        "id": "SL",
+        "name": "Seoul",
+        "country": "S. Korea",
+        "country_code": "KOR",
+        "network": "ProNET"
+    },
+    {
+        "id": "OH",
+        "name": "Ohio State University",
+        "country": "USA",
+        "country_code": "USA",
+        "network": "ProNET"
+    },
+    {
+        "id": "UR",
+        "name": "University of Rochester",
+        "country": "USA",
+        "country_code": "USA",
+        "network": "ProNET"
+    },
+    {
+        "id": "CU",
+        "name": "Columbia University",
+        "country": "USA",
+        "country_code": "USA",
+        "network": "ProNET"
+    }
+]
