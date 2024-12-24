@@ -68,14 +68,14 @@ def construct_init_queries(required_variables: List[str]) -> List[str]:
         List[str]: List of SQL queries.
     """
     drop_summary_table_query = """
-        DROP TABLE IF EXISTS cognitive_summary;
+        DROP TABLE IF EXISTS forms_derived.cognitive_summary;
     """
     drop_available_table_query = """
-        DROP TABLE IF EXISTS cognitive_data_availability;
+        DROP TABLE IF EXISTS forms_derived.cognitive_data_availability;
     """
 
     create_summary_table_query = f"""
-        CREATE TABLE cognitive_summary (
+        CREATE TABLE forms_derived.cognitive_summary (
             subject_id TEXT NOT NULL REFERENCES subjects(id),
             event_name TEXT NOT NULL,
             day INT NOT NULL,
@@ -85,7 +85,7 @@ def construct_init_queries(required_variables: List[str]) -> List[str]:
         );
     """
     create_available_table_query = f"""
-        CREATE TABLE cognitive_data_availability (
+        CREATE TABLE forms_derived.cognitive_data_availability (
             subject_id TEXT NOT NULL REFERENCES subjects(id),
             {", ".join([f"data_availability_{variable} BOOLEAN" for variable in constants.upenn_visit_order])},
             data_availability_summary TEXT,
@@ -133,7 +133,7 @@ def get_upenn_redcap_data(config_file: Path, subject_id: str) -> pd.DataFrame:
         pd.DataFrame: The UPenn form data.
     """
     query = f"""
-    SELECT subject_id, event_name, event_type, form_data FROM upenn_forms
+    SELECT subject_id, event_name, event_type, form_data FROM forms.upenn_forms
         WHERE subject_id = '{subject_id}';
     """
 
@@ -436,7 +436,7 @@ def availability_df_to_sql(df: pd.DataFrame, subject_id: str) -> List[str]:
     sql_queries: List[str] = []
     for _, row in df.iterrows():
         query = f"""
-            INSERT INTO cognitive_data_availability (
+            INSERT INTO forms_derived.cognitive_data_availability (
                 subject_id, {", ".join(row.index.tolist())})
             VALUES ('{subject_id}', {", ".join([f"'{value}'" for value in row.values.tolist()])});
         """
@@ -466,7 +466,7 @@ def summary_df_to_sql(df: pd.DataFrame, subject_id: str) -> List[str]:
         weekday = row["weekday"]
 
         query = f"""
-            INSERT INTO cognitive_summary (
+            INSERT INTO forms_derived.cognitive_summary (
                 subject_id, event_name, day, weekday,
                 {", ".join(required_variables)})
             VALUES ('{subject_id}', '{event_name}', {day}, {weekday},
@@ -534,7 +534,7 @@ def process_data(config_file: Path) -> None:
         None
     """
     subject_query = """
-        SELECT DISTINCT subject_id FROM upenn_forms;
+        SELECT DISTINCT subject_id FROM forms.upenn_forms;
     """
 
     subject_id_df = db.execute_sql(config_file, subject_query)

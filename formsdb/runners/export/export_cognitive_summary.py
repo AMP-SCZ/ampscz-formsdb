@@ -55,7 +55,7 @@ def fetch_avaiability_data(config_file: Path, subject_id: str) -> pd.DataFrame:
         pd.DataFrame: DataFrame containing the cognitive data availability for the subject.
     """
     query = f"""
-        SELECT * FROM cognitive_data_availability
+        SELECT * FROM forms_derived.cognitive_data_availability
         WHERE subject_id='{subject_id}'
         """
 
@@ -76,7 +76,7 @@ def fetch_summary_data(config_file: Path, subject_id: str) -> pd.DataFrame:
         pd.DataFrame: DataFrame containing the cognitive summary data for the subject.
     """
     query = f"""
-        SELECT * FROM cognitive_summary
+        SELECT * FROM forms_derived.cognitive_summary
         WHERE subject_id='{subject_id}'
         ORDER BY day;
         """
@@ -228,7 +228,7 @@ def export_data(
         None
     """
     subject_query = """
-        SELECT DISTINCT subject_id FROM upenn_forms ORDER BY subject_id ASC;
+        SELECT DISTINCT subject_id FROM forms.upenn_forms ORDER BY subject_id ASC;
     """
 
     subject_id_df = db.execute_sql(config_file, subject_query)

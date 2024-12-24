@@ -58,7 +58,7 @@ def fetch_blood_metrics(
     """
     query = f"""
         SELECT *
-        FROM blood_metrics
+        FROM forms_derived.blood_metrics
         WHERE subject_id='{subject_id}'
         """
 

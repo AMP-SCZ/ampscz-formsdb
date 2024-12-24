@@ -176,7 +176,7 @@ def add_additional_cols(
 
         query = query[:-1]
         query += f"""
-        FROM {table}
+        FROM forms_derived.{table}
         """
 
         if table == "filters":
@@ -210,34 +210,34 @@ def get_combined_csvs_output_dir(config_file: Path) -> Path:
     return output_dir
 
 
-# Reference:
-# https://github.com/AMP-SCZ/utility/blob/15a5ef5b49d1e081ee0a549375f78bb26160d958/rpms_to_redcap.py#L55C1-L71C21
-def handle_datetime(time_value: str) -> datetime:
-    """
-    Handles different time formats from RPMS.
+# # Reference:
+# # https://github.com/AMP-SCZ/utility/blob/15a5ef5b49d1e081ee0a549375f78bb26160d958/rpms_to_redcap.py#L55C1-L71C21
+# def handle_datetime(time_value: str) -> datetime:
+#     """
+#     Handles different time formats from RPMS.
 
-    This helps standardize the time formats to be used in the exported CSVs.
+#     This helps standardize the time formats to be used in the exported CSVs.
 
-    Args:
-        time_value (str): Time value to handle.
+#     Args:
+#         time_value (str): Time value to handle.
 
-    Returns:
-        datetime: Time value in datetime format.
-    """
-    if len(time_value) == 10:
-        try:
-            # interview_date e.g. 11/30/2022
-            datetime_val = datetime.strptime(time_value, "%m/%d/%Y")
-        except ValueError:
-            # psychs form e.g. 03/03/1903
-            datetime_val = datetime.strptime(time_value, "%d/%m/%Y")
-    elif len(time_value) > 10:
-        # all other forms e.g. 1/05/2022 12:00:00 AM
-        datetime_val = datetime.strptime(time_value, "%d/%m/%Y %I:%M:%S %p")
-    else:
-        raise ValueError(f"Unknown time format: {time_value}")
+#     Returns:
+#         datetime: Time value in datetime format.
+#     """
+#     if len(time_value) == 10:
+#         try:
+#             # interview_date e.g. 11/30/2022
+#             datetime_val = datetime.strptime(time_value, "%m/%d/%Y")
+#         except ValueError:
+#             # psychs form e.g. 03/03/1903
+#             datetime_val = datetime.strptime(time_value, "%d/%m/%Y")
+#     elif len(time_value) > 10:
+#         # all other forms e.g. 1/05/2022 12:00:00 AM
+#         datetime_val = datetime.strptime(time_value, "%d/%m/%Y %I:%M:%S %p")
+#     else:
+#         raise ValueError(f"Unknown time format: {time_value}")
 
-    return datetime_val
+#     return datetime_val
 
 
 def cast_dates_to_str(
@@ -277,10 +277,10 @@ def cast_dates_to_str(
             date_raw_val = row[date_variable]
             if not pd.isnull(date_raw_val) and date_raw_val is not None:
                 try:
-                    if network == "PRESCIENT":
-                        date_val = handle_datetime(date_raw_val)  # type: ignore
-                    else:
-                        date_val = datetime.fromisoformat(date_raw_val)  # type: ignore
+                    # if network == "PRESCIENT":
+                    #     date_val = handle_datetime(date_raw_val)  # type: ignore
+                    # else:
+                    date_val = datetime.fromisoformat(date_raw_val)  # type: ignore
                     date_str = date_val.strftime("%Y-%m-%d")
                     data_df.at[idx, date_variable] = date_str
                 except (TypeError, AttributeError):
@@ -306,10 +306,10 @@ def cast_dates_to_str(
             datetime_val = row[datetime_variable]
             if not pd.isnull(datetime_val) and datetime_val is not None:
                 try:
-                    if network == "PRESCIENT":
-                        datetime_val = handle_datetime(datetime_val)  # type: ignore
-                    else:
-                        datetime_val = datetime.fromisoformat(datetime_val)  # type: ignore
+                    # if network == "PRESCIENT":
+                    #     datetime_val = handle_datetime(datetime_val)  # type: ignore
+                    # else:
+                    datetime_val = datetime.fromisoformat(datetime_val)  # type: ignore
                     datetime_str = datetime_val.strftime("%Y-%m-%d %H:%M")
                     data_df.at[idx, datetime_variable] = datetime_str
                 except (TypeError, AttributeError):
@@ -334,10 +334,10 @@ def cast_dates_to_str(
             time_val = row[time_variable]
             if not pd.isnull(time_val) and time_val is not None:
                 try:
-                    if network == "PRESCIENT":
-                        time_val = handle_datetime(time_val)  # type: ignore
-                    else:
-                        time_val = datetime.fromisoformat(time_val)  # type: ignore
+                    # if network == "PRESCIENT":
+                    #     time_val = handle_datetime(time_val)  # type: ignore
+                    # else:
+                    time_val = datetime.fromisoformat(time_val)  # type: ignore
                     time_str = time_val.strftime("%H:%M")
                     data_df.at[idx, time_variable] = time_str
                 except TypeError:
@@ -451,7 +451,7 @@ def fetch_fasting_time(
         SELECT
             time_fasting
         FROM
-            subject_time_fasting
+            forms_derived.subject_time_fasting
         WHERE
             subject_id = '{subject_id}' AND
             event_name = '{timepoint}'
@@ -482,7 +482,7 @@ def fetch_vial_count(
     SELECT
         {fluid_type}_vial_count
     FROM
-        subject_vials_count
+        forms_derived.subject_vials_count
     WHERE
         subject_id = '{subject_id}' AND
         timepoint = '{event_name}'
@@ -518,7 +518,7 @@ def get_subject_visit_combined_df(
         event_name,
         form_data
     FROM
-        forms
+        forms.forms
     WHERE
         subject_id = '{subject_id}' AND
         event_name LIKE '%%{event_name}_arm%%'

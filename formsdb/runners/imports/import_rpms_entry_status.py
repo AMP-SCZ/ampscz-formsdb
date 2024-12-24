@@ -128,6 +128,7 @@ def import_data(config_file: Path) -> None:
     db.df_to_table(
         config_file=config_file,
         df=entry_status_df,
+        schema="forms",
         table_name="rpms_entry_status",
         if_exists="replace",
     )

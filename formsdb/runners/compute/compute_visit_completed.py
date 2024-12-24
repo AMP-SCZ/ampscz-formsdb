@@ -394,6 +394,7 @@ if __name__ == "__main__":
     visit_completed_df = compute_visit_completed(config_file=config_file)
     db.df_to_table(
         df=visit_completed_df,
+        schema="forms_derived",
         table_name="subject_visit_completed",
         config_file=config_file,
         if_exists="replace",

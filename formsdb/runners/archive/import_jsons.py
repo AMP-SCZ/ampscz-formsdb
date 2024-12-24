@@ -27,6 +27,7 @@ import copy
 import json
 import logging
 import multiprocessing
+import re
 from datetime import datetime
 from glob import glob
 from typing import Any, Dict, List, Tuple
@@ -37,6 +38,7 @@ from rich.logging import RichHandler
 
 from formsdb import constants, data
 from formsdb.helpers import db
+from formsdb.helpers import hash as hash_helper
 from formsdb.helpers import utils
 
 MODULE_NAME = "formsdb.runners.imports.import_jsons"
@@ -53,27 +55,6 @@ logargs = {
 logging.basicConfig(**logargs)
 
 FAILED_IMPORT_SUBJECTS: List[str] = []
-
-pd.set_option('future.no_silent_downcasting', True)
-
-
-def export_subject(subject_id: str) -> str:
-    """
-    Insert a subject into the subjects table.
-
-    Args:
-        subject_id (str): The subject id.
-
-    Returns:
-        str: The SQL query.
-    """
-    site_id = subject_id[:2]
-    sql_query = f"""
-    INSERT INTO subjects (id, site_id)
-    VALUES ('{subject_id}', '{site_id}') ON CONFLICT DO NOTHING;
-    """
-
-    return sql_query
 
 
 def generate_all_forms(
@@ -99,9 +80,9 @@ def generate_all_forms(
         if variable == "redcap_event_name":
             continue
         try:
-            form_name = data_dictionry.loc[data_dictionry["field_name"] == variable][
-                "form_name"
-            ].values[0]
+            form_name = data_dictionry.loc[
+                data_dictionry["field_name"] == variable
+            ]["form_name"].values[0]
         except IndexError:
             if "uncategorized" not in form_data:
                 form_data["uncategorized"] = {}
@@ -110,7 +91,7 @@ def generate_all_forms(
         if form_name not in form_data:
             form_data[form_name] = {}
 
-        values: List[Tuple[str, str]] = (  # type: ignore
+        values: Tuple[str, str] = (
             df_all_forms[[variable, "redcap_event_name"]].dropna().values.tolist()
         )
         for value in values:
@@ -118,6 +99,17 @@ def generate_all_forms(
 
             if value.isdigit() or (value.startswith("-") and value[1:].isdigit()):
                 value = int(value)
+                # Handle: MongoDB can only handle up to 8-byte int
+                if value > 2147483647 or value < -2147483648:
+                    skip_cast_pattern = r"barcode$|box|_id$|\d+id$|_id\d.|id_\d$"
+                    if re.search(skip_cast_pattern, variable):
+                        value = str(value)
+                    else:
+                        logger.warning(
+                            f"Value {value} for [{form_name}]:{variable} is too large for MongoDB"
+                        )
+                        logger.warning(f"Casting {variable} to float")
+                        value = float(value)
             elif value.replace(".", "", 1).isdigit() or (
                 value.startswith("-") and value[1:].replace(".", "", 1).isdigit()
             ):
@@ -180,9 +172,11 @@ def append_append_form_statistics(
     return result_dict
 
 
-def update_subject_form_data(subject_id: str, form_data: Dict[str, Any]) -> List[str]:
+def upsert_form_data(
+    config_file: Path, subject_id: str, form_data: Dict[str, Any]
+) -> None:
     """
-    Update or insert form data into PostgreSQL.
+    Update or insert form data into MongoDB.
 
     Args:
         config_file (Path): The path to the config file.
@@ -190,53 +184,34 @@ def update_subject_form_data(subject_id: str, form_data: Dict[str, Any]) -> List
         form_data (Dict[str, Any]): The form data.
 
     Returns:
-        List[str]: List of SQL queries.
+        None
     """
-    sql_queries: List[str] = []
+    mongodb = db.get_mongo_db(config_file)
+    subject_form_data = mongodb["forms"]
 
-    delete_query = f"DELETE FROM forms.forms WHERE subject_id = '{subject_id}';"
-    insert_subject_query = export_subject(subject_id)
-    sql_queries.append(delete_query)
-    sql_queries.append(insert_subject_query)
+    subject_form_data.update_one(
+        {"_id": subject_id},
+        {"$set": form_data},
+        upsert=True,
+    )
 
-    source_metadata = form_data.pop("metadata")
-    source_m_date = source_metadata["source_mdate"]
 
-    for form_name, form_data_across_events in form_data.items():
-        try:
-            for event_name, event_form_data in form_data_across_events.items():
-                form_metadata = event_form_data.pop("metadata")
+def delete_subject_form_data(config_file: Path, subject_id: str) -> None:
+    """
+    Deletes all form data for a subject.
 
-                for key, value in event_form_data.items():
-                    if isinstance(value, datetime):
-                        # convert datetime to isoformat
-                        event_form_data[key] = value.isoformat()
+    Args:
+        config_file (Path): The path to the config file.
+        subject_id (str): The subject ID.
 
-                variables_with_data = form_metadata["variables_with_data"]
+    Returns:
+        None
+    """
+    mongodb = db.get_mongo_db(config_file)
+    subject_form_data = mongodb["forms"]
 
-                try:
-                    variables_without_data = form_metadata["variables_without_data"]
-                    total_variables = form_metadata["total_variables"]
-                    percent_complete = form_metadata["percent_data_available"]
-                except KeyError:
-                    variables_without_data = "NULL"
-                    total_variables = "NULL"
-                    percent_complete = "NULL"
-
-                insert_query = f"""
-                INSERT INTO forms.forms (subject_id, form_name, event_name,
-                    form_data, source_mdate, variables_with_data,
-                    variables_without_data, total_variables, percent_complete)
-                VALUES ('{subject_id}', '{form_name}', '{event_name}',
-                    '{db.sanitize_json(event_form_data)}', '{source_m_date}', {variables_with_data},
-                    {variables_without_data}, {total_variables}, {percent_complete})
-                """
-                sql_queries.append(insert_query)
-        except AttributeError:
-            logger.error(f"Error: {form_name}")
-            raise
-
-    return sql_queries
+    subject_form_data.delete_many({"_id": subject_id})
+    return
 
 
 def process_subject(
@@ -244,7 +219,7 @@ def process_subject(
     data_dictionry_df: pd.DataFrame,
     config_file: Path,
     force: bool = False,
-) -> Tuple[bool, str, List[str]]:
+) -> Tuple[bool, str]:
     """
     Process a subject JSON file.
 
@@ -258,14 +233,15 @@ def process_subject(
     """
     subject_id = str(subject_json).split("/")[-1].split(".")[0]
     source_m_date = utils.get_file_mtime(subject_json)
+    source_hash = hash_helper.compute_hash(subject_json)
 
     if not force:
         up_to_date = db.check_if_subject_form_data_exists(
-            config_file, subject_id, source_m_date
+            config_file, subject_id, source_hash
         )
 
         if up_to_date:
-            return False, subject_id, []
+            return False, subject_id
 
     try:
         with open(subject_json, "r", encoding="utf-8") as f:
@@ -275,7 +251,7 @@ def process_subject(
         logger.error(f"JSON file: {subject_json}")
         logger.error(f"Import failed for {subject_id}")
         FAILED_IMPORT_SUBJECTS.append(subject_id)
-        return False, subject_id, []
+        return False, subject_id
 
     sub_data_all = pd.DataFrame.from_dict(json_data, orient="columns")
     sub_data_all = sub_data_all.apply(lambda x: x.str.strip()).replace("", np.nan)
@@ -291,17 +267,16 @@ def process_subject(
             )
 
     # Label form data with subject ID
-    metadata = {
-        "subject_id": subject_id,
-        "source": str(subject_json),
-        "source_mdate": source_m_date
-    }
-    form_data["metadata"] = metadata
+    form_data["_id"] = subject_id
+    form_data["_date_imported"] = utils.get_curent_datetime()
+    form_data["_source"] = str(subject_json)
+    form_data["_source_md5"] = hash_helper.compute_hash(subject_json)
+    form_data["_source_mdate"] = source_m_date
 
     try:
-        sql_queries = update_subject_form_data(subject_id, form_data)
+        delete_subject_form_data(config_file, subject_id)
+        upsert_form_data(config_file, subject_id, form_data)
     except Exception as e:
-        sql_queries = []
         logger.error(f"Error: {e}")
         logger.error(f"Subject: {subject_id}")
         with open(f"{subject_id}_DEBUG.json", "w", encoding="utf-8") as f:
@@ -309,12 +284,12 @@ def process_subject(
         logger.error(f"Dumped subject data to {subject_id}_DEBUG.json")
         raise e
 
-    return True, subject_id, sql_queries
+    return True, subject_id
 
 
 def process_subject_wrapper(
     args: Tuple[Path, pd.DataFrame, Path, bool]
-) -> Tuple[bool, str, List[str]]:
+) -> Tuple[bool, str]:
     """
     Wrapper for process_subject to allow for multiprocessing.
     """
@@ -352,14 +327,13 @@ def import_forms_by_network(
     skipped_subjects: List[str] = []
     processed_subjects: List[str] = []
 
-    num_processes = multiprocessing.cpu_count() // 2
+    num_processes = multiprocessing.cpu_count() // 4
     logger.info(f"Using {num_processes} processes.")
 
     params = [
         (Path(subject), data_dictionry_df, config_file, force)
         for subject in subjects_glob
     ]
-    sql_queries: List[str] = []
 
     with utils.get_progress_bar() as progress:
         with multiprocessing.Pool(num_processes) as pool:
@@ -367,28 +341,19 @@ def import_forms_by_network(
                 f"Processing {network} JSONs...", total=len(subjects_glob)
             )
             for result in pool.imap_unordered(process_subject_wrapper, params):
-                imported, subject_id, subject_sql_queries = result
+                imported, subject_id = result
                 if imported:
                     processed_subjects.append(subject_id)
                 else:
                     skipped_subjects.append(subject_id)
-                sql_queries.extend(subject_sql_queries)
                 progress.update(task, advance=1)
 
     logger.info(f"Processed {len(processed_subjects)} subjects")
     if len(processed_subjects) > 0:
         logger.info(f"Processed subjects: {', '.join(processed_subjects)}")
     if len(skipped_subjects) > 0:
-        logger.warning(f"Failed to import {len(skipped_subjects)} subjects")
-        logger.warning(f"Failed subjects: {', '.join(skipped_subjects)}")
-
-    if len(sql_queries) > 0:
-        db.execute_queries(
-            config_file=config_file,
-            queries=sql_queries,
-            show_commands=False,
-            show_progress=True,
-        )
+        logger.error(f"Failed to import {len(skipped_subjects)} subjects")
+        logger.error(f"Failed subjects: {', '.join(skipped_subjects)}")
 
 
 if __name__ == "__main__":
@@ -404,7 +369,7 @@ if __name__ == "__main__":
 
     data_root = Path(config_params["data_root"])
 
-    FORCE = False
+    FORCE = True
     logger.info(f"Force: {FORCE}")
 
     networks = constants.networks

@@ -12,9 +12,9 @@ from airflow.operators.empty import EmptyOperator
 from airflow.providers.apprise.notifications import apprise
 from apprise import NotifyType
 
-CONDA_ENV_PATH = "/PHShome/dm1447/mambaforge/envs/jupyter/bin"
+CONDA_ENV_PATH = "/home/pnl/miniforge3/envs/jupyter/bin"
 PYTHON_PATH = f"{CONDA_ENV_PATH}/python"
-REPO_ROOT = "/PHShome/dm1447/dev/ampscz-formsdb"
+REPO_ROOT = "/data/predict1/data_from_nda/formsdb/ampscz-formsdb"
 
 dpdash_csvs = Dataset(
     uri="file:///data/predict1/data_from_nda/formqc/??-*-form_dpdash_charts-*.csv"
@@ -23,7 +23,7 @@ dpdash_csvs = Dataset(
 
 # Define variables
 default_args = {
-    "owner": "admin",
+    "owner": "pnl",
     "depends_on_past": False,
     "start_date": datetime(2024, 8, 15),
     "email_on_failure": True,

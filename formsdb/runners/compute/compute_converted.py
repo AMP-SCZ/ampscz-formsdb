@@ -21,6 +21,7 @@ except ValueError:
     pass
 
 import logging
+import warnings
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
@@ -55,7 +56,7 @@ def count_converted(config_file: Path) -> int:
     Returns:
         int: Number of subjects that have been converted.
     """
-    query = "SELECT COUNT(*) FROM conversion_status WHERE converted = 'True';"
+    query = "SELECT COUNT(*) FROM forms_derived.conversion_status WHERE converted = 'True';"
     converted_count_r = db.fetch_record(config_file=config_file, query=query)
     if converted_count_r is None:
         raise ValueError("No converted subjects found in the database.")
@@ -152,7 +153,7 @@ def get_converted_date_rpms(subject_id: str, config_file: Path) -> Optional[date
         bool: Whether the subject has been converted.
     """
     query = f"""
-        SELECT * FROM client_status WHERE subject_id = '{subject_id}'
+        SELECT * FROM forms.rpms_client_status WHERE subject_id = '{subject_id}'
     """
 
     df = db.execute_sql(config_file=config_file, query=query)
@@ -333,20 +334,22 @@ def compute_converted(
                     )
                     converted = True
 
-            visit_status_df = pd.concat(
-                [
-                    visit_status_df,
-                    pd.DataFrame(
-                        {
-                            "subject_id": [subject_id],
-                            "converted": [converted],
-                            "converted_visit": [converted_visit],
-                            "conversion_date": [conversion_date],
-                            "conversion_info_source": [conversion_info_source],
-                        }
-                    ),
-                ]
-            )
+            with warnings.catch_warnings():
+                warnings.simplefilter(action='ignore', category=FutureWarning)
+                visit_status_df = pd.concat(
+                    [
+                        visit_status_df,
+                        pd.DataFrame(
+                            {
+                                "subject_id": [subject_id],
+                                "converted": [converted],
+                                "converted_visit": [converted_visit],
+                                "conversion_date": [conversion_date],
+                                "conversion_info_source": [conversion_info_source],
+                            }
+                        ),
+                    ]
+                )
 
     logger.info(f"Done computing converted status for {len(subject_ids)} subjects.")
 
@@ -374,6 +377,7 @@ if __name__ == "__main__":
     db.df_to_table(
         config_file=config_file,
         df=converted_status_df,
+        schema="forms_derived",
         table_name="conversion_status",
     )
 

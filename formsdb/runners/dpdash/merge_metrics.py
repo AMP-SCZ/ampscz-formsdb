@@ -307,6 +307,7 @@ def main(config_file: Path) -> None:
     logger.info("Exporting DataFrame to database")
     db.df_to_table(
         df=master_df,
+        schema="forms_derived",
         table_name="dpdash_charts",
         config_file=config_file,
     )

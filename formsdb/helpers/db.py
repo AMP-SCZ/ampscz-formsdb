@@ -4,11 +4,11 @@ Helper functions for interacting with a PostgreSQL database.
 
 import json
 import logging
+import random
 import time
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Literal, Optional
-import random
 
 import pandas as pd
 import psycopg2
@@ -41,34 +41,35 @@ def get_mongo_db(config_file: Path) -> database.Database:
 
 
 def check_if_subject_form_data_exists(
-    config_file: Path, subject_id: str, source_hash: str
-):
+    config_file: Path, subject_id: str, source_mdate: datetime
+) -> bool:
     """
-    Checks if a subject's form data exists in the MongoDB database and
+    Checks if a subject's form data exists in the Postgres database and
     is up-to-date.
 
-    A file is considered up-to-date if the hash of the source file
+    A file is considered up-to-date if the m_date of the source file
     matches the hash stored in the database.
 
     Args:
         config_file (Path): The path to the configuration file.
         subject_id (str): The subject ID.
-        source_hash (str): The hash of the source file.
+        source_mdate (str): The source modification date.
 
     Returns:
         bool: True if the subject's form data exists and is up-to-date, False otherwise.
     """
-    mongodb = get_mongo_db(config_file)
-    subject_form_data = mongodb["forms"]
+    query = f"""
+    SELECT MAX(source_mdate) AS source_m_date
+    FROM forms.forms
+    WHERE subject_id = '{subject_id}'
+    """
 
-    subject_form_data_count = subject_form_data.count_documents({"_id": subject_id})
-    if subject_form_data_count > 0:
-        subject_form_data = subject_form_data.find_one({"_id": subject_id})
-        if subject_form_data is not None:
-            if "_source_md5" not in subject_form_data:
-                return False
-            if subject_form_data["_source_md5"] == source_hash:
-                return True
+    source_m_date = fetch_record(config_file, query)
+
+    if source_m_date is not None:
+        source_m_date = datetime.strptime(source_m_date, "%Y-%m-%d %H:%M:%S")
+        if source_mdate == source_m_date:
+            return True
 
     return False
 
@@ -77,25 +78,28 @@ def check_if_subject_upenn_data_exists(
     config_file: Path,
     subject_id: str,
     source_m_date: datetime,
-    collection: Literal["upenn", "upenn_nda"],
-):
+) -> bool:
     """
-    Checks if a subject's UPenn data exists in the MongoDB database.
+    Checks if a subject's UPenn data exists in the Postgres database and
+    is up-to-date.
 
     Args:
         config_file (Path): The path to the configuration file.
         subject_id (str): The subject ID.
         source_m_date (datetime): The source modification date.
     """
-    mongodb = get_mongo_db(config_file)
-    subject_form_data = mongodb[collection]
+    query = f"""
+    SELECT MAX(source_mdate) AS source_m_date
+    FROM forms.upenn_forms
+    WHERE subject_id = '{subject_id}'
+    """
 
-    subject_form_data_count = subject_form_data.count_documents({"_id": subject_id})
-    if subject_form_data_count > 0:
-        subject_form_data = subject_form_data.find_one({"_id": subject_id})
-        if subject_form_data is not None:
-            if subject_form_data["_source_mdate"] >= source_m_date:
-                return True
+    source_m_date = fetch_record(config_file, query)
+
+    if source_m_date is not None:
+        source_m_date = datetime.strptime(source_m_date, "%Y-%m-%d %H:%M:%S")
+        if source_m_date == source_m_date:
+            return True
 
     return False
 
@@ -262,7 +266,7 @@ def get_db_connection(config_file: Path) -> sqlalchemy.engine.base.Engine:
         sqlalchemy.engine.base.Engine: The database connection engine.
     """
     params = config(path=config_file, section="postgresql")
-    engine = sqlalchemy.create_engine(
+    db_uri: str = (
         "postgresql+psycopg2://"
         + params["user"]
         + ":"
@@ -274,6 +278,7 @@ def get_db_connection(config_file: Path) -> sqlalchemy.engine.base.Engine:
         + "/"
         + params["database"]
     )
+    engine = sqlalchemy.create_engine(db_uri, echo=False)
 
     return engine  # type: ignore
 
@@ -350,6 +355,7 @@ def df_to_table(
     config_file: Path,
     df: pd.DataFrame,
     table_name: str,
+    schema: str = "public",
     if_exists: Literal["fail", "replace", "append"] = "replace",
 ) -> None:
     """
@@ -364,5 +370,5 @@ def df_to_table(
     """
 
     engine = get_db_connection(config_file=config_file)
-    df.to_sql(table_name, engine, if_exists=if_exists, index=False)
+    df.to_sql(table_name, engine, schema=schema, if_exists=if_exists, index=False)
     engine.dispose()
