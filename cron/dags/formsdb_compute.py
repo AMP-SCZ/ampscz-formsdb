@@ -14,9 +14,9 @@ from airflow.providers.apprise.notifications import apprise
 from airflow.utils.task_group import TaskGroup
 from apprise import NotifyType
 
-CONDA_ENV_PATH = "/PHShome/dm1447/mambaforge/envs/jupyter/bin"
+CONDA_ENV_PATH = "/home/pnl/miniforge3/envs/jupyter/bin"
 PYTHON_PATH = f"{CONDA_ENV_PATH}/python"
-REPO_ROOT = "/PHShome/dm1447/dev/ampscz-formsdb"
+REPO_ROOT = "/data/predict1/data_from_nda/formsdb/ampscz-formsdb"
 
 postgresdb = Dataset(
     uri="file:///PHShome/dm1447/dev/ampscz-formsdb/data/postgresql/postgresql.conf"
@@ -25,7 +25,7 @@ postgresdb = Dataset(
 
 # Define variables
 default_args = {
-    "owner": "admin",
+    "owner": "pnl",
     "depends_on_past": False,
     "start_date": datetime(2024, 3, 15),
     "email_on_failure": True,
@@ -134,6 +134,7 @@ compute_medication = BashOperator(
     dag=dag,
     cwd=REPO_ROOT,
     task_group=medication_tg,
+    pool_slots=8,
 )
 
 compute_converted = BashOperator(
@@ -158,6 +159,7 @@ compute_recruitment_status = BashOperator(
     cwd=REPO_ROOT,
     outlets=[filters, recruitment_status],
     task_group=recruitment_status_tg,
+    pool_slots=16,
 )
 
 compute_removed = BashOperator(
@@ -170,6 +172,7 @@ compute_removed = BashOperator(
     cwd=REPO_ROOT,
     outlets=[subject_removed],
     task_group=withdrawal_tg,
+    pool_slots=8,
 )
 
 compute_visit_status = BashOperator(
@@ -182,6 +185,7 @@ compute_visit_status = BashOperator(
     cwd=REPO_ROOT,
     outlets=[subject_visit_status],
     task_group=visit_status_tg,
+    pool_slots=8,
 )
 
 compute_visit_completed = BashOperator(
@@ -194,6 +198,7 @@ compute_visit_completed = BashOperator(
     cwd=REPO_ROOT,
     outlets=[subject_visit_completed],
     task_group=visit_competed_tg,
+    pool_slots=16,
 )
 
 compute_blood_metrics = BashOperator(
@@ -206,19 +211,20 @@ compute_blood_metrics = BashOperator(
     cwd=REPO_ROOT,
     outlets=[blood_metrics],
     task_group=blood_metrics_tg,
+    pool_slots=8,
 )
 
 # export
-export_cognitive_summary = BashOperator(
-    task_id="export_cognitive_summary",
-    bash_command=PYTHON_PATH
-    + " "
-    + REPO_ROOT
-    + "/formsdb/runners/export/export_cognitive_summary.py",
-    dag=dag,
-    cwd=REPO_ROOT,
-    task_group=cognition_tg,
-)
+# export_cognitive_summary = BashOperator(
+#     task_id="export_cognitive_summary",
+#     bash_command=PYTHON_PATH
+#     + " "
+#     + REPO_ROOT
+#     + "/formsdb/runners/export/export_cognitive_summary.py",
+#     dag=dag,
+#     cwd=REPO_ROOT,
+#     task_group=cognition_tg,
+# )
 
 export_combined_cognitive = BashOperator(
     task_id="export_combined_cognitive",
@@ -231,16 +237,16 @@ export_combined_cognitive = BashOperator(
     task_group=cognition_tg,
 )
 
-export_consolidated_combined_cognitive = BashOperator(
-    task_id="export_consolidated_combined_cognitive",
-    bash_command=PYTHON_PATH
-    + " "
-    + REPO_ROOT
-    + "/formsdb/runners/export/export_consolidated_combined_cognitive.py",
-    dag=dag,
-    cwd=REPO_ROOT,
-    task_group=cognition_tg,
-)
+# export_consolidated_combined_cognitive = BashOperator(
+#     task_id="export_consolidated_combined_cognitive",
+#     bash_command=PYTHON_PATH
+#     + " "
+#     + REPO_ROOT
+#     + "/formsdb/runners/export/export_consolidated_combined_cognitive.py",
+#     dag=dag,
+#     cwd=REPO_ROOT,
+#     task_group=cognition_tg,
+# )
 
 export_recruitment_status = BashOperator(
     task_id="export_recruitment_status",
@@ -330,11 +336,11 @@ compute_converted.set_downstream(compute_recruitment_status)
 compute_removed.set_downstream(compute_recruitment_status)
 compute_visit_status.set_downstream(compute_recruitment_status)
 
-compute_cognition.set_downstream(export_cognitive_summary)
+# compute_cognition.set_downstream(export_cognitive_summary)
 compute_cognition.set_downstream(export_combined_cognitive)
 compute_visit_status.set_downstream(export_visit_status)
 
-export_combined_cognitive.set_downstream(export_consolidated_combined_cognitive)
+# export_combined_cognitive.set_downstream(export_consolidated_combined_cognitive)
 
 compute_recruitment_status.set_downstream(export_recruitment_status)
 compute_recruitment_status.set_downstream(export_filters)
@@ -353,7 +359,7 @@ dpdash_merge_ready = EmptyOperator(
         tag="alerts",
     ),
 )
-export_cognitive_summary.set_downstream(dpdash_merge_ready)
+# export_cognitive_summary.set_downstream(dpdash_merge_ready)
 export_recruitment_status.set_downstream(dpdash_merge_ready)
 export_visit_status.set_downstream(dpdash_merge_ready)
 export_converted.set_downstream(dpdash_merge_ready)

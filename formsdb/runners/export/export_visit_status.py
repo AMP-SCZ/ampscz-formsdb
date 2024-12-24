@@ -85,9 +85,9 @@ def fetch_visit_data_w_converted_withdrawn(
                 WHEN removed THEN 'withdrawn'
                 ELSE timepoint
             END AS visit_status
-        FROM subject_visit_status
-        LEFT JOIN conversion_status USING(subject_id)
-        LEFT JOIN subject_removed USING(subject_id)
+        FROM forms_derived.subject_visit_status
+        LEFT JOIN forms_derived.conversion_status USING(subject_id)
+        LEFT JOIN forms_derived.subject_removed USING(subject_id)
         WHERE subject_id='{subject_id}'
         """
 

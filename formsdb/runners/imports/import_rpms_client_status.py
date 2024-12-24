@@ -55,10 +55,10 @@ def get_all_client_status_csvs(data_root: Path) -> List[Path]:
     Returns:
         List[Path]: List of all ClientStatus CSVs.
     """
+    search_path = "*/PHOENIX/PROTECTED/*/raw/*/surveys/*_ClientStatus_AllDates.csv"
+    logger.info(f"Searching for ClientStatus CSVs in {data_root}/{search_path}")
     client_status_csvs = list(
-        data_root.glob(
-            "*/PHOENIX/PROTECTED/*/raw/*/surveys/*_ClientStatus_AllDates.csv"
-        )
+        data_root.glob(search_path)
     )
     logger.info(f"Found {len(client_status_csvs)} ClientStatus CSVs")
     return client_status_csvs
@@ -74,7 +74,6 @@ def import_client_status_files(config_file: Path) -> None:
     config_params = utils.config(config_file, "general")
     data_root = Path(config_params["data_root"])
 
-    logger.info(f"Looking for ClientStatus CSVs in {data_root}")
     with utils.get_progress_bar() as progress:
         task = progress.add_task("Looking for ClientStatus CSVs...", total=None)
         client_status_csvs = get_all_client_status_csvs(data_root)

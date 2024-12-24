@@ -157,7 +157,7 @@ def consolidate_blood_metrics(config_file: Path) -> pd.DataFrame:
     subjects_count = len(subject_ids)
     logger.info(f"Found {subjects_count} subjects.")
 
-    num_processes = 8
+    num_processes = multiprocessing.cpu_count() // 4
     logger.info(f"Using {num_processes} processes.")
 
     params = [(config_file, subject_id) for subject_id in subject_ids]

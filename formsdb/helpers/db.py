@@ -42,7 +42,7 @@ def get_mongo_db(config_file: Path) -> database.Database:
 
 def check_if_subject_form_data_exists(
     config_file: Path, subject_id: str, source_mdate: datetime
-):
+) -> bool:
     """
     Checks if a subject's form data exists in the Postgres database and
     is up-to-date.
@@ -78,25 +78,28 @@ def check_if_subject_upenn_data_exists(
     config_file: Path,
     subject_id: str,
     source_m_date: datetime,
-    collection: Literal["upenn", "upenn_nda"],
-):
+) -> bool:
     """
-    Checks if a subject's UPenn data exists in the MongoDB database.
+    Checks if a subject's UPenn data exists in the Postgres database and
+    is up-to-date.
 
     Args:
         config_file (Path): The path to the configuration file.
         subject_id (str): The subject ID.
         source_m_date (datetime): The source modification date.
     """
-    mongodb = get_mongo_db(config_file)
-    subject_form_data = mongodb[collection]
+    query = f"""
+    SELECT MAX(source_mdate) AS source_m_date
+    FROM forms.upenn_forms
+    WHERE subject_id = '{subject_id}'
+    """
 
-    subject_form_data_count = subject_form_data.count_documents({"_id": subject_id})
-    if subject_form_data_count > 0:
-        subject_form_data = subject_form_data.find_one({"_id": subject_id})
-        if subject_form_data is not None:
-            if subject_form_data["_source_mdate"] >= source_m_date:
-                return True
+    source_m_date = fetch_record(config_file, query)
+
+    if source_m_date is not None:
+        source_m_date = datetime.strptime(source_m_date, "%Y-%m-%d %H:%M:%S")
+        if source_m_date == source_m_date:
+            return True
 
     return False
 

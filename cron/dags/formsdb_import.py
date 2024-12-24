@@ -13,9 +13,9 @@ from airflow.providers.apprise.notifications import apprise
 from airflow.utils.task_group import TaskGroup
 from apprise import NotifyType
 
-CONDA_ENV_PATH = "/PHShome/dm1447/mambaforge/envs/jupyter/bin"
+CONDA_ENV_PATH = "/home/pnl/miniforge3/envs/jupyter/bin"
 PYTHON_PATH = f"{CONDA_ENV_PATH}/python"
-REPO_ROOT = "/PHShome/dm1447/dev/ampscz-formsdb"
+REPO_ROOT = "/data/predict1/data_from_nda/formsdb/ampscz-formsdb"
 
 postgresdb = Dataset(
     uri="file:///PHShome/dm1447/dev/ampscz-formsdb/data/postgresql/postgresql.conf"
@@ -23,9 +23,9 @@ postgresdb = Dataset(
 
 # Define variables
 default_args = {
-    "owner": "admin",
+    "owner": "pnl",
     "depends_on_past": False,
-    "start_date": datetime(2024, 6, 4),
+    "start_date": datetime(2024, 12, 23),
     "email_on_failure": True,
     "email_on_retry": False,
     "retries": 3,
@@ -56,16 +56,6 @@ echo "$(date) - Uptime: $(uptime)"''',
     cwd=REPO_ROOT,
 )
 
-# Ignore exit code
-start_mongo = BashOperator(
-    task_id="start_mongo",
-    bash_command=CONDA_ENV_PATH
-    + "/mongod --config "
-    + REPO_ROOT
-    + "/data/mongod.conf || true",
-    dag=dag,
-)
-
 # Import
 # Data Dictionary
 import_data_dictionary = BashOperator(
@@ -90,17 +80,7 @@ import_upenn_jsons = BashOperator(
     cwd=REPO_ROOT,
     task_group=upenn_task_group,
     skip_on_exit_code=1,
-)
-
-export_upenn_json = BashOperator(
-    task_id="export_upenn_json",
-    bash_command=PYTHON_PATH
-    + " "
-    + REPO_ROOT
-    + "/formsdb/runners/imports/export_upenn_mongo_to_psql.py",
-    dag=dag,
-    cwd=REPO_ROOT,
-    task_group=upenn_task_group,
+    pool_slots=8,
 )
 
 # Harmonized JSONs
@@ -114,17 +94,7 @@ import_harmonized_jsons = BashOperator(
     dag=dag,
     cwd=REPO_ROOT,
     task_group=harmonized_task_group,
-)
-
-export_harmonized_jsons = BashOperator(
-    task_id="export_harmonized_jsons",
-    bash_command=PYTHON_PATH
-    + " "
-    + REPO_ROOT
-    + "/formsdb/runners/imports/export_mongo_to_psql.py",
-    dag=dag,
-    cwd=REPO_ROOT,
-    task_group=harmonized_task_group,
+    pool_slots=16,
 )
 
 # RPMS SPecific Imports
@@ -139,6 +109,7 @@ import_rpms_csvs = BashOperator(
     dag=dag,
     cwd=REPO_ROOT,
     task_group=rpms_imports_task_group,
+    pool_slots=16,
 )
 
 import_rpms_entry_status = BashOperator(
@@ -157,7 +128,7 @@ import_client_status = BashOperator(
     bash_command=PYTHON_PATH
     + " "
     + REPO_ROOT
-    + "/formsdb/runners/imports/import_client_status.py",
+    + "/formsdb/runners/imports/import_rpms_client_status.py",
     dag=dag,
     cwd=REPO_ROOT,
     task_group=rpms_imports_task_group,
@@ -165,19 +136,14 @@ import_client_status = BashOperator(
 # Done Task Definitions
 
 # Start DAG construction
-info.set_downstream(start_mongo)
-
-start_mongo.set_downstream(import_data_dictionary)
+info.set_downstream(import_data_dictionary)
 
 info.set_downstream(import_rpms_csvs)
 info.set_downstream(import_rpms_entry_status)
 info.set_downstream(import_client_status)
 
-start_mongo.set_downstream(import_upenn_jsons)
-start_mongo.set_downstream(import_harmonized_jsons)
-
-import_upenn_jsons.set_downstream(export_upenn_json)
-import_harmonized_jsons.set_downstream(export_harmonized_jsons)
+import_data_dictionary.set_downstream(import_upenn_jsons)
+import_data_dictionary.set_downstream(import_harmonized_jsons)
 
 all_imports_done = EmptyOperator(
     task_id="all_imports_done",
@@ -199,10 +165,11 @@ all_imports_done = EmptyOperator(
     outlets=[postgresdb],
     trigger_rule="none_failed",
 )
-export_upenn_json.set_downstream(all_imports_done)
-export_harmonized_jsons.set_downstream(all_imports_done)
+
 import_rpms_csvs.set_downstream(all_imports_done)
 import_rpms_entry_status.set_downstream(all_imports_done)
 import_client_status.set_downstream(all_imports_done)
+import_harmonized_jsons.set_downstream(all_imports_done)
+import_upenn_jsons.set_downstream(all_imports_done)
 
 # Done DAG construction

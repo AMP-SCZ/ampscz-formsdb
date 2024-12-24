@@ -352,7 +352,7 @@ def import_forms_by_network(
     skipped_subjects: List[str] = []
     processed_subjects: List[str] = []
 
-    num_processes = multiprocessing.cpu_count() // 4
+    num_processes = multiprocessing.cpu_count() // 2
     logger.info(f"Using {num_processes} processes.")
 
     params = [

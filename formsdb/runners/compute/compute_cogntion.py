@@ -133,7 +133,7 @@ def get_upenn_redcap_data(config_file: Path, subject_id: str) -> pd.DataFrame:
         pd.DataFrame: The UPenn form data.
     """
     query = f"""
-    SELECT subject_id, event_name, event_type, form_data FROM upenn_forms
+    SELECT subject_id, event_name, event_type, form_data FROM forms.upenn_forms
         WHERE subject_id = '{subject_id}';
     """
 
@@ -534,7 +534,7 @@ def process_data(config_file: Path) -> None:
         None
     """
     subject_query = """
-        SELECT DISTINCT subject_id FROM upenn_forms;
+        SELECT DISTINCT subject_id FROM forms.upenn_forms;
     """
 
     subject_id_df = db.execute_sql(config_file, subject_query)

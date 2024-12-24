@@ -228,7 +228,7 @@ def export_data(
         None
     """
     subject_query = """
-        SELECT DISTINCT subject_id FROM upenn_forms ORDER BY subject_id ASC;
+        SELECT DISTINCT subject_id FROM forms.upenn_forms ORDER BY subject_id ASC;
     """
 
     subject_id_df = db.execute_sql(config_file, subject_query)

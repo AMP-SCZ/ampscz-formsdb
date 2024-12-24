@@ -1245,7 +1245,7 @@ def get_subject_withdrawal_status(
 
     query = f"""
     SELECT withdrawal_status
-    FROM subject_removed
+    FROM forms_derived.subject_removed
     WHERE subject_id = '{subject_id}'
     """
 

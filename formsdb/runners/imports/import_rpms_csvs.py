@@ -424,8 +424,9 @@ def import_forms_by_network(
     data_root = Path(config_params["data_root"])
 
     network_id = "Prescient"
-
-    subjects_glob = list(data_root.glob(f"{network_id}/PHOENIX/PROTECTED/*/raw/*"))
+    search_path = f"{network_id}/PHOENIX/PROTECTED/*/raw/*"
+    logger.info(f"Searching for subjects in {data_root}/{search_path}")
+    subjects_glob = list(data_root.glob(search_path))
 
     queries: List[str] = []
     skipped_subjects: List[str] = []

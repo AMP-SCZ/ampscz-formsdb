@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-Import UPENN forms data from JSON to MongoDB.
+Import UPENN forms data from JSON to Postgres.
 """
 
 import sys
@@ -24,7 +24,7 @@ import json
 import logging
 from datetime import datetime
 from glob import glob
-from typing import Any, Dict, List, Literal, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 import multiprocessing
 
 import numpy as np
@@ -46,6 +46,8 @@ logargs = {
     "handlers": [RichHandler(rich_tracebacks=True)],
 }
 logging.basicConfig(**logargs)
+
+pd.set_option('future.no_silent_downcasting', True)
 
 
 def get_visit_date(all_forms_df: pd.DataFrame, visit_name: str) -> Optional[datetime]:
@@ -214,16 +216,6 @@ def merge_dicts(d1: Dict[str, Any], d2: Dict[str, Any]) -> Dict[str, Any]:
         else:
             merged_dict[key] = value
 
-    # if "records" in d1:
-    #     merged_dict["records"] = d1["records"]
-    # else:
-    #     merged_dict["records"] = [d1]
-
-    # if "records" in d2:
-    #     merged_dict["records"].extend(d2["records"])
-    # else:
-    #     merged_dict["records"].append(d2)
-
     return merged_dict
 
 
@@ -231,7 +223,6 @@ def generate_upenn_form(
     subject_id: str,
     df_upenn: pd.DataFrame,
     all_forms_df: pd.DataFrame,
-    collection: Literal["upenn", "upenn_nda"],
     config_file: Path,
 ) -> Dict[str, Dict[str, Dict[str, Any]]]:
     """
@@ -250,17 +241,6 @@ def generate_upenn_form(
     form_data: Dict[str, Dict[str, Any]] = {}
 
     for _, row in df_upenn.iterrows():
-        # if collection == "upenn":
-        #     session_date = row["session_date"]  # 2023-1-20
-        #     session_id = row["session_battery"]
-
-        #     session_date_dt = datetime.strptime(session_date, "%Y-%m-%d")
-
-        #     if "NOSPLLT" in session_id:
-        #         session_id = "NOSPLLT"
-        #     else:
-        #         session_id = "SPLLT"
-        # elif collection == "upenn_nda":
         session_date = row["interview_date"]  # 2023-06-19
         try:
             session_date_dt = datetime.strptime(session_date, "%Y-%m-%d")
@@ -287,8 +267,7 @@ def generate_upenn_form(
             )
 
         if visit is None:
-            logger.warning(f"Could not find visit for {subject_id} {collection}")
-            logger.warning(f"Falling back to visit date map for {subject_id}")
+            logger.warning(f"Could not find visit for {subject_id}, falling back to visit date map")
 
             visit_date_map = compute_visit_date_map(
                 all_forms_df=all_forms_df, visits=constants.upenn_visit_order
@@ -308,21 +287,12 @@ def generate_upenn_form(
                     config_file=config_file, subject_id=subject_id
                 )
                 match cohort:
-                    # case "CHR":
-                    #     visit = f"{visit}_arm_1_i"
-                    # case "HC":
-                    #     visit = f"{visit}_arm_2_i"
-                    # case _:
-                    #     visit = f"{visit}_arm_x_i"
                     case "CHR":
                         visit = f"{visit}_arm_1"
                     case "HC":
                         visit = f"{visit}_arm_2"
                     case _:
                         visit = f"{visit}_arm_x"
-
-        # if visit not in form_data:
-        #     form_data[visit] = {}
 
         session_data: Dict[str, Any] = {}
         for variable in row.index:
@@ -336,14 +306,6 @@ def generate_upenn_form(
         if visit_date is not None:
             session_data["penncnb_interview_date"] = visit_date.strftime("%Y-%m-%d")
 
-        # if collection == "upenn":
-        #     if session_id not in form_data[visit]:
-        #         form_data[visit][session_id] = session_data
-        #     else:
-        #         form_data[visit][session_id] = merge_dicts(
-        #             form_data[visit][session_id], session_data
-        #         )
-        # elif collection == "upenn_nda":
         if visit not in form_data:
             form_data[visit] = session_data
         else:
@@ -351,14 +313,12 @@ def generate_upenn_form(
     return form_data
 
 
-def upsert_form_data(
-    config_file: Path,
+def construct_insert_queries(
     subject_id: str,
     form_data: Dict[str, Any],
-    collection: Literal["upenn", "upenn_nda"],
-) -> None:
+) -> List[str]:
     """
-    Update or insert form data into the MongoDB's 'upenn' collection.
+    Update or insert form data into the Postgres database forms.upenn_forms table.
 
     Args:
         config_file (Path): The path to the configuration file.
@@ -366,37 +326,52 @@ def upsert_form_data(
         form_data (Dict[str, Any]): The form data.
 
     Returns:
-        None
+        List[str]: A list of SQL queries to update subject data.
     """
-    mongodb = db.get_mongo_db(config_file)
-    subject_form_data = mongodb[collection]
+    sql_queries: List[str] = []
 
-    subject_form_data.replace_one({"_id": subject_id}, form_data, upsert=True)
+    delete_query = f"DELETE FROM forms.upenn_forms WHERE subject_id = '{subject_id}';"
+    sql_queries.append(delete_query)
+
+    form_metadata = form_data.pop("metadata")
+    source_m_date = form_metadata["source_m_date"]
+    for event_name, event_form_data in form_data.items():
+        sql_query = f"""
+        INSERT INTO forms.upenn_forms (subject_id, event_name, event_type,
+            form_data, source_mdate)
+        VALUES ('{subject_id}', '{event_name}', 'nda',
+            '{db.sanitize_json(event_form_data)}', '{source_m_date}');
+        """
+        sql_queries.append(sql_query)
+
+    return sql_queries
 
 
-def process_subject(params: Tuple[Path, str, str, bool]) -> Tuple[str, bool]:
+def process_subject(params: Tuple[Path, str, str, bool]) -> Tuple[str, bool, List[str]]:
     """
     A function to process a subject's UPENN JSON file.
 
     Args:
-        params (Tuple[Path, Path, str, bool]): A tuple containing the config file, subject JSON file,
-            the source, and whether to force import the data.
+        params (Tuple[Path, Path, str, bool]): A tuple containing the config file,
+            subject JSON file, the source, and whether to force import the data.
+
+    Returns:
+        Tuple[str, bool, List[str]]: A tuple containing the subject ID, whether the subject was
+            imported successfully, and a list of SQL queries.
     """
-    config_file, subject_json, source, force_import = params
+    config_file, subject_json, force_import = params
 
     subject_id = subject_json.split("/")[-1].split(".")[0]
     source_m_date = utils.get_file_mtime(Path(subject_json))
-    mongo_collection = source.lower()
     if (
         db.check_if_subject_upenn_data_exists(
             config_file,
             subject_id,
             source_m_date,
-            collection=mongo_collection,  # type: ignore
         )
         and not force_import
     ):
-        return subject_id, False
+        return subject_id, False, []
 
     with open(subject_json, "r", encoding="utf-8") as f:
         json_data = json.load(f)
@@ -415,26 +390,25 @@ def process_subject(params: Tuple[Path, str, str, bool]) -> Tuple[str, bool]:
         df_upenn=sub_data_all,
         all_forms_df=all_forms_df,
         config_file=config_file,
-        collection=mongo_collection,  # type: ignore
     )
     # except Exception as e:
     #     logger.error(f"Error: {e}")
     #     logger.error(f"JSON file: {subject_json}")
 
     # Label form data with subject ID
-    form_data["_id"] = subject_id
-    form_data["_date_imported"] = utils.get_curent_datetime()
-    form_data["_source"] = subject_json
-    form_data["_source_mdate"] = source_m_date
+    form_metadata: Dict[str, Any] = {
+        "subject_id": subject_id,
+        "source": subject_json,
+        "source_m_date": source_m_date,
+    }
+    form_data["metadata"] = form_metadata
 
     try:
-        upsert_form_data(
-            config_file=config_file,
+        sql_queries = construct_insert_queries(
             subject_id=subject_id,
-            form_data=form_data,
-            collection=mongo_collection,  # type: ignore
+            form_data=form_data
         )
-        return subject_id, True
+        return subject_id, True, sql_queries
     except Exception as e:
         logger.error(f"Error: {e}")
         logger.error(f"Subject: {subject_id}")
@@ -460,55 +434,55 @@ def import_forms_by_network(
     Returns:
         None
     """
-    upenn_sources: List[str] = ["UPENN_nda"]
+    skipped_count = 0
+    imported_count = 0
+
+    search_pattern = f"{data_root}/{network}/PHOENIX/PROTECTED/*/raw/*/surveys/*.UPENN_nda.json"
+    logger.info(f"Searching for subjects in {search_pattern}")
+    subjects_glob = glob(search_pattern)
+    logger.info(f"Found {len(subjects_glob)} subjects for {network}")
+
+    # Sort subjects by subject ID
+    subjects_glob = sorted(subjects_glob)
+
+    num_processes = 8
+    logger.info(f"Using {num_processes} processes.")
+
+    skip_buffer = []
+    params = [
+        (config_file, subject_json, force_import)
+        for subject_json in subjects_glob
+    ]
+
+    sql_queries: List[str] = []
     with utils.get_progress_bar() as progress:
-        # source_process = progress.add_task(
-        #     "[red]Processing source...", total=len(upenn_sources)
-        # )
-        skipped_count = 0
-        imported_count = 0
-        for source in upenn_sources:
-            # progress.update(
-            #     source_process,
-            #     advance=1,
-            #     description=f"Importing UPENN JSONs for {network} ({source})...",
-            # )
-
-            subjects_glob = glob(
-                f"{data_root}/{network}/PHOENIX/PROTECTED/*/raw/*/surveys/*.{source}.json"
+        with multiprocessing.Pool(processes=int(num_processes)) as pool:
+            task = progress.add_task(
+                f"Processing {network}...", total=len(params)
             )
-            logger.info(f"Found {len(subjects_glob)} subjects for {network}")
-
-            # Sort subjects by subject ID
-            subjects_glob = sorted(subjects_glob)
-
-            num_processes = 8
-            logger.info(f"Using {num_processes} processes.")
-
-            skip_buffer = []
-            params = [
-                (config_file, subject_json, source, force_import)
-                for subject_json in subjects_glob
-            ]
-
-            with multiprocessing.Pool(processes=int(num_processes)) as pool:
-                task = progress.add_task(
-                    f"Processing {network} ({source})...", total=len(params)
-                )
-                for result in pool.imap_unordered(process_subject, params):
-                    subject_id, imported = result
-                    if imported:
-                        imported_count += 1
-                    else:
-                        skipped_count += 1
-                        skip_buffer.append(subject_id)
-                    progress.update(task, advance=1)
+            for result in pool.imap_unordered(process_subject, params):
+                subject_id, imported, subject_sql_queries = result
+                if imported:
+                    imported_count += 1
+                else:
+                    skipped_count += 1
+                    skip_buffer.append(subject_id)
+                sql_queries.extend(subject_sql_queries)
+                progress.update(task, advance=1)
 
         logger.info(f"Skipped {skipped_count} subjects")
         logger.info(f"Imported {imported_count} subjects")
 
         if imported_count < 1:
             logger.warning(f"No subjects imported for {network}")
+
+    if len(sql_queries) > 0:
+        db.execute_queries(
+            config_file=config_file,
+            queries=sql_queries,
+            show_commands=False,
+            show_progress=True,
+        )
 
 
 if __name__ == "__main__":
@@ -525,10 +499,11 @@ if __name__ == "__main__":
     data_params = utils.config(config_file, "data")
     data_root = Path(config_params["data_root"])
 
-    FORCE_IMPORT = True
+    FORCE_IMPORT = False
     logger.info(f"Force import: {FORCE_IMPORT}")
 
     for network in constants.networks:
+        logger.info(f"Importing UPENN data for {network}")
         import_forms_by_network(
             config_file=config_file,
             network=network,
