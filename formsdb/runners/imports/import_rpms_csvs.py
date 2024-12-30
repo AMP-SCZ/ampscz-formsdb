@@ -309,7 +309,7 @@ def process_subject(
             elif subject_cohort == "HealthyControl":
                 subject_cohort = "HC"
             else:
-                raise ValueError(f"Unknown cohort: {subject_cohort}")
+                raise ValueError(f"{form_name} - Unknown cohort: {subject_cohort}")
 
             form_data["chric_record_id"] = subject_id
 
@@ -319,7 +319,7 @@ def process_subject(
             elif subject_cohort == "HC":
                 form_data["chrdemo_age_mos_hc"] = form_data["interview_age"]
             else:
-                raise ValueError(f"Unknown cohort: {subject_cohort}")
+                raise ValueError(f"{form_name} - Unknown cohort: {subject_cohort}")
 
         if form_name == "coenrollment_form":
             # only insert first row
@@ -377,10 +377,10 @@ def process_subject(
             subject_id=subject_id, config_file=config_file
         )
     except ValueError as e:
-        logger.error(f"Error processing subject {subject_id}: {e}")
+        logger.error(f"Error linking form completion variables: {e}")
         return {
             "subject_id": subject_id,
-            "queries": [],
+            "queries": subject_queries,
         }
     subject_queries.extend(uncategorized_queries)
 
