@@ -17,7 +17,7 @@ PYTHON_PATH = f"{CONDA_ENV_PATH}/python"
 REPO_ROOT = "/data/predict1/data_from_nda/formsdb/ampscz-formsdb"
 
 dpdash_csvs = Dataset(
-    uri="file:///data/predict1/data_from_nda/formqc/??-*-form_dpdash_charts-*.csv"
+    uri="file:///PHOENIX/PROTECTED/_NETWORK_/processed/_SUBJECT_/surveys/_FORMS_.csv",
 )
 
 
@@ -38,7 +38,6 @@ dag = DAG(
     default_args=default_args,
     description="DAG for AMPSCZ formsdb - Export combined CSV",
     schedule=[dpdash_csvs],
-    schedule_interval=None,
 )
 
 # Define variables

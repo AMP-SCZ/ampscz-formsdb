@@ -259,7 +259,7 @@ def get_subject_visit_completed_data(
         pd.DataFrame: The subject visit completed data.
     """
     query = (
-        f"SELECT * FROM subject_visit_completed_data WHERE subject_id = '{subject_id}'"
+        f"SELECT * FROM forms_derived.subject_visit_completed_data WHERE subject_id = '{subject_id}'"
     )
 
     completed_forms_df = db.execute_sql(
@@ -385,6 +385,7 @@ if __name__ == "__main__":
     visit_completed_df = compute_visit_completed_data(config_file=config_file)
     db.df_to_table(
         df=visit_completed_df,
+        schema="forms_derived",
         table_name="subject_visit_completed_data",
         config_file=config_file,
         if_exists="replace",
