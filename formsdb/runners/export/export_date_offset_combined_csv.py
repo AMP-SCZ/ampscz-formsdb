@@ -61,7 +61,7 @@ def get_combined_csvs(config_file: Path) -> List[Path]:
     output_params = utils.config(config_file, "outputs")
 
     output_dir = Path(output_params["combined_csvs"])
-    csv_files = list(output_dir.glob("*.csv"))
+    csv_files = list(output_dir.glob("AMPSCZ*.csv"))
 
     return csv_files
 

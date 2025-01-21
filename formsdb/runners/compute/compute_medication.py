@@ -416,6 +416,7 @@ def update_medication_data(
 
     db.df_to_table(
         df=medication_df,
+        schema="forms_derived",
         table_name="medication_data",
         config_file=config_file,
         if_exists="replace",

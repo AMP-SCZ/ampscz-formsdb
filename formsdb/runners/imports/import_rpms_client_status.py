@@ -97,6 +97,7 @@ def import_client_status_files(config_file: Path) -> None:
     db.df_to_table(
         df=master_df,
         table_name="rpms_client_status",
+        schema="forms",
         if_exists="replace",
         config_file=config_file,
     )

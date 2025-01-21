@@ -28,7 +28,7 @@ default_args = {
 
 # Outputs
 dpdash_csvs = Dataset(
-    uri="file:///data/predict1/data_from_nda/formqc/??-*-form_dpdash_charts-*.csv"
+    uri="file:///PHOENIX/PROTECTED/_NETWORK_/processed/_SUBJECT_/surveys/_FORMS_.csv",
 )
 
 dag = DAG(
