@@ -109,17 +109,17 @@ def get_subject_started_visit(
             timepoint_not_found = True
             continue
 
-        timepoint_delta = subject_timepoints.index(
-            timepoint
-        ) - subject_timepoints.index(current_timepoint)
-        if (
-            timepoint_delta > 6
-            and not timepoint_not_found
-            and cohort.lower()
-            == "chr"  # Only for CHR subjects; HC subjects can have large gaps
-        ):
-            # print(f"Timepoint: {timepoint} has not started")
-            break
+        # timepoint_delta = subject_timepoints.index(
+        #     timepoint
+        # ) - subject_timepoints.index(current_timepoint)
+        # if (
+        #     timepoint_delta > 6
+        #     and not timepoint_not_found
+        #     and cohort.lower()
+        #     == "chr"  # Only for CHR subjects; HC subjects can have large gaps
+        # ):
+        #     # print(f"Timepoint: {timepoint} has not started")
+        #     break
 
     # print(f"Current timepoint: {current_timepoint}")
     return current_timepoint
@@ -170,7 +170,7 @@ def compute_recent_visit(config_file: Path) -> pd.DataFrame:
         config_file=config_file
     )
 
-    num_processes = multiprocessing.cpu_count() // 4
+    num_processes = multiprocessing.cpu_count() // 2
     logger.info(f"Using {num_processes} processes.")
 
     params = [
@@ -261,7 +261,7 @@ def populate_cumulative_charts_data(config_file: Path) -> None:
     timepoints = ["baseline", "month_1", "month_2", "month_6", "month_12", "month_18"]
 
     params = [(config_file, subject_id, timepoints) for subject_id in subject_ids]
-    num_processes = 8
+    num_processes = multiprocessing.cpu_count() // 2
     results = []
 
     logger.info(f"Using {num_processes} processes.")
