@@ -133,6 +133,30 @@ import_client_status = BashOperator(
     cwd=REPO_ROOT,
     task_group=rpms_imports_task_group,
 )
+
+import_client_status_raw = BashOperator(
+    task_id="import_client_status_raw",
+    bash_command=PYTHON_PATH
+    + " "
+    + REPO_ROOT
+    + "/formsdb/runners/imports/import_rpms_client_status_war.py",
+    dag=dag,
+    cwd=REPO_ROOT,
+    task_group=rpms_imports_task_group,
+)
+
+# Form QC
+import_form_qc = BashOperator(
+    task_id="import_form_qc",
+    bash_command=PYTHON_PATH
+    + " "
+    + REPO_ROOT
+    + "/formsdb/runners/imports/import_form_qc.py",
+    dag=dag,
+    cwd=REPO_ROOT,
+    pool_slots=16,
+)
+
 # Done Task Definitions
 
 # Start DAG construction
@@ -142,8 +166,13 @@ info.set_downstream(import_rpms_csvs)
 info.set_downstream(import_rpms_entry_status)
 info.set_downstream(import_client_status)
 
+import_client_status.set_downstream(import_client_status_raw)
+
 import_data_dictionary.set_downstream(import_upenn_jsons)
 import_data_dictionary.set_downstream(import_harmonized_jsons)
+
+import_rpms_csvs.set_downstream(import_form_qc)
+import_harmonized_jsons.set_downstream(import_form_qc)
 
 all_imports_done = EmptyOperator(
     task_id="all_imports_done",
@@ -166,9 +195,9 @@ all_imports_done = EmptyOperator(
     trigger_rule="none_failed",
 )
 
-import_rpms_csvs.set_downstream(all_imports_done)
+import_form_qc.set_downstream(all_imports_done)
 import_rpms_entry_status.set_downstream(all_imports_done)
-import_client_status.set_downstream(all_imports_done)
+import_client_status_raw.set_downstream(all_imports_done)
 import_harmonized_jsons.set_downstream(all_imports_done)
 import_upenn_jsons.set_downstream(all_imports_done)
 
