@@ -178,11 +178,13 @@ def process_subject(params: Tuple[Path, str]) -> List[Dict[str, Any]]:
 
     results = []
     for timepoint in timepoints:
-        is_timepoint_completed, all_form_map, missing_forms_map = subject_completed_timepoint(
-            config_file=config_file,
-            subject_id=subject_id,
-            forms_cohort_timepoint_map=forms_cohort_timepoint_map,
-            timepoint=timepoint,
+        is_timepoint_completed, all_form_map, missing_forms_map = (
+            subject_completed_timepoint(
+                config_file=config_file,
+                subject_id=subject_id,
+                forms_cohort_timepoint_map=forms_cohort_timepoint_map,
+                timepoint=timepoint,
+            )
         )
 
         # Remove keys with True values
@@ -235,10 +237,23 @@ def compute_visit_completed_data(config_file: Path) -> pd.DataFrame:
 
     completed_forms_df["completed_not_missing"] = None
     for idx, row in completed_forms_df.iterrows():
-        completed_forms = str(row["completed_forms"])[1:-1].split(",")
-        missing_forms = str(row["missing_forms"])[1:-1].split(",")
-        completed_not_missing = [form for form in completed_forms if form not in missing_forms]
-        completed_forms_df["completed_not_missing"][idx] = completed_not_missing
+        completed_forms = row["completed_forms"]
+        missing_forms = row["missing_forms"]
+        completed_forms_clean = [
+            str(form).strip().replace("'", "")
+            for form in completed_forms
+            if isinstance(form, str) and form.strip()
+        ]
+        missing_forms_clean = [
+            str(form).strip().replace("'", "")
+            for form in missing_forms
+            if isinstance(form, str) and form.strip()
+        ]
+
+        completed_not_missing = [
+            form for form in completed_forms_clean if form not in missing_forms_clean
+        ]
+        completed_forms_df.at[idx, "completed_not_missing"] = completed_not_missing
 
     return completed_forms_df
 
@@ -258,9 +273,7 @@ def get_subject_visit_completed_data(
     Returns:
         pd.DataFrame: The subject visit completed data.
     """
-    query = (
-        f"SELECT * FROM forms_derived.subject_visit_completed_data WHERE subject_id = '{subject_id}'"
-    )
+    query = f"SELECT * FROM forms_derived.subject_visit_completed_data WHERE subject_id = '{subject_id}'"
 
     completed_forms_df = db.execute_sql(
         config_file=config_file,
