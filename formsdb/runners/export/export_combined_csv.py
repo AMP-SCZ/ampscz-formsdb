@@ -68,8 +68,8 @@ additional_cols = [
     },
     {
         "table": "conversion_status",
-        "name": ["converted", "converted_visit"],
-        "column": ["converted", "converted_visit"],
+        "name": ["converted", "converted_visit", "conversion_date"],
+        "column": ["converted", "converted_visit", "conversion_date"],
     },
     {
         "table": "subject_removed",
@@ -140,9 +140,11 @@ def legacy_add_additional_cols(df: pd.DataFrame) -> pd.DataFrame:
 
     # replace visit_status_string with 'removed' if removed is True
     df.loc[df["removed"] == "True", "visit_status_string"] = "removed"
+    df.loc[df["removed"] == "1", "visit_status_string"] = "removed"
 
     # replace visit_status_string with 'converted' if converted is True
     df.loc[df["converted"] == "True", "visit_status_string"] = "converted"
+    df.loc[df["converted"] == "1", "visit_status_string"] = "converted"
 
     return df
 
@@ -161,6 +163,7 @@ def add_additional_cols(
     Returns:
         None
     """
+    global additional_cols
     master_df = pd.DataFrame(df)  # noqa # pylint: disable=unused-variable
     logger.info("Adding additional columns to the master table...")
     for col in additional_cols:
