@@ -82,6 +82,7 @@ if __name__ == "__main__":
     db.df_to_table(
         config_file=config_file,
         df=data_dictionary,
+        schema="forms",
         table_name="data_dictionary",
         if_exists="replace",
     )
