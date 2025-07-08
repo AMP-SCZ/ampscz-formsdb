@@ -86,6 +86,7 @@ upenn_tests: List[str] = [
 
 
 form_name_to_abbrv: Dict[str, str] = {
+    "enrollment_note": "enrollment_note",
     "informed_consent_run_sheet": "chric",
     "informed_reconsent": "chric",
     "missing_data": "chrmiss",
@@ -107,7 +108,7 @@ form_name_to_abbrv: Dict[str, str] = {
     "adverse_events": "chrae",
     "sofas_screening": "chrsofas",
     "sofas_followup": "chrsofas",
-    "psychs_av_recording_run_sheet": "psychs_av_recording_run_sheet",
+    "psychs_av_recording_run_sheet": "chrpsychs_av",
     "psychs_p1p8": "chrpsychs_scr",
     "psychs_p9ac32": "chrpsychs_scr",
     "psychs_p1p8_fu": "chrpsychs_fu",
@@ -127,8 +128,10 @@ form_name_to_abbrv: Dict[str, str] = {
     "digital_biomarkers_mindlamp_onboarding": "chrdbb",
     "digital_biomarkers_mindlamp_checkin": "chrdig",
     "digital_biomarkers_mindlamp_end_of_12month__study_p": "chrdbe",
+    "digital_biomarkers_mindlamp_end_of_12month_study_p": "chrdbe",
     "digital_biomarkers_axivity_onboarding": "chrax",
     "digital_biomarkers_axivity_checkin": "chraxci",
+    "digital_biomarkers_axivity_end_of_12month_study_pe": "chraxe",
     "digital_biomarkers_axivity_end_of_12month__study_pe": "chraxe",
     "current_health_status": "chrchs",
     "daily_activity_and_saliva_sample_collection": "chrsaliva",
@@ -155,6 +158,22 @@ form_name_to_abbrv: Dict[str, str] = {
     "ra_prediction": "chrpred",
     "guid_form": "chrguid",
     "conversion_form": "chrconv",
+}
+
+form_name_to_date_variable_overrides: Dict[str, str] = {
+    "lifetime_ap_exposure_screen": "chrap_date",
+    "informed_consent_run_sheet": "chric_consent_date",
+    "inclusionexclusion_criteria_review": "chrcrit_date",
+    "psychs_p9ac32": None,
+    "sofas_followup": "chrsofas_interview_date_fu",
+}
+
+formname_to_missing_overrides: Dict[str, str] = {
+    "psychs_p1p8_fu": "chrpsychs_fu_missing_fu",
+    "psychs_p1p8_fu_hc": "hcpsychs_fu_missing_fu",
+    "psychs_p9ac32_fu": "chrpsychs_fu_missing_fu_2",
+    "psychs_p9ac32_fu_hc": "hcpsychs_fu_missing_fu_2",
+    "sofas_followup": "chrsofas_missing_fu",
 }
 
 # Similar List at:

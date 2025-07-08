@@ -12,7 +12,7 @@ from typing import Any, Dict, List, Optional, Union
 
 import pandas as pd
 
-from formsdb import constants
+from formsdb import constants, data
 from formsdb.helpers import db, utils
 
 logger = logging.getLogger(__name__)
@@ -391,6 +391,21 @@ def get_subject_consent_dates(config_file: Path, subject_id: str) -> datetime:
         date = pd.to_datetime(date, dayfirst=True)
         date = date.to_pydatetime()
 
+    if data.subject_uses_rpms(config_file=config_file, subject_id=subject_id):
+        query = f"""
+        SELECT "Consent Received (Enrolled)"
+        FROM forms.rpms_client_status
+        WHERE subject_id = '{subject_id}'
+        """
+
+        rpms_date = db.fetch_record(config_file=config_file, query=query)
+
+        if rpms_date is not None:
+            # 26/12/2022
+            rpms_date = datetime.strptime(rpms_date, "%d/%m/%Y")
+            if rpms_date < date:
+                date = rpms_date
+
     return date
 
 
@@ -408,7 +423,7 @@ def get_subject_age(config_file: Path, subject_id: str) -> Optional[int]:
         Optional[int]: The age of the subject in yrs.
     """
 
-    variables: List[str] = ["chrdemo_age_mos_chr", "chrdemo_age_mos_hc"]
+    variables: List[str] = ["chrdemo_age_mos_chr", "chrdemo_age_mos_hc", "chrdemo_age_mos2"]
 
     for variable in variables:
         query = f"""
@@ -427,7 +442,7 @@ def get_subject_age(config_file: Path, subject_id: str) -> Optional[int]:
     if age is None:
         return None
 
-    age = int(int(age) / 12)
+    age = int(float(age) / 12)
 
     return age
 
@@ -914,8 +929,12 @@ def form_has_missing_data(
 
     form_df = utils.explode_col(df=form_df, col="form_data")
 
-    form_abbrv = constants.form_name_to_abbrv[form_name]
-    missing_variable = f"{form_abbrv}_missing"
+    # Check overrides
+    missing_variable = constants.formname_to_missing_overrides.get(form_name, None)
+
+    if missing_variable is None:
+        form_abbrv = constants.form_name_to_abbrv[form_name]
+        missing_variable = f"{form_abbrv}_missing"
 
     try:
         missing = form_df[missing_variable].iloc[0]
