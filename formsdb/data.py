@@ -141,6 +141,16 @@ def get_all_medication_info(
             med_name, _ = value.split("_")
             med_class = "UNCATEGORIZED"
 
+        # Override medication classes based on IDs
+        if med_id == '333':
+            med_class = "ANTIPSYCHOTIC"
+        elif med_id == '444':
+            med_class = "ANTIDEPRESSANT"
+        elif med_id == '555':
+            med_class = "MOOD STABILIZER"
+        elif med_id == '666':
+            med_class = "STIMULANT"
+
         med_data[int(med_id)] = {
             "med_id": med_id,
             "med_name": med_name,

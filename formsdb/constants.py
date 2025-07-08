@@ -255,78 +255,79 @@ rmps_to_redcap_form_name: Dict[str, str] = {
 }
 
 form_name_to_rpms_suffix: Dict[str, str] = {
-    'informed_consent_run_sheet': "informed_consent_run_sheet.csv",
-    'adverse_events': 'adverse_events.csv.flat',
-    'assist': "assist.csv",
-    'blood_sample_preanalytic_quality_assurance': "blood_sample_preanalytic_quality_assurance.csv.flat",
-    'bprs': "bprs.csv",
-    'cbc_with_differential': "cbc_with_differential.csv",
-    'cdss': "cdss.csv",
-    'coenrollment_form': "coenrollment_form.csv",
-    'conversion_form': "conversion_form.csv",
-    'cssrs_baseline': "cssrs_baseline.csv",
-    'cssrs_followup': "cssrs_followup.csv",
-    'current_health_status': "current_health_status.csv",
-    'current_pharmaceutical_treatment_floating_med_125': "current_pharmaceutical_treatment_floating_med_125.csv.flat",
-    'current_pharmaceutical_treatment_floating_med_2650': "current_pharmaceutical_treatment_floating_med_2650.csv.flat",
-    'daily_activity_and_saliva_sample_collection': "daily_activity_and_saliva_sample_collection.csv",
-    'digital_biomarkers_axivity_checkin': "digital_biomarkers_axivity_checkin.csv",
-    'digital_biomarkers_axivity_end_of_12month__study_pe': "digital_biomarkers_axivity_end_of_12month_study_pe.csv",
-    'digital_biomarkers_axivity_onboarding': "digital_biomarkers_axivity_onboarding.csv",
-    'digital_biomarkers_mindlamp_checkin': "digital_biomarkers_mindlamp_checkin.csv",
-    'digital_biomarkers_mindlamp_end_of_12month__study_p': "digital_biomarkers_mindlamp_end_of_12month_study_p.csv",
-    'digital_biomarkers_mindlamp_onboarding': "digital_biomarkers_mindlamp_onboarding.csv",
-    'eeg_run_sheet': "eeg_run_sheet.csv",
-    'family_interview_for_genetic_studies_figs': "family_interview_for_genetic_studies_figs.csv.flat",
-    'gcp_cbc_with_differential': "gcp_cbc_with_differential.csv",
-    'gcp_current_health_status': "gcp_current_health_status.csv",
-    'global_functioning_role_scale': "global_functioning_role_scale.csv",
-    'global_functioning_role_scale_followup': "global_functioning_social_scale_followup.csv",
-    'global_functioning_social_scale': "global_functioning_social_scale.csv",
-    'global_functioning_social_scale_followup': "global_functioning_social_scale_followup.csv",
-    'guid_form': "guid_form.csv",
-    'health_conditions_genetics_fluid_biomarkers': "health_conditions_genetics_fluid_biomarkers.csv",
-    'health_conditions_medicalpsychiatric_history': "_health_conditions_medical_historypsychiatric_histo.csv.flat",
-    'inclusionexclusion_criteria_review': "inclusionexclusion_criteria_review.csv",
+    "informed_consent_run_sheet": "informed_consent_run_sheet.csv",
+    "adverse_events": "adverse_events.csv.flat",
+    "assist": "assist.csv",
+    "blood_sample_preanalytic_quality_assurance": "blood_sample_preanalytic_quality_assurance.csv.flat",
+    "bprs": "bprs.csv",
+    "cbc_with_differential": "cbc_with_differential.csv",
+    "cdss": "cdss.csv",
+    "coenrollment_form": "coenrollment_form.csv",
+    "conversion_form": "conversion_form.csv",
+    "cssrs_baseline": "cssrs_baseline.csv",
+    "cssrs_followup": "cssrs_followup.csv",
+    "current_health_status": "current_health_status.csv",
+    "current_pharmaceutical_treatment_floating_med_125": "current_pharmaceutical_treatment_floating_med_125.csv.flat",
+    "current_pharmaceutical_treatment_floating_med_2650": "current_pharmaceutical_treatment_floating_med_2650.csv.flat",
+    "daily_activity_and_saliva_sample_collection": "daily_activity_and_saliva_sample_collection.csv",
+    "digital_biomarkers_axivity_checkin": "digital_biomarkers_axivity_checkin.csv",
+    "digital_biomarkers_axivity_end_of_12month__study_pe": "digital_biomarkers_axivity_end_of_12month_study_pe.csv",
+    "digital_biomarkers_axivity_onboarding": "digital_biomarkers_axivity_onboarding.csv",
+    "digital_biomarkers_mindlamp_checkin": "digital_biomarkers_mindlamp_checkin.csv",
+    "digital_biomarkers_mindlamp_end_of_12month__study_p": "digital_biomarkers_mindlamp_end_of_12month_study_p.csv",
+    "digital_biomarkers_mindlamp_onboarding": "digital_biomarkers_mindlamp_onboarding.csv",
+    "eeg_run_sheet": "eeg_run_sheet.csv",
+    "family_interview_for_genetic_studies_figs": "family_interview_for_genetic_studies_figs.csv.flat",
+    "gcp_cbc_with_differential": "gcp_cbc_with_differential.csv",
+    "gcp_current_health_status": "gcp_current_health_status.csv",
+    "global_functioning_role_scale": "global_functioning_role_scale.csv",
+    "global_functioning_role_scale_followup": "global_functioning_role_scale_followup.csv",
+    "global_functioning_social_scale": "global_functioning_social_scale.csv",
+    "global_functioning_social_scale_followup": "global_functioning_social_scale_followup.csv",
+    "guid_form": "guid_form.csv",
+    "health_conditions_genetics_fluid_biomarkers": "health_conditions_genetics_fluid_biomarkers.csv",
+    "health_conditions_medicalpsychiatric_history": "_health_conditions_medical_historypsychiatric_histo.csv.flat",
+    "inclusionexclusion_criteria_review": "inclusionexclusion_criteria_review.csv",
     # 'informed_reconsent',
-    'iq_assessment_wasiii_wiscv_waisiv': "iq_assessment_wasiii_wiscv_waisiv.csv",
-    'item_promis_for_sleep': "item_promis_for_sleep.csv",
-    'lifetime_ap_exposure_screen': "lifetime_ap_exposure_screen.csv",
-    'missing_data': "missing_data.csv",
+    "iq_assessment_wasiii_wiscv_waisiv": "iq_assessment_wasiii_wiscv_waisiv.csv",
+    "item_promis_for_sleep": "item_promis_for_sleep.csv",
+    "lifetime_ap_exposure_screen": "lifetime_ap_exposure_screen.csv",
+    "missing_data": "missing_data.csv",
     # 'mri_incidental_findings_run_sheet',
-    'mri_run_sheet': "mri_run_sheet.csv",
-    'nsipr': "nsipr.csv",
-    'oasis': "oasis.csv",
-    'past_pharmaceutical_treatment': "past_pharmaceutical_treatment.csv.flat",
-    'penncnb': "penncnb.csv",
-    'perceived_discrimination_scale': "perceived_discrimination_scale.csv",
-    'perceived_stress_scale': "perceived_stress_scale.csv",
-    'pgis': "pgis.csv",
-    'premorbid_adjustment_scale': "premorbid_adjustment_scale.csv",
-    'premorbid_iq_reading_accuracy': "premorbid_iq_reading_accuracy.csv",
-    'psychosis_polyrisk_score': "psychosis_polyrisk_score.csv",
-    'psychosocial_treatment_form': "psychosocial_treatment_form.csv.flat",
-    'psychs_av_recording_run_sheet': "psychs_av_recording_run_sheet.csv",
-    'psychs_p1p8': "psychs_p1p8.csv",
-    'psychs_p1p8_fu': "psychs_p1p8_fu.csv",
-    'psychs_p1p8_fu_hc': "psychs_p1p8_fu_hc.csv",
-    'psychs_p9ac32': "psychs_p9ac32.csv",
-    'psychs_p9ac32_fu': "psychs_p9ac32_fu.csv",
-    'psychs_p9ac32_fu_hc': "psychs_p9ac32_fu_hc.csv",
-    'pubertal_developmental_scale': "pubertal_developmental_scale.csv",
-    'ra_prediction': "ra_prediction.csv",
-    'recruitment_source': "recruitment_source.csv",
-    'resource_use_log': "resource_use_log.csv.flat",
-    'scid5_psychosis_mood_substance_abuse': "scid5_psychosis_mood_substance_abuse.csv",
-    'scid5_schizotypal_personality_sciddpq': "scid5_schizotypal_personality_sciddpq.csv",
-    'sociodemographics': "sociodemographics.csv",
-    'sofas_followup': "sofas_followup.csv",
-    'sofas_screening': "sofas_screening.csv",
-    'speech_sampling_run_sheet': "speech_sampling_run_sheet.csv",
-    'traumatic_brain_injury_screen': "traumatic_brain_injury_screen.csv.flat"
+    "mri_run_sheet": "mri_run_sheet.csv",
+    "nsipr": "nsipr.csv",
+    "oasis": "oasis.csv",
+    "past_pharmaceutical_treatment": "past_pharmaceutical_treatment.csv.flat",
+    "penncnb": "penncnb.csv",
+    "perceived_discrimination_scale": "perceived_discrimination_scale.csv",
+    "perceived_stress_scale": "perceived_stress_scale.csv",
+    "pgis": "pgis.csv",
+    "premorbid_adjustment_scale": "premorbid_adjustment_scale.csv",
+    "premorbid_iq_reading_accuracy": "premorbid_iq_reading_accuracy.csv",
+    "psychosis_polyrisk_score": "psychosis_polyrisk_score.csv",
+    "psychosocial_treatment_form": "psychosocial_treatment_form.csv.flat",
+    "psychs_av_recording_run_sheet": "psychs_av_recording_run_sheet.csv",
+    "psychs_p1p8": "psychs_p1p8.csv",
+    "psychs_p1p8_fu": "psychs_p1p8_fu.csv",
+    "psychs_p1p8_fu_hc": "psychs_p1p8_fu_hc.csv",
+    "psychs_p9ac32": "psychs_p9ac32.csv",
+    "psychs_p9ac32_fu": "psychs_p9ac32_fu.csv",
+    "psychs_p9ac32_fu_hc": "psychs_p9ac32_fu_hc.csv",
+    "pubertal_developmental_scale": "pubertal_developmental_scale.csv",
+    "ra_prediction": "ra_prediction.csv",
+    "recruitment_source": "recruitment_source.csv",
+    "resource_use_log": "resource_use_log.csv.flat",
+    "scid5_psychosis_mood_substance_abuse": "scid5_psychosis_mood_substance_abuse.csv",
+    "scid5_schizotypal_personality_sciddpq": "scid5_schizotypal_personality_sciddpq.csv",
+    "sociodemographics": "sociodemographics.csv",
+    "sofas_followup": "sofas_followup.csv",
+    "sofas_screening": "sofas_screening.csv",
+    "speech_sampling_run_sheet": "speech_sampling_run_sheet.csv",
+    "traumatic_brain_injury_screen": "traumatic_brain_injury_screen.csv.flat",
 }
 
 rpms_to_redcap_event: Dict[int, str] = {
+    0: "unknown",
     1: "screening",
     2: "baseline",
     3: "month_1",
@@ -344,8 +345,9 @@ rpms_to_redcap_event: Dict[int, str] = {
     15: "month_18",
     16: "month_24",
     17: "other_study",
+    22: "other_study",
     98: "conversion",
-    99: "floating",
+    99: "floating_forms",
     100: "screening",  # Self Consent
     101: "screening",  # Parental Consent
 }
@@ -356,6 +358,113 @@ rpms_entry_status_map: Dict[int, str] = {
     2: "Complete",
     3: "N/A",
     4: "Missing",
+}
+
+med_idx_drug_equivalent_dose: Dict[int, float] = {
+    238: 1875,  # Amisulpride (Solian)  # 'amisulpride/Solian'
+    305: 187.5,  # Aripiprazole (Abilitat, Abilify)  # 'aripiprazole/Abilify'
+    725: 187.5,  # Aripiprazole (Abilitat, Abilify)  # 'aripiprazole/Abilify ACUTE INJECTION'
+    547: 187.5,  # Aripiprazole (Abilitat, Abilify)  # 'aripiprazole LAI/Abilify Maintena'
+    723: 187.5,  # Aripiprazole (Abilitat, Abilify)  # 'aripiprazole lauroxil LAI/Aristada'
+    530: 125,  # Asenapine (Saphris)  # 'asenapine/Saphris'
+    732: 125,  # Asenapine (Saphris)  # 'asenapine patch/Secuado'
+    574: 25,  # Brexpiprazole (Rexulti)  # 'brexpiprazole/Rexulti'
+    721: 18.75,  # Cariprazine (Vraylar)  # 'cariprazine/Vraylar'
+    256: 2500,  # Chlorpromazine (Largactil)  # 'chlorpromazine/Thorazine'
+    257: 2500,  # Chlorpromazine (Largactil)  # 'chlorpromazine/Thorazine ACUTE INJECTION'
+    69: 2500,  # Clozapine (Clozaril)  # 'clozapine/Clozaril'
+    403: 100,  # Droperidol (Droleptan)  # 'droperidol/Inapsine'
+    727: 100,  # Droperidol (Droleptan)  # 'droperidol/Inapsine ACUTE INJECTION'
+    220: 50,  # Fluphenazine HCL (Anatensol)  # 'fluphenazine/Prolixin/Permitil'
+    222: 50,  # Fluphenazine HCL (Anatensol)  # 'fluphenazine LAI/Prolixin Decanoate'
+    122: 50,  # Haloperidol (Haldol)  # 'haloperidol/Haldol'
+    123: 50,  # Haloperidol (Haldol)  # 'haloperidol/Haldol ACUTE INJECTION'
+    124: 50,  # Haloperidol (Haldol)  # 'haloperidol LAI/Haldol Decanoate'
+    532: 100,  # Iloperidone (Fanapt)  # 'iloperidone/Fanapt'
+    728: 525,  # Lumateperone (Caplyta)  # 'lumateperone/Caplyta'
+    540: 1500,  # Lurasidone (Latuda)  # 'lurasidone/Latuda'
+    201: 125,  # Olanzapine (Zyprexa)  # 'olanzapine/Zyprexa/Symbyax/Lybalvi '
+    726: 125,  # Olanzapine (Zyprexa)  # 'olanzapine/Zyprexa ACUTE INJECTION'
+    720: 125,  # Olanzapine (Zyprexa)  # 'olanzapine LAI/Relprevv'
+    531: 50,  # Paliperidone (Invega)  #  'paliperidone/Invega'
+    546: 50,  # Paliperidone (Invega)  #  'paliperidone palmitate LAI/Invega Sustenna'
+    722: 50,  # Paliperidone (Invega)  #  'paliperidone palmitate LAI/Invega Trinza'
+    408: 50,  # Pimozide (Orap)  # 'pimozide/Orap'
+    110: 200,  # Perphenazine (Trilafon)  #  'amitriptyline perphenazine/Etrafon/Etrafon Forte/Triavil'  ???
+    270: 200,  # Perphenazine (Trilafon)  #  'perphenazine/Trilafon'
+    271: 200,  # Perphenazine (Trilafon)  #  'perphenazine/Trilafon ACUTE INJECTION'
+    235: 1875,  # Quetiapine Fumarate (Seroquel)  #  'quetiapine/Seroquel'
+    300: 50,  # Risperidone (Risperdal)  #  'risperidone/Risperdal'
+    425: 50,  # Risperidone (Risperdal)  #  'risperidone LAI/Risperdal Consta'  ???
+    452: 50,  # Risperidone (Risperdal)  #  'risperidone SC LAI/Perseris'  ???
+    184: 100,  # Thiothixene (Navane)  #  'thiothixene/Navane'
+    158: 2500,  # Thioridazine (Melleril, Aldazine)  #  'thioridazine/Mellaril'
+    244: 125,  # Trifluoperazine (Stelazine)  #  'trifluoperazine/Stelazine'
+    245: 125,  # Trifluoperazine (Stelazine)  #  'trifluoperazine/Stelazine ACUTE INJECTION'
+    304: 1500,  # Ziprasidone (Geodon)  #  'ziprasidone/Geodon'
+    724: 1500,  # Ziprasidone (Geodon)  #  'ziprasidone/Geodon ACUTE INJECTION'
+    538: 1500,  # Ziprasidone (Geodon)  #  'ziprasidone/Geodon or placebo (Blinded)'
+}
+
+# Missing drug eqivalent dose
+drug_equivalent_dose: Dict[str, float] = {
+    "Pericyazine (Neulactil)": 250,
+    "Sulpride (Dolmatil, Sulpitil, Sulparex)": 5000,
+}
+
+antidepressant_fluoxetine_40mg_drug_equivalent_dose: Dict[str, float] = {
+    "fluoxetine": 40,
+    "agomelatine": 53.2,
+    "amitriptyline": 122.3,
+    "bupropion": 348.5,
+    "citalopram": 36,
+    "clomipramine": 116.1,
+    "desipramine": 196.3,
+    "dothiepin": 154.8,
+    "doxepin": 140.1,
+    "escitalopram": 18,
+    "fluvoxamine": 143.3,
+    "imipramine": 137.2,
+    "lofepramine": 250.2,
+    "matprotiline": 118,
+    "mianserin": 101.1,
+    "mirtazapine": 50.9,
+    "moclobemide": 575.2,
+    "nefazodone": 535.2,
+    "nortriptyline": 100.9,
+    "paroxetine": 34,
+    "reboxetine": 11.5,
+    "sertraline": 98.5,
+    "trazodone": 401.4,
+    "venlafaxine": 149.4,
+}
+
+benzodiazepine_diazepam_5mg_drug_equivalent_dose: Dict[str, float] = {
+    "diazepam": 5,
+    "alprazolam": 0.25,
+    # "bromazepam": 2.75,
+    "chlordiazepoxide": 12.5,
+    "clobazam": 10,
+    "clonazepam": 0.25,
+    "clorazepate": 7.5,
+    "estazolam": 0.75,
+    "eszopiclone": 1.5,
+    "flurazepam": 11.25,
+    "halazepam": 10,
+    # "loprazolam": 0.75,
+    "lorazepam": 0.5,
+    # "lormetazepam": 0.75,
+    # "nitrazepam": 5,
+    "oxazepam": 10,
+    "prazepam": 7.5,
+    "quazepam": 10,
+    "temazepam": 10,
+    "triazolam": 0.25,
+    "zaleplon": 10,
+    "zolpidem": 10,
+    "zopiclone": 7.5, # 'zopiclone/Imovane', 'zopiclone/Zimovane', 'eszopiclone/Lunesta'
+    # "bromazepam": 0.45,
+    # 'lemborexant': ?
 }
 
 # missingness detection
