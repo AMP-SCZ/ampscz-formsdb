@@ -172,6 +172,7 @@ def rpms_to_redcap_entry_status_map(
 def get_subject_form_completion_variables(
     subject_id: str,
     config_file: Path,
+    cohort: Optional[str] = None,
 ) -> List[str]:
     """
     Generates SQL queries with form completion variables for a subject.
@@ -183,10 +184,11 @@ def get_subject_form_completion_variables(
     Returns:
         List[str]: The SQL queries.
     """
-    cohort = data.get_subject_cohort(
-        subject_id=subject_id,
-        config_file=config_file,
-    )
+    if cohort is None:
+        cohort = data.get_subject_cohort(
+            subject_id=subject_id,
+            config_file=config_file,
+        )
     entry_status_df = data.get_all_rpms_entry_status(
         subject_id=subject_id, config_file=config_file
     )
@@ -215,8 +217,10 @@ def get_subject_form_completion_variables(
             if redcap_status == "":
                 continue
 
-            redcap_variable = f"{redcap_form_name}_complete"
-            visit_data[redcap_variable] = int(redcap_status)
+            if redcap_form_name is not None:
+                redcap_variable = f"{redcap_form_name}_complete"
+                visit_data[f"{redcap_variable}_rpms"] = int(rpms_status)
+                visit_data[redcap_variable] = int(redcap_status)
 
         if len(visit_data) > 0:
             insert_query = f"""
@@ -325,6 +329,11 @@ def process_subject(
             # only insert first row
             form_data = form_data.head(1)
 
+        if form_name == "current_pharmaceutical_treatment_floating_med_125":
+            form_data["chrpharm_date_mod"]  = form_data["LastModifiedDate"]
+        elif form_name == "current_pharmaceutical_treatment_floating_med_2650":
+            form_data["chrpharm_date_mod_2"] = form_data["LastModifiedDate"]
+
         for _, row in form_data.iterrows():
             visit = int(row["visit"])
             visit_redcap_event_name = constants.rpms_to_redcap_event[visit]
@@ -374,7 +383,7 @@ def process_subject(
             subject_queries.append(insert_query.strip())
     try:
         uncategorized_queries = get_subject_form_completion_variables(
-            subject_id=subject_id, config_file=config_file
+            subject_id=subject_id, config_file=config_file, cohort=subject_cohort
         )
     except ValueError as e:
         logger.error(f"Error linking form completion variables: {e}")
