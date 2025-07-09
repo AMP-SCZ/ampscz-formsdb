@@ -115,8 +115,10 @@ def handle_datetime(time_value: str) -> Optional[datetime]:
         else:
             raise ValueError(f"Unknown time format: {time_value}") from e
 
-    # If date is before 1990, return None
-    if datetime_val.year < 1990:
+    # If date is 1903, return None
+    if datetime_val.year == 1903:
+        return None
+    if datetime_val.year == 1909:
         return None
 
     # # Check if time is 09:09 (missing code)
@@ -222,14 +224,14 @@ def get_subject_medication_info(
                 continue
             med_idx_str: str = str(form_df[med_name_variable].iloc[0])
             med_idx_str = med_idx_str.replace(".0", "")
-            med_name = int(med_idx_str)
+            med_id = int(med_idx_str)
             # if med_name == 999:
             #     continue
             med_info = data.get_medication_info_by_id(
-                config_file=config_file, med_id=med_name
+                config_file=config_file, med_id=med_id
             )
             if med_info is None:
-                raise ValueError(f"Medication {med_name} not found in database")
+                raise ValueError(f"Medication {med_id} not found in database")
 
             # priorotize first dose as start date over onset date for start date
             first_dose_date_variable = f"chrpharm_firstdose_med{med_idx}"
@@ -253,7 +255,7 @@ def get_subject_medication_info(
                 # print(f"Missing start date for med {med_idx}: {subject_id}@{medication_form}")
                 pass
 
-            # similarly, prioritize last use date over offset date for end date
+            # similarly, prioritize offset date over last use date for end date
             last_use_date_variable = f"chrpharm_lastuse_med{med_idx}"
             offset_date_variable = f"chrpharm_med{med_idx}_offset"
             # form_modified_date_variable = "chrpharm_date_mod"
@@ -263,13 +265,13 @@ def get_subject_medication_info(
                 # form_modified_date_variable = f"{form_modified_date_variable}_past"
 
             end_date = None
-            if last_use_date_variable in form_df.columns:
-                end_date = form_df[last_use_date_variable].iloc[0]
+            if offset_date_variable in form_df.columns:
+                end_date = form_df[offset_date_variable].iloc[0]
                 end_date = remove_missing_codes(end_date)
                 if end_date is not None:
                     end_date = handle_datetime(end_date)
-            if end_date is None and offset_date_variable in form_df.columns:
-                end_date = form_df[offset_date_variable].iloc[0]
+            if end_date is None and last_use_date_variable in form_df.columns:
+                end_date = form_df[last_use_date_variable].iloc[0]
                 end_date = remove_missing_codes(end_date)
                 if end_date is not None:
                     end_date = handle_datetime(end_date)
@@ -338,7 +340,7 @@ def get_subject_medication_info(
                     med_indication = int(float(med_indication))
                 except ValueError:
                     logger.warning(
-                        f"Invalid indication code for med {med_idx} ({med_name}) in {medication_form} for subject {subject_id}: {med_indication}"
+                        f"Invalid indication code for med {med_idx} ({med_id}) in {medication_form} for subject {subject_id}: {med_indication}"
                     )
                     med_indication = None
                 if med_indication == 8:
@@ -371,33 +373,18 @@ def get_subject_medication_info(
                 med_dosage = float(med_dosage)
                 if med_dosage < 0:
                     logger.warning(
-                        f"Negative dosage for med {med_idx} ({med_name}: {med_dosage}) in {medication_form} for subject {subject_id}"
+                        f"Negative dosage for med {med_idx} ({med_id}: {med_dosage}) in {medication_form} for subject {subject_id}"
                     )
                     med_dosage = pd.NA
 
-            if start_date is not None and end_date is not None:
-                duration_days = (end_date - start_date).days
-            else:
-                duration_days = None
-
-            start_days_from_consent = None
-            end_days_from_consent = None
-            if start_date is not None:
-                start_days_from_consent = dpdash.get_days_between_dates(
-                    consent_date=subject_consent,
-                    event_date=start_date,
-                )
-                if start_date < subject_consent:
-                    start_days_from_consent = -start_days_from_consent
-            if end_date is not None:
-                end_days_from_consent = dpdash.get_days_between_dates(
-                    consent_date=subject_consent,
-                    event_date=end_date,
-                )
-                if end_date < subject_consent:
-                    end_days_from_consent = -end_days_from_consent
-
             # Check if medication is ongoing
+            ongoing = None
+            if end_date is not None and end_date.year == 1901:
+                # Placeholder for ongoing medication
+                ongoing = True
+                end_date = None
+                stopped_medication = False
+
             if "current_pharmaceutical_treatment" in medication_form:
                 # timpoint_added_variable = f"chrpharm_med{med_idx}_tp"
                 # timpoint_added = form_df[timpoint_added_variable].iloc[0]
@@ -405,7 +392,6 @@ def get_subject_medication_info(
 
                 months = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 18, 24]
 
-                ongoing = None
                 for month in months:
                     ongoing_variable = f"chrpharm_med{med_idx}_mo{month}"
                     if ongoing_variable in form_df.columns:
@@ -421,7 +407,7 @@ def get_subject_medication_info(
                 if ongoing is True:
                     stopped_medication = False
                     # logger.debug(
-                    #     f"Medication {med_idx} ({med_name}) in {medication_form} for subject {subject_id} is ongoing"
+                    #     f"Medication {med_idx} ({med_id}) in {medication_form} for subject {subject_id} is ongoing"
                     # )
                     # end_date = datetime(
                     #     1606, 6, 6
@@ -445,10 +431,33 @@ def get_subject_medication_info(
             else:
                 last_visit_interest = None
 
+            start_days_from_consent = None
+            end_days_from_consent = None
+            if start_date is not None:
+                start_days_from_consent = dpdash.get_days_between_dates(
+                    consent_date=subject_consent,
+                    event_date=start_date,
+                )
+                if start_date < subject_consent:
+                    start_days_from_consent = -start_days_from_consent
+            if end_date is not None:
+                end_days_from_consent = dpdash.get_days_between_dates(
+                    consent_date=subject_consent,
+                    event_date=end_date,
+                )
+                if end_date < subject_consent:
+                    end_days_from_consent = -end_days_from_consent
+
+            if start_date is not None and end_date is not None:
+                duration_days = (end_date - start_date).days
+            else:
+                duration_days = None
+
             raw_data = {
                 "subject_id": subject_id,
                 "source_form": medication_form,
-                "med_idx": med_name,
+                "med_idx": med_idx,
+                "med_id": med_id,
                 "med_name": med_info["med_name"],
                 "med_class": med_info["med_class"],
                 "med_indication": med_indication_str,
