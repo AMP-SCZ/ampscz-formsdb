@@ -368,7 +368,15 @@ def df_to_table(
         if_exists (Literal["fail", "replace", "append"], optional): What to do
             if the table already exists.
     """
+    # If replace, TRUNCATE and append
+    if if_exists == "replace":
+        # Truncate the table before appending
+        logging.info(f"Truncating table {schema}.{table_name} before appending data.")
+        query = f"TRUNCATE TABLE {schema}.{table_name};"
+        execute_queries(config_file, [query], silent=True)
+        if_exists = "append"
 
     engine = get_db_connection(config_file=config_file)
+
     df.to_sql(table_name, engine, schema=schema, if_exists=if_exists, index=False)
     engine.dispose()
