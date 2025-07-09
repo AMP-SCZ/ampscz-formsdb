@@ -139,7 +139,7 @@ import_client_status_raw = BashOperator(
     bash_command=PYTHON_PATH
     + " "
     + REPO_ROOT
-    + "/formsdb/runners/imports/import_rpms_client_status_war.py",
+    + "/formsdb/runners/imports/import_rpms_client_status_raw.py",
     dag=dag,
     cwd=REPO_ROOT,
     task_group=rpms_imports_task_group,
