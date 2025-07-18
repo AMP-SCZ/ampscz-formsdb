@@ -23,7 +23,7 @@ except ValueError:
 
 import logging
 import multiprocessing
-from typing import Dict, List, Tuple, Any
+from typing import Dict, List, Tuple, Any, Optional
 
 import pandas as pd
 from rich.logging import RichHandler
@@ -47,7 +47,9 @@ logging.basicConfig(**logargs)
 required_variables: List[str] = []
 
 
-def subject_has_a_valid_baseline_form_data(subject_id: str, config_file: Path) -> bool:
+def subject_has_a_valid_baseline_form_data(
+    subject_id: str, config_file: Path
+) -> Tuple[bool, Optional[List[str]]]:
     """
     Check if a subject has any valid baseline form data.
 
@@ -59,6 +61,7 @@ def subject_has_a_valid_baseline_form_data(subject_id: str, config_file: Path) -
 
     Returns:
         True if the subject has any valid baseline form data, otherwise False
+        List of valid forms if any, otherwise None
     """
     recruited_status_baseline_form_requirements: List[str] = [
         "scid5_psychosis_mood_substance_abuse",
@@ -92,8 +95,9 @@ def subject_has_a_valid_baseline_form_data(subject_id: str, config_file: Path) -
             config_file=config_file, subject_id=subject_id, event_name="baseline"
         )
     except ValueError:
-        return False
+        return False, None
 
+    completed_baseline_forms: List[str] = []
     for required_form in recruited_status_baseline_form_requirements:
         is_missing = data.form_has_missing_data(
             config_file=config_file,
@@ -116,59 +120,15 @@ def subject_has_a_valid_baseline_form_data(subject_id: str, config_file: Path) -
             is_complete = False
 
         if is_complete and not is_missing:
-            return True
+            completed_baseline_forms.append(required_form)
 
-    return False
+    completed_baseline_forms = sorted(completed_baseline_forms)
 
-
-def subject_completed_sociodemographics(subject_id: str, config_file: Path) -> bool:
-    """
-    Check if a subject has completed the sociodemographics form.
-
-    Args:
-        subject_id: The subject ID
-        config_file: The path to the config file
-
-    Returns:
-        True if the subject has completed the sociodemographics form, otherwise False
-    """
-
-    form_name = "sociodemographics"
-    event_name = "baseline"
-
-    try:
-        form_status = data.get_all_form_status_for_event(
-            config_file=config_file, subject_id=subject_id, event_name=event_name
-        )
-    except ValueError:
-        return False
-    complete_variable = f"{form_name}_complete"
-
-    if complete_variable in form_status:
-        completion_status = form_status[complete_variable]
-        if completion_status == 2:
-            # Check if the form has missing data
-            is_missing = data.form_has_missing_data(
-                config_file=config_file,
-                subject_id=subject_id,
-                form_name=form_name,
-                event_name=event_name,
-            )
-            if not is_missing:
-                return True
-            else:
-                # Form marked complete but has missing data
-                return False
-        else:
-            # Form not marked complete
-            return False
-    else:
-        # Form does not have a complete variable
-        return False
+    return bool(completed_baseline_forms), completed_baseline_forms
 
 
 # Define the worker function
-def worker(params: Tuple[str, Path]) -> Dict[str, str | bool | None]:
+def worker(params: Tuple[str, Path]) -> Dict[str, Any]:
     """
     Worker function to process the data for a single subject.
 
@@ -182,9 +142,13 @@ def worker(params: Tuple[str, Path]) -> Dict[str, str | bool | None]:
     )
     included = data.subject_is_included(subject_id=subject_id, config_file=config_file)
     excluded = data.subject_is_excluded(subject_id=subject_id, config_file=config_file)
-    converted = data.fetch_subject_converted(subject_id=subject_id, config_file=config_file)
-    valid_baseline_form_data = subject_has_a_valid_baseline_form_data(
+    converted = data.fetch_subject_converted(
         subject_id=subject_id, config_file=config_file
+    )
+    has_valid_baseline_form_data, completed_baseline_forms = (
+        subject_has_a_valid_baseline_form_data(
+            subject_id=subject_id, config_file=config_file
+        )
     )
 
     # Positive screen: Has consent date + is Included
@@ -200,7 +164,7 @@ def worker(params: Tuple[str, Path]) -> Dict[str, str | bool | None]:
     if converted:
         recruited = True
     else:
-        recruited = positive_screen and valid_baseline_form_data
+        recruited = positive_screen and has_valid_baseline_form_data
 
     subject_status = None
     if consented:
@@ -278,6 +242,7 @@ def worker(params: Tuple[str, Path]) -> Dict[str, str | bool | None]:
         "recruited": recruited,
         "recruitment_status": subject_status,
         "recruitment_status_v2": recruitmest_status_v2,
+        "completed_baseline_forms": completed_baseline_forms,
     }
 
 
