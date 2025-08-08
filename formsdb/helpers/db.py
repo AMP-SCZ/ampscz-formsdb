@@ -95,10 +95,10 @@ def check_if_subject_upenn_data_exists(
     WHERE subject_id = '{subject_id}'
     """
 
-    source_m_date = fetch_record(config_file, query)
+    source_m_date = fetch_record(config_file, query)  # type: ignore
 
     if source_m_date is not None:
-        source_m_date = datetime.strptime(source_m_date, "%Y-%m-%d %H:%M:%S")
+        source_m_date = datetime.strptime(source_m_date, "%Y-%m-%d %H:%M:%S")  # type: ignore
         if source_m_date == source_m_date:
             return True
 

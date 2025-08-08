@@ -434,6 +434,7 @@ def get_subject_age(config_file: Path, subject_id: str) -> Optional[int]:
     """
 
     variables: List[str] = ["chrdemo_age_mos_chr", "chrdemo_age_mos_hc", "chrdemo_age_mos2"]
+    age: Optional[int] = None
 
     for variable in variables:
         query = f"""
@@ -444,7 +445,7 @@ def get_subject_age(config_file: Path, subject_id: str) -> Optional[int]:
             form_data ? '{variable}';
         """
 
-        age = db.fetch_record(config_file=config_file, query=query)
+        age = db.fetch_record(config_file=config_file, query=query)  # type: ignore
 
         if age is not None:
             break
