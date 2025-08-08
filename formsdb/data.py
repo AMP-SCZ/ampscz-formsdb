@@ -887,15 +887,8 @@ def rpms_form_has_missing_data(
     if status_form_df.empty:
         return None
 
-    status = status_form_df["CompletionStatus"].iloc[0]
-
-    # RMPS completion status
-    # 0: Incomplete
-    # 1: Partial
-    # 2: Complete
-    # 3: N/A
-    # 4: Missing
-    if status == 4 or status == 3:
+    # Check if any row has CompletionStatus == 3 or 4
+    if (status_form_df["CompletionStatus"].isin([3, 4])).any():
         return True
 
     return False
