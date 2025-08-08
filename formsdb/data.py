@@ -393,7 +393,7 @@ def get_subject_consent_dates(config_file: Path, subject_id: str) -> datetime:
     date = db.fetch_record(config_file=config_file, query=query)
 
     if date is None:
-        raise NoSubjectConsentDateException("No consent date found in the database.")
+        raise NoSubjectConsentDateException(f"{subject_id}: No consent date found in the database.")
 
     try:
         date = datetime.strptime(date, "%Y-%m-%dT%H:%M:%S")
