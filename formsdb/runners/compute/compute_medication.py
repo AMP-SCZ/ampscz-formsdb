@@ -200,7 +200,10 @@ def get_subject_medication_info(
                 form_modified_date = form_df[form_modified_date_var].iloc[0]
             except KeyError:
                 logger.warning(
-                    f"Missing modified date variable {form_modified_date_var} for {medication_form} for subject {subject_id}"
+                    f"Missing modified date variable "
+                    f"{form_modified_date_var} for "
+                    f"{medication_form} for subject "
+                    f"{subject_id}"
                 )
                 form_modified_date = None
             form_modified_date = remove_missing_codes(form_modified_date)
@@ -423,7 +426,11 @@ def get_subject_medication_info(
                 if ongoing is True:
                     stopped_medication = False
                     # logger.debug(
-                    #     f"Medication {med_idx} ({med_id}) in {medication_form} for subject {subject_id} is ongoing"
+                    #     f"Medication {med_idx} "
+                    #     f"({med_id}) in "
+                    #     f"{medication_form} "
+                    #     f"for subject {subject_id} "
+                    #     f"is ongoing"
                     # )
                     # end_date = datetime(
                     #     1606, 6, 6
