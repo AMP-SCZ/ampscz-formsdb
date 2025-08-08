@@ -234,6 +234,12 @@ def get_subject_form_completion_variables(
             """
             sql_queries.append(insert_query)
 
+    if len(sql_queries) == 0:
+        logger.warning(
+            f"No form completion variables found for subject {subject_id} "
+            f"- number of visits: {len(visits)}"
+        )
+
     return sql_queries
 
 
@@ -266,22 +272,31 @@ def process_subject(
 
     if not inclusionexclusion_criteria_review_path.exists():
         # inclusionexclusion_criteria_review form not found.
-        return {
-            "subject_id": subject_id,
-            "queries": [],
-        }
-
-    inclusionexclusion_criteria_review_data = pd.read_csv(
-        inclusionexclusion_criteria_review_path, dtype=str, keep_default_na=False
-    )
-    chrcrit_part = inclusionexclusion_criteria_review_data["chrcrit_part"].iloc[0]
-    arm = f"arm_{chrcrit_part}"
+        # logger.warning(
+        #     f"Inclusion/Exclusion Criteria Review form not found for subject {subject_id}"
+        # )
+        subject_cohort: Optional[str] = None
+        arm: Optional[int] = None
+    else:
+        inclusionexclusion_criteria_review_data = pd.read_csv(
+            inclusionexclusion_criteria_review_path, dtype=str, keep_default_na=False
+        )
+        chrcrit_part = int(inclusionexclusion_criteria_review_data["chrcrit_part"].iloc[0])
+        if chrcrit_part == 1:
+            subject_cohort = "CHR"
+            arm = 1
+        elif chrcrit_part == 2:
+            subject_cohort = "HC"
+            arm = 2
+        else:
+            raise ValueError(
+                f"Unknown chrcrit_part value: {chrcrit_part} for subject {subject_id}"
+            )
 
     subject_drop_query = f"DELETE FROM forms.forms WHERE subject_id = '{subject_id}'"
     insert_subject_query = export_subject(subject_id)
     subject_queries.append(subject_drop_query.strip())
     subject_queries.append(insert_subject_query.strip())
-    subject_cohort: Optional[str] = None
 
     for form_name, suffix in constants.form_name_to_rpms_suffix.items():
         form_path = subject_surveys_root / f"{subject_id}_{suffix}"
@@ -307,13 +322,16 @@ def process_subject(
                 "chric_consent_date"
             ].dt.strftime("%d/%m/%Y %I:%M:%S %p")
 
-            subject_cohort = form_data["group"].iloc[0]
-            if subject_cohort == "UHR":
-                subject_cohort = "CHR"
-            elif subject_cohort == "HealthyControl":
-                subject_cohort = "HC"
-            else:
-                raise ValueError(f"{form_name} - Unknown cohort: {subject_cohort}")
+            if subject_cohort is None:
+                subject_cohort = form_data["group"].iloc[0]
+                if subject_cohort == "UHR":
+                    subject_cohort = "CHR"
+                    arm = 1
+                elif subject_cohort == "HealthyControl":
+                    subject_cohort = "HC"
+                    arm = 2
+                else:
+                    raise ValueError(f"{form_name} - Unknown cohort: {subject_cohort}")
 
             form_data["chric_record_id"] = subject_id
 
@@ -372,7 +390,7 @@ def process_subject(
                 variables_without_data,
                 total_variables,
                 percent_complete
-            ) VALUES ('{subject_id}', '{form_name}', '{visit_redcap_event_name}_{arm}',
+            ) VALUES ('{subject_id}', '{form_name}', '{visit_redcap_event_name}_arm_{arm}',
                 '{db.sanitize_json(slim_visit_data)}', '{source_m_date}',
                 {form_metadata['variables_with_data']},
                 {form_metadata['variables_without_data']},
@@ -386,11 +404,9 @@ def process_subject(
             subject_id=subject_id, config_file=config_file, cohort=subject_cohort
         )
     except ValueError as e:
-        logger.error(f"Error linking form completion variables: {e}")
-        return {
-            "subject_id": subject_id,
-            "queries": subject_queries,
-        }
+        logger.error(f"Error linking form completion variables for subject {subject_id}: {e}")
+        uncategorized_queries = []
+
     subject_queries.extend(uncategorized_queries)
 
     result = {
