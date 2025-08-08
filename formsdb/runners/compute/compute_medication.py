@@ -158,9 +158,12 @@ def get_subject_medication_info(
     """
     subject_medication_data: List[Dict[str, Any]] = []
 
-    subject_consent = data.get_subject_consent_dates(
-        subject_id=subject_id, config_file=config_file
-    )
+    try:
+        subject_consent = data.get_subject_consent_dates(
+            subject_id=subject_id, config_file=config_file
+        )
+    except data.NoSubjectConsentDateException:
+        return subject_medication_data
 
     for medication_form in medication_forms:
         form_event_name = "floating_forms"
