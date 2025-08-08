@@ -37,7 +37,7 @@ dag = DAG(
     "ampscz_forms_db_import",
     default_args=default_args,
     description="DAG for AMPSCZ forms database Import",
-    schedule="0 18 * * *",
+    schedule="0 20 * * *",
 )
 
 info = BashOperator(
@@ -100,6 +100,17 @@ import_harmonized_jsons = BashOperator(
 # RPMS SPecific Imports
 rpms_imports_task_group = TaskGroup("rpms_csvs", dag=dag)
 
+import_rpms_entry_status = BashOperator(
+    task_id="import_rpms_entry_status",
+    bash_command=PYTHON_PATH
+    + " "
+    + REPO_ROOT
+    + "/formsdb/runners/imports/import_rpms_entry_status.py",
+    dag=dag,
+    cwd=REPO_ROOT,
+    task_group=rpms_imports_task_group,
+)
+
 import_rpms_csvs = BashOperator(
     task_id="import_rpms_csvs",
     bash_command=PYTHON_PATH
@@ -110,17 +121,6 @@ import_rpms_csvs = BashOperator(
     cwd=REPO_ROOT,
     task_group=rpms_imports_task_group,
     pool_slots=16,
-)
-
-import_rpms_entry_status = BashOperator(
-    task_id="import_rpms_entry_status",
-    bash_command=PYTHON_PATH
-    + " "
-    + REPO_ROOT
-    + "/formsdb/runners/imports/import_rpms_entry_status.py",
-    dag=dag,
-    cwd=REPO_ROOT,
-    task_group=rpms_imports_task_group,
 )
 
 import_client_status = BashOperator(
@@ -162,9 +162,10 @@ import_form_qc = BashOperator(
 # Start DAG construction
 info.set_downstream(import_data_dictionary)
 
-info.set_downstream(import_rpms_csvs)
 info.set_downstream(import_rpms_entry_status)
 info.set_downstream(import_client_status)
+
+import_rpms_entry_status.set_downstream(import_rpms_csvs)
 
 import_client_status.set_downstream(import_client_status_raw)
 
@@ -196,7 +197,6 @@ all_imports_done = EmptyOperator(
 )
 
 import_form_qc.set_downstream(all_imports_done)
-import_rpms_entry_status.set_downstream(all_imports_done)
 import_client_status_raw.set_downstream(all_imports_done)
 import_harmonized_jsons.set_downstream(all_imports_done)
 import_upenn_jsons.set_downstream(all_imports_done)
