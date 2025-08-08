@@ -337,35 +337,43 @@ def get_subject_medication_info(
             med_indication_variable = f"chrpharm_med{med_idx}_indication"
             if medication_form == "past_pharmaceutical_treatment":
                 med_indication_variable = f"{med_indication_variable}_past"
+
+            med_indication_str = None
+            med_indication = None
             if med_indication_variable in form_df.columns:
                 med_indication = form_df[med_indication_variable].iloc[0]
                 try:
                     med_indication = int(float(med_indication))
-                except ValueError:
+                except (ValueError, TypeError):
                     logger.warning(
-                        f"Invalid indication code for med {med_idx} ({med_id}) in {medication_form} for subject {subject_id}: {med_indication}"
+                        f"Invalid indication code for med {med_idx} "
+                        f"({med_id}) in {medication_form} "
+                        f"for subject {subject_id}: "
+                        f"{med_indication}"
                     )
                     med_indication = None
-                if med_indication == 8:
-                    med_indication_variable = f"chrpharm_med{med_idx}_other2"
-                    if medication_form == "past_pharmaceutical_treatment":
-                        med_indication_variable = f"{med_indication_variable}_past"
 
-                    if med_indication_variable in form_df.columns:
-                        med_indication_str = form_df[med_indication_variable].iloc[0]
-                    else:
-                        med_indication_str = None
-                else:
-                    if med_indication is not None:
-                        med_indication_str = data.get_dictionary_choice(
-                            config_file=config_file,
-                            variable_name=med_indication_variable,
-                            choice=med_indication,
-                        )
-                    else:
-                        med_indication_str = None
+                if med_indication is not None:
+                    med_indication_str = data.get_dictionary_choice(
+                        config_file=config_file,
+                        variable_name=med_indication_variable,
+                        choice=med_indication,
+                    )
+
+            # Free-text indication comment
+            med_indication_comment_variable = f"chrpharm_med{med_idx}_other2"
+            if medication_form == "past_pharmaceutical_treatment":
+                med_indication_comment_variable = (
+                    f"{med_indication_comment_variable}_past"
+                )
+
+            if med_indication_comment_variable in form_df.columns:
+                med_indication_comment = form_df[med_indication_comment_variable].iloc[
+                    0
+                ]
+                med_indication_comment = remove_missing_codes(med_indication_comment)
             else:
-                med_indication_str = None
+                med_indication_comment = None
 
             med_dosage = remove_missing_codes(med_dosage)
             med_compliance = remove_missing_codes(med_compliance)
@@ -376,7 +384,12 @@ def get_subject_medication_info(
                 med_dosage = float(med_dosage)
                 if med_dosage < 0:
                     logger.warning(
-                        f"Negative dosage for med {med_idx} ({med_id}: {med_dosage}) in {medication_form} for subject {subject_id}"
+                        (
+                            f"Negative dosage for med {med_idx} "
+                            f"({med_id}: {med_dosage}) in "
+                            f"{medication_form} for subject "
+                            f"{subject_id}"
+                        )
                     )
                     med_dosage = pd.NA
 
@@ -464,6 +477,7 @@ def get_subject_medication_info(
                 "med_name": med_info["med_name"],
                 "med_class": med_info["med_class"],
                 "med_indication": med_indication_str,
+                "med_indication_comment": med_indication_comment,
                 "med_dosage": med_dosage,
                 "start_date": start_date,
                 "end_date": end_date,
