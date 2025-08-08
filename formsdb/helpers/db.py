@@ -17,6 +17,7 @@ import pymongo.database as database
 import sqlalchemy
 from rich.console import Console
 from sqlalchemy.exc import OperationalError
+from psycopg2.errors import UndefinedTable
 
 from formsdb.helpers import utils
 from formsdb.helpers.config import config
@@ -370,11 +371,14 @@ def df_to_table(
     """
     # If replace, TRUNCATE and append
     if if_exists == "replace":
-        # Truncate the table before appending
-        logging.info(f"Truncating table {schema}.{table_name} before appending data.")
-        query = f"TRUNCATE TABLE {schema}.{table_name};"
-        execute_queries(config_file, [query], silent=True)
-        if_exists = "append"
+        try:
+            # Truncate the table before appending
+            logging.info(f"Truncating table {schema}.{table_name} before appending data.")
+            query = f"TRUNCATE TABLE {schema}.{table_name};"
+            execute_queries(config_file, [query], silent=True)
+            if_exists = "append"
+        except UndefinedTable:
+            logging.info(f"Table {schema}.{table_name} does not exist. Creating new table.")
 
     engine = get_db_connection(config_file=config_file)
 
