@@ -23,8 +23,8 @@ except ValueError:
 
 import logging
 import multiprocessing
-
-# import random
+import math
+import random
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple, Union, Set
 
@@ -249,6 +249,89 @@ def get_medication_duaraion_i(
     return complied_avg_dosage, avg_dosage, duration
 
 
+def is_medication_ongoing(
+    medication_df: pd.DataFrame,
+    target_medication_idx: str,
+    target_date: Union[str, datetime],
+) -> Optional[bool]:
+    """
+    Check if a medication is ongoing at the target date.
+
+    Args:
+        medication_df (pd.DataFrame): DataFrame containing medication information.
+        target_medication_idx (str): Target medication index.
+        target_date (Union[str, datetime]): Target date to check medication status.
+
+    Returns:
+        Optional[bool]: True if the medication is ongoing, False if not, None if not found.
+    """
+    target_date = pd.to_datetime(target_date)
+    med_records = medication_df[medication_df["med_id"] == target_medication_idx].copy()
+
+    if med_records.empty:
+        return None
+
+    med_records["start_date"] = pd.to_datetime(med_records["start_date"])
+    med_records["end_date"] = pd.to_datetime(med_records["end_date"])
+
+    # If a medication is explicitly marked as not stopped (0), its end_date is irrelevant.
+    med_records.loc[med_records["stopped_medication"] == 0, "end_date"] = pd.NaT
+
+    started_by_target = med_records["start_date"] <= target_date
+    not_ended_by_target = (med_records["end_date"].isna()) | (
+        med_records["end_date"] >= target_date
+    )
+
+    is_ongoing = (started_by_target & not_ended_by_target).any()
+
+    return bool(is_ongoing)
+
+
+def date_last_taken(
+    medication_df: pd.DataFrame,
+    target_medication_idx: str,
+    target_date: Union[str, datetime],
+) -> Optional[datetime]:
+    """
+    Get the last date a medication was taken before the target date.
+    Args:
+        medication_df (pd.DataFrame): DataFrame containing medication information.
+        target_medication_idx (str): Target medication index.
+        target_date (Union[str, datetime]): Target date to check medication status.
+    Returns:
+        Optional[datetime]: The last date the medication was taken before the target date,
+            or None if not found.
+    """
+
+    target_date = pd.to_datetime(target_date)
+    med_records = medication_df[medication_df["med_id"] == int(target_medication_idx)].copy()
+
+    if med_records.empty:
+        return None
+
+    med_records["start_date"] = pd.to_datetime(med_records["start_date"])
+    med_records["end_date"] = pd.to_datetime(med_records["end_date"])
+
+    # If a medication is explicitly marked as not stopped (0), its end_date is irrelevant.
+    med_records.loc[med_records["stopped_medication"] == 0, "end_date"] = pd.NaT
+
+    # Filter records that started before the target date and ended before the target date
+    valid_records = med_records[
+        (med_records["start_date"] <= target_date)
+        & ((med_records["end_date"].isna()) | (med_records["end_date"] < target_date))
+    ]
+
+    if valid_records.empty:
+        return None
+
+    last_taken_dates = valid_records["end_date"].dropna()
+
+    if last_taken_dates.empty:
+        return None
+
+    return last_taken_dates.max()
+
+
 # Check missing codes
 def remove_missing_codes(value):
     """
@@ -295,12 +378,11 @@ def get_subject_medication_effect_info(
         ]
         if temp_medication_data.empty:
             # Subject has no medications except for 999
-            pass
-            # # Subject has no medications
             # logger.warning(
             #     f"Subject {subject_id} has no medications. Skipping."
             # )
             # return subject_results
+            pass
         else:
             logger.warning(
                 f"Subject {subject_id} has other medications despite med_id=999 presence. \
@@ -333,8 +415,8 @@ Removing 999."
         lifetime_use_inconclusive = True
         # logger.warning(
         #     f"Subject {subject_id} has taken medication with med_id 777 or 888. \
-    # Lifetime use inconclusive since {inconclusive_meds_start_date}."
-    # )
+        # Lifetime use inconclusive since {inconclusive_meds_start_date}."
+        # )
     else:
         lifetime_use_inconclusive = False
         inconclusive_meds_start_date = None
@@ -348,7 +430,7 @@ Removing 999."
         time_variable = modalities_info[modality].get("time_variable", None)
 
         for timepoint in timepoints:
-            # print(f"Processing modality: {modality} - Timepoint: {timepoint}")
+            # logger.debug(f"Processing modality: {modality} - Timepoint: {timepoint}")
             subject_date = None
             if isinstance(date_variables, list):
                 for date_variable in date_variables:
@@ -408,9 +490,9 @@ Removing 999."
                 days_from_consent = (subject_date_dt - subject_consent_date).days + 1
 
             if subject_date_dt is None:
-                # print(f"Skipping {modality} - {timepoint} for {subject_id}")
+                # logger.warning(f"Skipping {modality} - {timepoint} for {subject_id}")
                 continue
-            # print(f"Processing {modality} - {timepoint} for {subject_id} on {subject_date_dt}")
+            # logger.warning(f"Processing {modality} - {timepoint} for {subject_id} on {subject_date_dt}")
             currently_taking, potential_currently_taking, taken_before = (
                 get_medication_status(
                     medication_df=subject_medication_data, target_date=subject_date_dt
@@ -439,6 +521,26 @@ Removing 999."
                     target_medication_idx=med_idx,
                     target_date=subject_date_dt,
                 )
+                is_ongoing = is_medication_ongoing(
+                    medication_df=subject_medication_data,
+                    target_medication_idx=med_idx,
+                    target_date=subject_date_dt,
+                )
+
+                if is_ongoing:
+                    days_since_last_taken = 0
+                else:
+                    last_taken_date = date_last_taken(
+                        medication_df=subject_medication_data,
+                        target_medication_idx=med_idx,
+                        target_date=subject_date_dt,
+                    )
+                    if last_taken_date is None:
+                        days_since_last_taken = pd.NA
+                    else:
+                        days_since_last_taken = (
+                            subject_date_dt - last_taken_date
+                        ).days
 
                 if result is None:
                     complied_dosage, dosage_prescribed, duration_prescribed = (
@@ -486,7 +588,7 @@ Removing 999."
                                 * duration_prescribed
                             )
                         else:
-                            # print(f"Missing AP Standard Equivalent Drug Dose for {med_idx}")
+                            # logger.warning(f"Missing AP Standard Equivalent Drug Dose for {med_idx}")
                             ap_equivalent_drug_dose_prescribed = pd.NA
                             ap_equivalent_drug_dose_taken = pd.NA
                     else:
@@ -498,13 +600,9 @@ Removing 999."
                         # Get first word
                         ad_med_name = ad_med_name.split("/")[0].lower()
                         ad_med_name = ad_med_name.split(" ")[0]
-                        ad_standard_equivalent_drug_dose = (
-                            constants
-                            .antidepressant_fluoxetine_40mg_drug_equivalent_dose
-                            .get(
-                                ad_med_name,
-                                None,
-                            )
+                        ad_standard_equivalent_drug_dose = constants.antidepressant_fluoxetine_40mg_drug_equivalent_dose.get(
+                            ad_med_name,
+                            None,
                         )
                         if ad_standard_equivalent_drug_dose is not None:
                             prescribed_eq_dosage_for_day = dosage_prescribed * (
@@ -525,7 +623,7 @@ Removing 999."
                                 * duration_prescribed
                             )
                         else:
-                            # print(f"Missing AD Standard Equivalent Drug Dose for {ad_med_name}")
+                            # logger.warning(f"Missing AD Standard Equivalent Drug Dose for {ad_med_name}")
                             ad_equivalent_drug_dose_prescribed = pd.NA
                             ad_equivalent_drug_dose_taken = pd.NA
                     else:
@@ -537,10 +635,8 @@ Removing 999."
                         # Get first word
                         bd_med_name = bd_med_name.split("/")[0].lower()
                         bd_med_name = bd_med_name.split(" ")[0]
-                        bd_standard_equivalent_drug_dose = (
-                            constants.benzodiazepine_diazepam_5mg_drug_equivalent_dose.get(
-                                bd_med_name, None
-                            )
+                        bd_standard_equivalent_drug_dose = constants.benzodiazepine_diazepam_5mg_drug_equivalent_dose.get(
+                            bd_med_name, None
                         )
                         if bd_standard_equivalent_drug_dose is not None:
                             prescribed_eq_dosage_for_day = dosage_prescribed * (
@@ -561,7 +657,7 @@ Removing 999."
                                 * duration_prescribed
                             )
                         else:
-                            print(
+                            logger.warning(
                                 f"Missing BD Standard Equivalent Drug Dose for {bd_med_name}"
                             )
                             bd_equivalent_drug_dose_prescribed = pd.NA
@@ -603,6 +699,8 @@ Removing 999."
                         "med_id": med_idx,
                         "med_name": med_info[int(med_idx)]["med_name"],
                         "med_class": med_class,
+                        "is_ongoing": is_ongoing,
+                        "days_since_last_taken": days_since_last_taken,
                         "ap_equivalent_drug_dose_prescribed": ap_equivalent_drug_dose_prescribed,
                         "ap_equivalent_drug_dose_taken": ap_equivalent_drug_dose_taken,
                         "ad_equivalent_drug_dose_prescribed": ad_equivalent_drug_dose_prescribed,
@@ -619,8 +717,8 @@ Removing 999."
                     }
                     subject_results.append(result)
                 except Exception as e:
-                    print(f"Error: {e}")
-                    print(f"subject_id: {subject_id}")
+                    logger.error(f"Error: {e}")
+                    logger.error(f"subject_id: {subject_id}")
                     raise e
 
     return subject_results
@@ -651,10 +749,14 @@ def compile_medication_effects(
     """
     medication_effect_raw_data: List[Dict[str, Any]] = []
 
-    subjects = data.get_all_subjects(config_file=config_file)
+    all_subjects = data.get_all_subjects(config_file=config_file)
 
-    # max_count = 25
-    # subjects = random.sample(subjects, min(max_count, len(subjects)))
+    subjects = all_subjects
+    # max_count = math.floor(0.1 * len(all_subjects))
+    # subjects = random.sample(all_subjects, min(max_count, len(all_subjects)))
+    # logger.warning(
+    #     f"Randomly selected {len(subjects)} subjects for processing (out of {len(all_subjects)} total subjects)."
+    # )
 
     num_processes = multiprocessing.cpu_count() // 4
     logger.info(f"Using {num_processes} processes for parallel computation.")
