@@ -258,6 +258,7 @@ def check_if_removed_redcap(
     form_names = ["status_form", "uncategorized"]
     event_name = "floating_forms"
 
+    result = None
     # Legacy Form
     for form_name in form_names:
         query = f"""
@@ -302,9 +303,7 @@ def check_if_removed_redcap(
 
         result = db.fetch_record(config_file=config_file, query=query)
 
-    if result is None:
-        return None
-    else:
+    if result is not None:
         try:
             result_dt = datetime.strptime(result, "%Y-%m-%d")
             withdrawn_timepoint = data.get_closest_timepoint(
@@ -314,6 +313,30 @@ def check_if_removed_redcap(
                 return withdrawn_timepoint, "withdrawn", result_dt
         except ValueError:
             logger.error(f"{subject_id}: Could not parse date: {result}")
+            return None
+    else:
+        # Check if screen fail
+        variable = "chr_statusform_screenfail"
+        form_name = "revised_status_form"
+        event_name = "floating_forms"
+
+        query = f"""
+        SELECT
+            form_data ->> '{variable}' AS screen_fail
+        FROM
+            forms.forms
+        WHERE
+            subject_id = '{subject_id}'
+            AND form_name = '{form_name}'
+            AND event_name LIKE '%%{event_name}%%'
+            AND form_data ? '{variable}';
+        """
+        result = db.fetch_record(config_file=config_file, query=query)
+        result_dt = None
+        if result is not None and result == "1":
+            # If screen fail, we return screening as the event
+            return "screening", "screen_fail", result_dt
+        else:
             return None
 
     return "uncategorized", "withdrawn", result_dt
@@ -347,16 +370,16 @@ def get_subject_removed_status(
         )
         removed_info_source = "client_status"
     else:
-        removed_r = check_if_removed(
-            subject_id=subject_id, visit_order=visit_order, config_file=config_file
-        )
-        removed_info_source = "missing_data_form"
-
-        if removed_r is None:
-            removed_r = check_if_removed_redcap(
+        removed_r = check_if_removed_redcap(
                 subject_id=subject_id, config_file=config_file
             )
-            removed_info_source = "floating_forms(statusform_withdrawal)"
+        removed_info_source = "floating_forms(statusform_withdrawal)"
+
+        if removed_r is None:
+            removed_r = check_if_removed(
+                subject_id=subject_id, visit_order=visit_order, config_file=config_file
+            )
+            removed_info_source = "missing_data_form"
 
     if removed_r is None:
         removed_event = np.nan
