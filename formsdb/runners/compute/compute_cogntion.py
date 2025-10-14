@@ -541,7 +541,7 @@ def process_data(config_file: Path) -> None:
     subject_ids = subject_id_df["subject_id"].tolist()
 
     subjects_count = len(subject_ids)
-    logger.info(f"Exporting data for {subjects_count} subjects...")
+    logger.info(f"Computing data for {subjects_count} subjects...")
 
     sql_queries: List[str] = []
     with utils.get_progress_bar() as progress:
