@@ -1,0 +1,12 @@
+[project]
+name = "ampscz-formsdb"
+version = "0.1.0"
+description = "Scripts that help build and maintain the AMPS-CZ Forms Database"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "apache-airflow>=3.1.0",
+    "pandas>=2.3.3",
+    "psycopg2-binary>=2.9.11",
+    "rich>=14.2.0",
+]
