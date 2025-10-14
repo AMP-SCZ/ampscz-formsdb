@@ -164,7 +164,7 @@ form_name_to_date_variable_overrides: Dict[str, str] = {
     "lifetime_ap_exposure_screen": "chrap_date",
     "informed_consent_run_sheet": "chric_consent_date",
     "inclusionexclusion_criteria_review": "chrcrit_date",
-    "psychs_p9ac32": None,
+    "psychs_p9ac32": None,  # type: ignore
     "sofas_followup": "chrsofas_interview_date_fu",
 }
 
@@ -286,7 +286,7 @@ form_name_to_rpms_suffix: Dict[str, str] = {
     "global_functioning_social_scale_followup": "global_functioning_social_scale_followup.csv",
     "guid_form": "guid_form.csv",
     "health_conditions_genetics_fluid_biomarkers": "health_conditions_genetics_fluid_biomarkers.csv",
-    "health_conditions_medicalpsychiatric_history": "_health_conditions_medical_historypsychiatric_histo.csv.flat",
+    "health_conditions_medicalpsychiatric_history": "health_conditions_medical_historypsychiatric_histo.csv.flat",
     "inclusionexclusion_criteria_review": "inclusionexclusion_criteria_review.csv",
     # 'informed_reconsent',
     "iq_assessment_wasiii_wiscv_waisiv": "iq_assessment_wasiii_wiscv_waisiv.csv",
@@ -360,6 +360,7 @@ rpms_entry_status_map: Dict[int, str] = {
     4: "Missing",
 }
 
+# Antipsychotic medication equivalent doses to ?
 med_idx_drug_equivalent_dose: Dict[int, float] = {
     238: 1875,  # Amisulpride (Solian)  # 'amisulpride/Solian'
     305: 187.5,  # Aripiprazole (Abilitat, Abilify)  # 'aripiprazole/Abilify'
