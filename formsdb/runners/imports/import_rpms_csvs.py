@@ -293,11 +293,6 @@ def process_subject(
                 f"Unknown chrcrit_part value: {chrcrit_part} for subject {subject_id}"
             )
 
-    subject_drop_query = f"DELETE FROM forms.forms WHERE subject_id = '{subject_id}'"
-    insert_subject_query = export_subject(subject_id)
-    subject_queries.append(subject_drop_query.strip())
-    subject_queries.append(insert_subject_query.strip())
-
     for form_name, suffix in constants.form_name_to_rpms_suffix.items():
         form_path = subject_surveys_root / f"{subject_id}_{suffix}"
         if not form_path.exists():
@@ -408,6 +403,20 @@ def process_subject(
         uncategorized_queries = []
 
     subject_queries.extend(uncategorized_queries)
+
+    if len(subject_queries) > 0:
+        insert_subject_query = export_subject(subject_id)
+        subject_queries.insert(0, insert_subject_query.strip())
+    else:
+        drop_subject_query = f"""
+        DELETE FROM subjects WHERE id = '{subject_id}';
+        """
+        subject_queries.insert(0, drop_subject_query.strip())
+
+    subject_drop_query = f"""
+    DELETE FROM forms.forms WHERE subject_id = '{subject_id}'
+    """
+    subject_queries.insert(0, subject_drop_query.strip())
 
     result = {
         "subject_id": subject_id,

@@ -8,11 +8,11 @@ import logging
 from datetime import datetime
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union, Literal
 
 import pandas as pd
 
-from formsdb import constants, data
+from formsdb import constants
 from formsdb.helpers import db, utils
 
 logger = logging.getLogger(__name__)
@@ -150,6 +150,8 @@ def get_all_medication_info(
             med_class = "MOOD STABILIZER"
         elif med_id == '666':
             med_class = "STIMULANT"
+        elif med_id == '999':
+            med_class = "NO_MEDS"
 
         med_data[int(med_id)] = {
             "med_id": med_id,
@@ -401,7 +403,7 @@ def get_subject_consent_dates(config_file: Path, subject_id: str) -> datetime:
         date = pd.to_datetime(date, dayfirst=True)
         date = date.to_pydatetime()
 
-    if data.subject_uses_rpms(config_file=config_file, subject_id=subject_id):
+    if subject_uses_rpms(config_file=config_file, subject_id=subject_id):
         query = f"""
         SELECT "Consent Received (Enrolled)"
         FROM forms.rpms_client_status
@@ -1281,7 +1283,10 @@ def get_subject_withdrawal_status(
 
 
 def estimate_event_date(
-    subject_id: str, event: str, config_file: Path
+    subject_id: str,
+    event: str,
+    config_file: Path,
+    prefered_date: Literal["earliest", "latest"] = "earliest",
 ) -> Optional[datetime]:
     """
     Infers the events date.
@@ -1303,6 +1308,7 @@ def estimate_event_date(
     if visit_df.empty:
         return None
 
+    found_dates: List[datetime] = []
     for _, row in visit_df.iterrows():
         form_name = row["form_name"]
 
@@ -1316,6 +1322,7 @@ def estimate_event_date(
         form_variables = form_data_r.keys()
 
         date_variables = [v for v in form_variables if "date" in v]
+        date_variables = [v for v in date_variables if "entry_date" not in v]
 
         for date_variable in date_variables:
             date = form_data_r[date_variable]
@@ -1328,7 +1335,15 @@ def estimate_event_date(
                 if date_ts < datetime(2019, 1, 1):
                     continue
                 date_dt = date_ts.to_pydatetime()
-                return date_dt
+                found_dates.append(date_dt)
+
+
+    if found_dates:
+        found_dates = sorted(found_dates)
+        if prefered_date == "earliest":
+            return min(found_dates)
+        else:
+            return max(found_dates)
 
     return None
 
@@ -1489,3 +1504,29 @@ def get_subject_latest_visit_started(
     timepoint = db.fetch_record(config_file=config_file, query=qurery)
 
     return timepoint
+
+def get_form_qc(
+    subject_id: str,
+    form_name: str,
+    event_name: str,
+    config_file: Path
+) -> Dict[str, Any]:
+    """
+    Get the QC information for a specific form and event for a subject.
+    Returns a dictionary with QC information.
+    """
+    query = f"""
+    SELECT * FROM forms_derived.form_qc
+    WHERE subject_id = '{subject_id}' AND
+        form_name = '{form_name}' AND
+        event_name LIKE '%%{event_name}%%';
+    """
+
+    df = db.execute_sql(query=query, config_file=config_file)
+
+    if df.empty:
+        return {}
+    
+    qc_info = df.iloc[0].to_dict()
+
+    return qc_info

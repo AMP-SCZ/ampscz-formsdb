@@ -213,36 +213,6 @@ def get_combined_csvs_output_dir(config_file: Path) -> Path:
     return output_dir
 
 
-# # Reference:
-# # https://github.com/AMP-SCZ/utility/blob/15a5ef5b49d1e081ee0a549375f78bb26160d958/rpms_to_redcap.py#L55C1-L71C21
-# def handle_datetime(time_value: str) -> datetime:
-#     """
-#     Handles different time formats from RPMS.
-
-#     This helps standardize the time formats to be used in the exported CSVs.
-
-#     Args:
-#         time_value (str): Time value to handle.
-
-#     Returns:
-#         datetime: Time value in datetime format.
-#     """
-#     if len(time_value) == 10:
-#         try:
-#             # interview_date e.g. 11/30/2022
-#             datetime_val = datetime.strptime(time_value, "%m/%d/%Y")
-#         except ValueError:
-#             # psychs form e.g. 03/03/1903
-#             datetime_val = datetime.strptime(time_value, "%d/%m/%Y")
-#     elif len(time_value) > 10:
-#         # all other forms e.g. 1/05/2022 12:00:00 AM
-#         datetime_val = datetime.strptime(time_value, "%d/%m/%Y %I:%M:%S %p")
-#     else:
-#         raise ValueError(f"Unknown time format: {time_value}")
-
-#     return datetime_val
-
-
 def cast_dates_to_str(
     data_df: pd.DataFrame, config_file: Path, network: str
 ) -> pd.DataFrame:
@@ -280,9 +250,6 @@ def cast_dates_to_str(
             date_raw_val = row[date_variable]
             if not pd.isnull(date_raw_val) and date_raw_val is not None:
                 try:
-                    # if network == "PRESCIENT":
-                    #     date_val = handle_datetime(date_raw_val)  # type: ignore
-                    # else:
                     date_val = datetime.fromisoformat(date_raw_val)  # type: ignore
                     date_str = date_val.strftime("%Y-%m-%d")
                     data_df.at[idx, date_variable] = date_str
@@ -309,9 +276,6 @@ def cast_dates_to_str(
             datetime_val = row[datetime_variable]
             if not pd.isnull(datetime_val) and datetime_val is not None:
                 try:
-                    # if network == "PRESCIENT":
-                    #     datetime_val = handle_datetime(datetime_val)  # type: ignore
-                    # else:
                     datetime_val = datetime.fromisoformat(datetime_val)  # type: ignore
                     datetime_str = datetime_val.strftime("%Y-%m-%d %H:%M")
                     data_df.at[idx, datetime_variable] = datetime_str
@@ -560,6 +524,11 @@ def get_subject_visit_combined_df(
     # result_df = pd.DataFrame([merged_row])
     merged_row_dict = merged_row.to_dict()
 
+    # If any keys has 'None' string as value, replace with 'NoneRaw'
+    for key, value in merged_row_dict.items():
+        if value == "None":
+            merged_row_dict[key] = "NoneRaw"
+
     return merged_row_dict
 
 
@@ -617,6 +586,20 @@ def get_visit_df(
     return visit_df
 
 
+def handle_raw_nones(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Handles 'NoneRaw' values in the dataframe.
+
+    Args:
+        df (pd.DataFrame): Dataframe to handle 'NoneRaw' values in.
+
+    Returns:
+        pd.DataFrame: Dataframe with 'NoneRaw' values handled.
+    """
+    df = df.replace("NoneRaw", "None")
+    return df
+
+
 if __name__ == "__main__":
     console.rule(f"[bold red]{MODULE_NAME}")
 
@@ -638,6 +621,7 @@ if __name__ == "__main__":
     networks = networks[::-1]
 
     visits = ["conversion", "floating_forms"] + visits
+    # visits = ["month_6"]
 
     # duckdb.execute("SET GLOBAL pandas_analyze_sample=1000000")  # type: ignore
 
@@ -671,6 +655,7 @@ if __name__ == "__main__":
 
                 # legacy
                 visit_df = legacy_add_additional_cols(df=visit_df)
+                # visit_df = handle_raw_nones(df=visit_df)
 
                 output_name = dpdash.get_dpdash_name(
                     study="AMPSCZ",
