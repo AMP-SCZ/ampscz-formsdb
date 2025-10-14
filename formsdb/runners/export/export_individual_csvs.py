@@ -252,11 +252,14 @@ def export_subject_form_wrapper(params: Tuple[str, Path, Path]) -> None:
         None
     """
     subject_id, subject_output_dir, config_file = params
-    export_subject_form_csvs(
-        subject_id=subject_id,
-        subject_output_dir=subject_output_dir,
-        config_file=config_file,
-    )
+    try:
+        export_subject_form_csvs(
+            subject_id=subject_id,
+            subject_output_dir=subject_output_dir,
+            config_file=config_file,
+        )
+    except Exception as e:
+        logger.error(f"Error exporting subject {subject_id}: {e}")
 
 
 def export_csvs(config_file: Path, data_root: Path) -> None:
