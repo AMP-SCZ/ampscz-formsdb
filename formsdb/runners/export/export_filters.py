@@ -85,6 +85,7 @@ def generate_filter_filename(subject_id: str) -> str:
         data_type="form",
         category="filters",
         # optional_tag=["status"],
+        optional_tag=[],
         time_range="day1to1",
     )
 
@@ -124,6 +125,11 @@ def generate_csv(
     output_path = output_dir / filename
 
     df = data.make_df_dpdash_ready(df=df, subject_id=subject_id)
+
+    # recruitment_status -> Map to only `recruited`, `not_recruited`
+    df["recruitment_status"] = df["recruitment_status"].apply(
+        lambda x: "recruited" if x == "recruited" else "not recruited"
+    )
 
     df.to_csv(output_path, index=False)
 
