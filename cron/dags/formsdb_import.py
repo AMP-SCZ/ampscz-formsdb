@@ -157,6 +157,19 @@ import_form_qc = BashOperator(
     pool_slots=16,
 )
 
+# Calculated Outcomes
+import_calculated_outcomes = BashOperator(
+    task_id="import_calculated_outcomes",
+    bash_command=PYTHON_PATH
+    + " "
+    + REPO_ROOT
+    + "/formsdb/runners/imports/import_calculated_outcomes.py",
+    dag=dag,
+    cwd=REPO_ROOT,
+    pool_slots=16,
+    outlets=[postgresdb],
+)
+
 # Done Task Definitions
 
 # Start DAG construction
@@ -173,7 +186,9 @@ import_data_dictionary.set_downstream(import_upenn_jsons)
 import_data_dictionary.set_downstream(import_harmonized_jsons)
 
 import_rpms_csvs.set_downstream(import_form_qc)
+import_rpms_csvs.set_downstream(import_calculated_outcomes)
 import_harmonized_jsons.set_downstream(import_form_qc)
+import_harmonized_jsons.set_downstream(import_calculated_outcomes)
 
 all_imports_done = EmptyOperator(
     task_id="all_imports_done",
@@ -197,6 +212,7 @@ all_imports_done = EmptyOperator(
 )
 
 import_form_qc.set_downstream(all_imports_done)
+import_calculated_outcomes.set_downstream(all_imports_done)
 import_client_status_raw.set_downstream(all_imports_done)
 import_harmonized_jsons.set_downstream(all_imports_done)
 import_upenn_jsons.set_downstream(all_imports_done)
