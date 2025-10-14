@@ -293,14 +293,6 @@ def get_subject_medication_info(
             if end_date is not None:
                 stopped_medication = True
 
-            dosage_variable = f"chrpharm_med{med_idx}_dosage"
-            if medication_form == "past_pharmaceutical_treatment":
-                dosage_variable = f"{dosage_variable}_past"
-            if dosage_variable in form_df.columns:
-                med_dosage = form_df[dosage_variable].iloc[0]
-            else:
-                med_dosage = None
-
             med_compliance_variable = f"chrpharm_med{med_idx}_comp"
             med_final_compliance_variable = f"chrpharm_med{med_idx}_comp_2"
             if medication_form == "past_pharmaceutical_treatment":
@@ -325,6 +317,23 @@ def get_subject_medication_info(
                     med_use = int(float(med_use))
             else:
                 med_use = None
+
+            dosage_variable = f"chrpharm_med{med_idx}_dosage"
+            if medication_form == "past_pharmaceutical_treatment":
+                dosage_variable = f"{dosage_variable}_past"
+            if dosage_variable in form_df.columns:
+                med_dosage = form_df[dosage_variable].iloc[0]
+            else:
+                med_dosage = None
+
+            if med_dosage is None and med_use == 2:
+                dosage_variable = f"chrpharm_med{med_idx}_dosage_2"
+                if medication_form == "past_pharmaceutical_treatment":
+                    dosage_variable = f"{dosage_variable}_past"
+                if dosage_variable in form_df.columns:
+                    med_dosage = form_df[dosage_variable].iloc[0]
+                else:
+                    med_dosage = None
 
             med_frequency_variable = f"chrpharm_med{med_idx}_frequency"
             if medication_form == "past_pharmaceutical_treatment":
@@ -486,6 +495,9 @@ def get_subject_medication_info(
                 "med_indication": med_indication_str,
                 "med_indication_comment": med_indication_comment,
                 "med_dosage": med_dosage,
+                "med_use": med_use,
+                "med_frequency_per_month": med_frequency,
+                "med_compliance": med_compliance,
                 "start_date": start_date,
                 "end_date": end_date,
                 "stopped_medication": stopped_medication,
@@ -493,9 +505,6 @@ def get_subject_medication_info(
                 "start_days_from_consent": start_days_from_consent,
                 "end_days_from_consent": end_days_from_consent,
                 "duration_days": duration_days,
-                "med_use": med_use,
-                "med_frequency_per_month": med_frequency,
-                "med_compliance": med_compliance,
             }
             subject_medication_data.append(raw_data)
 

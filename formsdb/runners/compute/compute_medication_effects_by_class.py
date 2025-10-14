@@ -146,20 +146,21 @@ def get_subject_medication_effects_info_by_class(
                     "date": date,
                     "days_from_consent": days_from_consent,
                     "med_class": med_class,
+                    "days_since_last_taken": None,
                     "current_use": 0,
                     "lifetime_use": 0,
                 }
             else:
-                if (filtered_df["current_use"] == 1).any():
+                if (med_class_df["current_use"] == 1).any():
                     current_use = 1
-                elif filtered_df["current_use"].isna().any():
+                elif med_class_df["current_use"].isna().any():
                     current_use = None
                 else:
                     current_use = 0
 
-                if (filtered_df["lifetime_use"] == 1).any():
+                if (med_class_df["lifetime_use"] == 1).any():
                     lifetime_use = 1
-                elif filtered_df["lifetime_use"].isna().any():
+                elif med_class_df["lifetime_use"].isna().any():
                     lifetime_use = None
                 else:
                     lifetime_use = 0
@@ -173,43 +174,40 @@ def get_subject_medication_effects_info_by_class(
 
                 if med_class == "ANTIPSYCHOTIC":
                     ap_equivalent_drug_dose_prescribed = sum_or_none(
-                        filtered_df["ap_equivalent_drug_dose_prescribed"]
+                        med_class_df["ap_equivalent_drug_dose_prescribed"]
                     )
                     ap_equivalent_drug_dose_taken = sum_or_none(
-                        filtered_df["ap_equivalent_drug_dose_taken"]
+                        med_class_df["ap_equivalent_drug_dose_taken"]
                     )
                 else:
                     ap_equivalent_drug_dose_prescribed = None
                     ap_equivalent_drug_dose_taken = None
 
-                if med_class == "ANTIDEPRESSANT":
-                    ad_equivalent_drug_dose_prescribed = sum_or_none(
-                        filtered_df["ad_equivalent_drug_dose_prescribed"]
-                    )
-                    ad_equivalent_drug_dose_taken = sum_or_none(
-                        filtered_df["ad_equivalent_drug_dose_taken"]
-                    )
-                else:
-                    ad_equivalent_drug_dose_prescribed = None
-                    ad_equivalent_drug_dose_taken = None
-
                 if med_class == "BENZODIAZEPINE":
                     bd_equivalent_drug_dose_prescribed = sum_or_none(
-                        filtered_df["bd_equivalent_drug_dose_prescribed"]
+                        med_class_df["bd_equivalent_drug_dose_prescribed"]
                     )
                     bd_equivalent_drug_dose_taken = sum_or_none(
-                        filtered_df["bd_equivalent_drug_dose_taken"]
+                        med_class_df["bd_equivalent_drug_dose_taken"]
                     )
                 else:
                     bd_equivalent_drug_dose_prescribed = None
                     bd_equivalent_drug_dose_taken = None
 
                 prescribed_equivalent_drug_dose_for_day = sum_or_none(
-                    filtered_df["prescribed_equivalent_drug_dose_for_day"]
+                    med_class_df["prescribed_equivalent_drug_dose_for_day"]
                 )
                 complied_equivalent_drug_dose_for_day = sum_or_none(
-                    filtered_df["complied_equivalent_drug_dose_for_day"]
+                    med_class_df["complied_equivalent_drug_dose_for_day"]
                 )
+
+                days_since_last_taken_values = med_class_df[
+                    "days_since_last_taken"
+                ].dropna()
+                if not days_since_last_taken_values.empty:
+                    days_since_last_taken = days_since_last_taken_values.min()
+                else:
+                    days_since_last_taken = None
 
                 result = {
                     "subject_id": subject_id,
@@ -218,12 +216,11 @@ def get_subject_medication_effects_info_by_class(
                     "date": date,
                     "days_from_consent": days_from_consent,
                     "med_class": med_class,
+                    "days_since_last_taken": days_since_last_taken,
                     "current_use": current_use,
                     "lifetime_use": lifetime_use,
                     "ap_equivalent_drug_dose_prescribed": ap_equivalent_drug_dose_prescribed,
                     "ap_equivalent_drug_dose_taken": ap_equivalent_drug_dose_taken,
-                    "ad_equivalent_drug_dose_prescribed": ad_equivalent_drug_dose_prescribed,
-                    "ad_equivalent_drug_dose_taken": ad_equivalent_drug_dose_taken,
                     "bd_equivalent_drug_dose_prescribed": bd_equivalent_drug_dose_prescribed,
                     "bd_equivalent_drug_dose_taken": bd_equivalent_drug_dose_taken,
                     "prescribed_equivalent_drug_dose_for_day":
@@ -284,8 +281,6 @@ def compile_medication_effects(
         "days_from_consent",
         "ap_equivalent_drug_dose_prescribed",
         "ap_equivalent_drug_dose_taken",
-        "ad_equivalent_drug_dose_prescribed",
-        "ad_equivalent_drug_dose_taken",
         "bd_equivalent_drug_dose_prescribed",
         "bd_equivalent_drug_dose_taken",
         "current_use",

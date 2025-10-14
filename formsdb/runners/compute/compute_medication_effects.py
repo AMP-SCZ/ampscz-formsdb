@@ -384,7 +384,7 @@ def get_subject_medication_effect_info(
             # return subject_results
             pass
         else:
-            logger.warning(
+            logger.debug(
                 f"Subject {subject_id} has other medications despite med_id=999 presence. \
 Removing 999."
             )
@@ -480,9 +480,15 @@ Removing 999."
                 else:
                     subject_date_dt = None
 
-            subject_consent_date = data.get_subject_consent_dates(
-                config_file=config_file, subject_id=subject_id
-            )
+            try:
+                subject_consent_date = data.get_subject_consent_dates(
+                    config_file=config_file, subject_id=subject_id
+                )
+            except data.NoSubjectConsentDateException:
+                logger.warning(
+                    f"Subject {subject_id} has no consent date. Skipping {modality} - {timepoint}."
+                )
+                continue
 
             if subject_date_dt is None:
                 days_from_consent = None
@@ -557,8 +563,6 @@ Removing 999."
                 if pd.isna(dosage_prescribed) or pd.isna(duration_prescribed):
                     ap_equivalent_drug_dose_prescribed = pd.NA
                     ap_equivalent_drug_dose_taken = pd.NA
-                    ad_equivalent_drug_dose_prescribed = pd.NA
-                    ad_equivalent_drug_dose_taken = pd.NA
                     bd_equivalent_drug_dose_prescribed = pd.NA
                     bd_equivalent_drug_dose_taken = pd.NA
                 else:
@@ -588,55 +592,28 @@ Removing 999."
                                 * duration_prescribed
                             )
                         else:
-                            # logger.warning(f"Missing AP Standard Equivalent Drug Dose for {med_idx}")
+                            # logger.warning(
+                            #     f"Missing AP Standard Equivalent Drug Dose for "
+                            #     f"{med_idx}"
+                            # )
                             ap_equivalent_drug_dose_prescribed = pd.NA
                             ap_equivalent_drug_dose_taken = pd.NA
                     else:
                         ap_equivalent_drug_dose_prescribed = pd.NA
                         ap_equivalent_drug_dose_taken = pd.NA
 
-                    if med_class == "ANTIDEPRESSANT":
-                        ad_med_name: str = med_info[int(med_idx)]["med_name"]
-                        # Get first word
-                        ad_med_name = ad_med_name.split("/")[0].lower()
-                        ad_med_name = ad_med_name.split(" ")[0]
-                        ad_standard_equivalent_drug_dose = constants.antidepressant_fluoxetine_40mg_drug_equivalent_dose.get(
-                            ad_med_name,
-                            None,
-                        )
-                        if ad_standard_equivalent_drug_dose is not None:
-                            prescribed_eq_dosage_for_day = dosage_prescribed * (
-                                50 / ad_standard_equivalent_drug_dose
-                            )
-                            ad_equivalent_drug_dose_prescribed = (
-                                prescribed_eq_dosage_for_day * duration_prescribed
-                            )
-                            if complied_dosage is not None:
-                                complied_equivalent_drug_dose_for_day = (
-                                    complied_dosage
-                                    * (50 / ad_standard_equivalent_drug_dose)
-                                )
-                            else:
-                                complied_equivalent_drug_dose_for_day = pd.NA
-                            ad_equivalent_drug_dose_taken = (
-                                complied_equivalent_drug_dose_for_day
-                                * duration_prescribed
-                            )
-                        else:
-                            # logger.warning(f"Missing AD Standard Equivalent Drug Dose for {ad_med_name}")
-                            ad_equivalent_drug_dose_prescribed = pd.NA
-                            ad_equivalent_drug_dose_taken = pd.NA
-                    else:
-                        ad_equivalent_drug_dose_prescribed = pd.NA
-                        ad_equivalent_drug_dose_taken = pd.NA
-
                     if med_class == "BENZODIAZEPINE":
                         bd_med_name: str = med_info[int(med_idx)]["med_name"]
                         # Get first word
                         bd_med_name = bd_med_name.split("/")[0].lower()
                         bd_med_name = bd_med_name.split(" ")[0]
-                        bd_standard_equivalent_drug_dose = constants.benzodiazepine_diazepam_5mg_drug_equivalent_dose.get(
-                            bd_med_name, None
+                        bd_standard_equivalent_drug_dose = (
+                            constants
+                            .benzodiazepine_diazepam_5mg_drug_equivalent_dose
+                            .get(
+                                bd_med_name,
+                                None,
+                            )
                         )
                         if bd_standard_equivalent_drug_dose is not None:
                             prescribed_eq_dosage_for_day = dosage_prescribed * (
@@ -682,12 +659,11 @@ Removing 999."
                 else:
                     lifetime_use_v = 0
 
-                if lifetime_use_inconclusive:
+                if lifetime_use_inconclusive and lifetime_use_v == 0:
                     if inconclusive_meds_start_date is None:
                         lifetime_use_v = pd.NA
                     elif subject_date_dt >= inconclusive_meds_start_date:
-                        if lifetime_use_v == 0:
-                            lifetime_use_v = pd.NA
+                        lifetime_use_v = pd.NA
 
                 try:
                     result = {
@@ -703,8 +679,6 @@ Removing 999."
                         "days_since_last_taken": days_since_last_taken,
                         "ap_equivalent_drug_dose_prescribed": ap_equivalent_drug_dose_prescribed,
                         "ap_equivalent_drug_dose_taken": ap_equivalent_drug_dose_taken,
-                        "ad_equivalent_drug_dose_prescribed": ad_equivalent_drug_dose_prescribed,
-                        "ad_equivalent_drug_dose_taken": ad_equivalent_drug_dose_taken,
                         "bd_equivalent_drug_dose_prescribed": bd_equivalent_drug_dose_prescribed,
                         "bd_equivalent_drug_dose_taken": bd_equivalent_drug_dose_taken,
                         "duration_prescribed_days": duration_prescribed,
@@ -775,8 +749,6 @@ def compile_medication_effects(
         "days_from_consent",
         "ap_equivalent_drug_dose_prescribed",
         "ap_equivalent_drug_dose_taken",
-        "ad_equivalent_drug_dose_prescribed",
-        "ad_equivalent_drug_dose_taken",
         "bd_equivalent_drug_dose_prescribed",
         "bd_equivalent_drug_dose_taken",
         "duration_prescribed_days",
