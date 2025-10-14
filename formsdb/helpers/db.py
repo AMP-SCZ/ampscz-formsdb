@@ -12,8 +12,6 @@ from typing import Literal, Optional
 
 import pandas as pd
 import psycopg2
-import pymongo
-import pymongo.database as database
 import sqlalchemy
 from rich.console import Console
 from sqlalchemy.exc import OperationalError
@@ -21,24 +19,6 @@ from psycopg2.errors import UndefinedTable
 
 from formsdb.helpers import utils
 from formsdb.helpers.config import config
-
-
-def get_mongo_db(config_file: Path) -> database.Database:
-    """
-    Returns a MongoClient object.
-
-    Returns:
-        MongoClient: A MongoClient object.
-    """
-    config_params = config(config_file, "mongodb")
-    host = config_params["host"]
-    port = int(config_params["port"])
-    db = config_params["database"]
-
-    mongo_client = pymongo.MongoClient(host, port)
-
-    db = mongo_client[db]
-    return db
 
 
 def check_if_subject_form_data_exists(
