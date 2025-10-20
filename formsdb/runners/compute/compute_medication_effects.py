@@ -349,6 +349,48 @@ def remove_missing_codes(value):
     return value
 
 
+def date_has_inconclusive_medication(
+    medication_df: pd.DataFrame,
+    target_date: datetime
+) -> bool:
+    """
+    Check if the target date has inconclusive medication status.
+
+    Args:
+        medication_df (pd.DataFrame): DataFrame containing medication information.
+        target_date (datetime): Target date to check medication status.
+
+    Returns:
+        bool: True if the target date has inconclusive medication status, False otherwise.
+    """
+    inconclusive_medications = [777, 888]
+    med_records = medication_df[
+        medication_df["med_id"].isin(inconclusive_medications)
+    ].copy()
+
+    if med_records.empty:
+        return False
+
+    for _, row in med_records.iterrows():
+        start_date_raw = row["start_date"]
+        end_date_raw = row["end_date"]
+
+        if pd.isna(start_date_raw):
+            # If start date is missing, we cannot determine inconclusiveness
+            # Assume inconclusive
+            return True
+        start_date = pd.to_datetime(start_date_raw)
+        if pd.isna(end_date_raw):
+            end_date = datetime.max
+        else:
+            end_date = pd.to_datetime(end_date_raw)
+
+        if start_date <= target_date <= end_date:
+            return True
+
+    return False
+
+
 def get_subject_medication_effect_info(
     config_file: Path, subject_id: str
 ) -> List[Dict[str, Any]]:
@@ -409,9 +451,9 @@ Removing 999."
         subject_inconclusive_medication_data["start_date"] = pd.to_datetime(
             subject_inconclusive_medication_data["start_date"]
         )
-        inconclusive_meds_start_date = subject_inconclusive_medication_data[
-            "start_date"
-        ].min()
+        # inconclusive_meds_start_date = subject_inconclusive_medication_data[
+        #     "start_date"
+        # ].min()
         lifetime_use_inconclusive = True
         # logger.warning(
         #     f"Subject {subject_id} has taken medication with med_id 777 or 888. \
@@ -419,7 +461,7 @@ Removing 999."
         # )
     else:
         lifetime_use_inconclusive = False
-        inconclusive_meds_start_date = None
+        # inconclusive_meds_start_date = None
 
     for modality_info in modalities_info:
         modality = modality_info
@@ -660,10 +702,29 @@ Removing 999."
                     lifetime_use_v = 0
 
                 if lifetime_use_inconclusive and lifetime_use_v == 0:
-                    if inconclusive_meds_start_date is None:
+                    if date_has_inconclusive_medication(
+                        medication_df=subject_inconclusive_medication_data,
+                        target_date=subject_date_dt
+                    ):
                         lifetime_use_v = pd.NA
-                    elif subject_date_dt >= inconclusive_meds_start_date:
-                        lifetime_use_v = pd.NA
+                    # if inconclusive_meds_start_date is None:
+                    #     lifetime_use_v = pd.NA
+                    # elif subject_date_dt >= inconclusive_meds_start_date:
+                    #     lifetime_use_v = pd.NA
+
+                if lifetime_use_inconclusive:
+                    ap_equivalent_drug_dose_prescribed = pd.NA
+                    ap_equivalent_drug_dose_taken = pd.NA
+                    bd_equivalent_drug_dose_prescribed = pd.NA
+                    bd_equivalent_drug_dose_taken = pd.NA
+
+                    if date_has_inconclusive_medication(
+                        medication_df=subject_inconclusive_medication_data,
+                        target_date=subject_date_dt
+                    ):
+                        prescribed_eq_dosage_for_day = pd.NA
+                        complied_equivalent_drug_dose_for_day = pd.NA
+
 
                 try:
                     result = {
