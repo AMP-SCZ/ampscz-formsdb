@@ -4,6 +4,9 @@
 # Generated data
 data/
 
+# config files
+config.ini
+
 # scratch
 scratch/
 
