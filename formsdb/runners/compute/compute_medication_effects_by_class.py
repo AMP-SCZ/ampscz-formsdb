@@ -148,7 +148,7 @@ def get_subject_medication_effects_info_by_class(
                     "med_class": med_class,
                     "days_since_last_taken": None,
                     "current_use": 0,
-                    "lifetime_use": 0,
+                    "ever_used": 0,
                 }
             else:
                 if (med_class_df["current_use"] == 1).any():
@@ -158,12 +158,12 @@ def get_subject_medication_effects_info_by_class(
                 else:
                     current_use = 0
 
-                if (med_class_df["lifetime_use"] == 1).any():
-                    lifetime_use = 1
-                elif med_class_df["lifetime_use"].isna().any():
-                    lifetime_use = None
+                if (med_class_df["ever_used"] == 1).any():
+                    ever_used = 1
+                elif med_class_df["ever_used"].isna().any():
+                    ever_used = None
                 else:
-                    lifetime_use = 0
+                    ever_used = 0
 
                 def sum_or_none(series: pd.Series) -> Optional[Union[int, float]]:
                     """
@@ -176,23 +176,23 @@ def get_subject_medication_effects_info_by_class(
                     ap_equivalent_drug_dose_prescribed = sum_or_none(
                         med_class_df["ap_equivalent_drug_dose_prescribed"]
                     )
-                    ap_equivalent_drug_dose_taken = sum_or_none(
-                        med_class_df["ap_equivalent_drug_dose_taken"]
+                    ap_equivalent_drug_dose_estimated_taken = sum_or_none(
+                        med_class_df["ap_equivalent_drug_dose_estimated_taken"]
                     )
                 else:
                     ap_equivalent_drug_dose_prescribed = None
-                    ap_equivalent_drug_dose_taken = None
+                    ap_equivalent_drug_dose_estimated_taken = None
 
                 if med_class == "BENZODIAZEPINE":
                     bd_equivalent_drug_dose_prescribed = sum_or_none(
                         med_class_df["bd_equivalent_drug_dose_prescribed"]
                     )
-                    bd_equivalent_drug_dose_taken = sum_or_none(
-                        med_class_df["bd_equivalent_drug_dose_taken"]
+                    bd_equivalent_drug_dose_estimated_taken = sum_or_none(
+                        med_class_df["bd_equivalent_drug_dose_estimated_taken"]
                     )
                 else:
                     bd_equivalent_drug_dose_prescribed = None
-                    bd_equivalent_drug_dose_taken = None
+                    bd_equivalent_drug_dose_estimated_taken = None
 
                 prescribed_equivalent_drug_dose_for_day = sum_or_none(
                     med_class_df["prescribed_equivalent_drug_dose_for_day"]
@@ -218,11 +218,11 @@ def get_subject_medication_effects_info_by_class(
                     "med_class": med_class,
                     "days_since_last_taken": days_since_last_taken,
                     "current_use": current_use,
-                    "lifetime_use": lifetime_use,
+                    "ever_used": ever_used,
                     "ap_equivalent_drug_dose_prescribed": ap_equivalent_drug_dose_prescribed,
-                    "ap_equivalent_drug_dose_taken": ap_equivalent_drug_dose_taken,
+                    "ap_equivalent_drug_dose_estimated_taken": ap_equivalent_drug_dose_estimated_taken,
                     "bd_equivalent_drug_dose_prescribed": bd_equivalent_drug_dose_prescribed,
-                    "bd_equivalent_drug_dose_taken": bd_equivalent_drug_dose_taken,
+                    "bd_equivalent_drug_dose_estimated_taken": bd_equivalent_drug_dose_estimated_taken,
                     "prescribed_equivalent_drug_dose_for_day":
                         prescribed_equivalent_drug_dose_for_day,
                     "complied_equivalent_drug_dose_for_day":
@@ -280,11 +280,11 @@ def compile_medication_effects(
     int_cols = [
         "days_from_consent",
         "ap_equivalent_drug_dose_prescribed",
-        "ap_equivalent_drug_dose_taken",
+        "ap_equivalent_drug_dose_estimated_taken",
         "bd_equivalent_drug_dose_prescribed",
-        "bd_equivalent_drug_dose_taken",
+        "bd_equivalent_drug_dose_estimated_taken",
         "current_use",
-        "lifetime_use",
+        "ever_used",
     ]
 
     for col in int_cols:

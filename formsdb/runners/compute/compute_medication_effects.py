@@ -172,7 +172,7 @@ def get_medication_duaraion_i(
     medication_df: pd.DataFrame,
     target_medication_idx: str,
     target_date: Union[str, datetime],
-) -> Optional[Tuple[float, float, int]]:
+) -> Optional[Tuple[int, float, float, int]]:
     """
     Returns the duration of medication intake.
 
@@ -183,6 +183,7 @@ def get_medication_duaraion_i(
 
     Returns:
         Optional[Tuple[float, float, int]]: Tuple containing:
+            - med_use
             - Average complied dosage per day
             - Average dosage per day
             - Duration in days
@@ -199,6 +200,7 @@ def get_medication_duaraion_i(
     for _, row in medication_df.iterrows():
         start_date = row["start_date"]
         end_date = row["end_date"]
+        med_use = row["med_use"]
         dosage = row["med_dosage"]
         compliance = row["med_compliance"]
 
@@ -246,7 +248,7 @@ def get_medication_duaraion_i(
     avg_dosage = sum(total_dosage_by_date.values()) / duration
     complied_avg_dosage = sum(complied_total_dosage_by_date.values()) / duration
 
-    return complied_avg_dosage, avg_dosage, duration
+    return med_use, complied_avg_dosage, avg_dosage, duration
 
 
 def is_medication_ongoing(
@@ -426,10 +428,10 @@ def get_subject_medication_effect_info(
             # return subject_results
             pass
         else:
-            logger.debug(
-                f"Subject {subject_id} has other medications despite med_id=999 presence. \
-Removing 999."
-            )
+#             logger.debug(
+#                 f"Subject {subject_id} has other medications despite med_id=999 presence. \
+# Removing 999."
+#             )
             subject_medication_data = subject_medication_data[
                 subject_medication_data["med_id"] != no_meds_id
             ]
@@ -454,13 +456,13 @@ Removing 999."
         # inconclusive_meds_start_date = subject_inconclusive_medication_data[
         #     "start_date"
         # ].min()
-        lifetime_use_inconclusive = True
+        ever_used_inconclusive = True
         # logger.warning(
         #     f"Subject {subject_id} has taken medication with med_id 777 or 888. \
         # Lifetime use inconclusive since {inconclusive_meds_start_date}."
         # )
     else:
-        lifetime_use_inconclusive = False
+        ever_used_inconclusive = False
         # inconclusive_meds_start_date = None
 
     for modality_info in modalities_info:
@@ -562,7 +564,7 @@ Removing 999."
                     continue
                 under_influence = med_idx in currently_taking
                 could_be_under_influence = med_idx in potential_currently_taking
-                lifetime_use = med_idx in taken_before
+                ever_used = med_idx in taken_before
 
                 result = get_medication_duaraion_i(
                     medication_df=subject_medication_data,
@@ -591,22 +593,23 @@ Removing 999."
                         ).days
 
                 if result is None:
-                    complied_dosage, dosage_prescribed, duration_prescribed = (
+                    med_use, complied_dosage, dosage_prescribed, duration_prescribed = (
+                        None,
                         None,
                         None,
                         None,
                     )
                 else:
-                    complied_dosage, dosage_prescribed, duration_prescribed = result
+                    med_use, complied_dosage, dosage_prescribed, duration_prescribed = result
 
                 prescribed_eq_dosage_for_day = pd.NA
                 complied_equivalent_drug_dose_for_day = pd.NA
 
                 if pd.isna(dosage_prescribed) or pd.isna(duration_prescribed):
                     ap_equivalent_drug_dose_prescribed = pd.NA
-                    ap_equivalent_drug_dose_taken = pd.NA
+                    ap_equivalent_drug_dose_estimated_taken = pd.NA
                     bd_equivalent_drug_dose_prescribed = pd.NA
-                    bd_equivalent_drug_dose_taken = pd.NA
+                    bd_equivalent_drug_dose_estimated_taken = pd.NA
                 else:
                     if med_class == "ANTIPSYCHOTIC":
                         ap_standard_equivalent_drug_dose = (
@@ -629,7 +632,7 @@ Removing 999."
                                 )
                             else:
                                 complied_equivalent_drug_dose_for_day = pd.NA
-                            ap_equivalent_drug_dose_taken = (
+                            ap_equivalent_drug_dose_estimated_taken = (
                                 complied_equivalent_drug_dose_for_day
                                 * duration_prescribed
                             )
@@ -639,10 +642,10 @@ Removing 999."
                             #     f"{med_idx}"
                             # )
                             ap_equivalent_drug_dose_prescribed = pd.NA
-                            ap_equivalent_drug_dose_taken = pd.NA
+                            ap_equivalent_drug_dose_estimated_taken = pd.NA
                     else:
                         ap_equivalent_drug_dose_prescribed = pd.NA
-                        ap_equivalent_drug_dose_taken = pd.NA
+                        ap_equivalent_drug_dose_estimated_taken = pd.NA
 
                     if med_class == "BENZODIAZEPINE":
                         bd_med_name: str = med_info[int(med_idx)]["med_name"]
@@ -671,7 +674,7 @@ Removing 999."
                                 )
                             else:
                                 complied_equivalent_drug_dose_for_day = pd.NA
-                            bd_equivalent_drug_dose_taken = (
+                            bd_equivalent_drug_dose_estimated_taken = (
                                 complied_equivalent_drug_dose_for_day
                                 * duration_prescribed
                             )
@@ -680,10 +683,10 @@ Removing 999."
                                 f"Missing BD Standard Equivalent Drug Dose for {bd_med_name}"
                             )
                             bd_equivalent_drug_dose_prescribed = pd.NA
-                            bd_equivalent_drug_dose_taken = pd.NA
+                            bd_equivalent_drug_dose_estimated_taken = pd.NA
                     else:
                         bd_equivalent_drug_dose_prescribed = pd.NA
-                        bd_equivalent_drug_dose_taken = pd.NA
+                        bd_equivalent_drug_dose_estimated_taken = pd.NA
 
                 if under_influence:
                     under_influence_v = 1
@@ -696,32 +699,33 @@ Removing 999."
                     prescribed_eq_dosage_for_day = 0
                     complied_equivalent_drug_dose_for_day = 0
 
-                if lifetime_use:
-                    lifetime_use_v = 1
+                if ever_used:
+                    ever_used_v = 1
                 else:
-                    lifetime_use_v = 0
+                    ever_used_v = 0
 
-                if lifetime_use_inconclusive and lifetime_use_v == 0:
+                if ever_used_inconclusive and ever_used_v == 0:
                     if date_has_inconclusive_medication(
                         medication_df=subject_inconclusive_medication_data,
                         target_date=subject_date_dt
                     ):
-                        lifetime_use_v = pd.NA
+                        ever_used_v = pd.NA
                     # if inconclusive_meds_start_date is None:
-                    #     lifetime_use_v = pd.NA
+                    #     ever_used_v = pd.NA
                     # elif subject_date_dt >= inconclusive_meds_start_date:
-                    #     lifetime_use_v = pd.NA
+                    #     ever_used_v = pd.NA
 
-                if lifetime_use_inconclusive:
+                if ever_used_inconclusive:
                     ap_equivalent_drug_dose_prescribed = pd.NA
-                    ap_equivalent_drug_dose_taken = pd.NA
+                    ap_equivalent_drug_dose_estimated_taken = pd.NA
                     bd_equivalent_drug_dose_prescribed = pd.NA
-                    bd_equivalent_drug_dose_taken = pd.NA
+                    bd_equivalent_drug_dose_estimated_taken = pd.NA
 
                     if date_has_inconclusive_medication(
                         medication_df=subject_inconclusive_medication_data,
                         target_date=subject_date_dt
                     ):
+                        under_influence_v = pd.NA
                         prescribed_eq_dosage_for_day = pd.NA
                         complied_equivalent_drug_dose_for_day = pd.NA
 
@@ -739,16 +743,17 @@ Removing 999."
                         "is_ongoing": is_ongoing,
                         "days_since_last_taken": days_since_last_taken,
                         "ap_equivalent_drug_dose_prescribed": ap_equivalent_drug_dose_prescribed,
-                        "ap_equivalent_drug_dose_taken": ap_equivalent_drug_dose_taken,
+                        "ap_equivalent_drug_dose_estimated_taken": ap_equivalent_drug_dose_estimated_taken,
                         "bd_equivalent_drug_dose_prescribed": bd_equivalent_drug_dose_prescribed,
-                        "bd_equivalent_drug_dose_taken": bd_equivalent_drug_dose_taken,
+                        "bd_equivalent_drug_dose_estimated_taken": bd_equivalent_drug_dose_estimated_taken,
+                        "med_use": med_use,
                         "duration_prescribed_days": duration_prescribed,
                         "prescribed_equivalent_drug_dose_for_day": prescribed_eq_dosage_for_day,
                         "complied_equivalent_drug_dose_for_day": (
                             complied_equivalent_drug_dose_for_day
                         ),
                         "current_use": under_influence_v,
-                        "lifetime_use": lifetime_use_v,
+                        "ever_used": ever_used_v,
                     }
                     subject_results.append(result)
                 except Exception as e:
@@ -793,7 +798,7 @@ def compile_medication_effects(
     #     f"Randomly selected {len(subjects)} subjects for processing (out of {len(all_subjects)} total subjects)."
     # )
 
-    num_processes = multiprocessing.cpu_count() // 4
+    num_processes = multiprocessing.cpu_count() // 2
     logger.info(f"Using {num_processes} processes for parallel computation.")
     params = [(config_file, subject_id) for subject_id in subjects]
 
@@ -809,12 +814,12 @@ def compile_medication_effects(
     int_cols = [
         "days_from_consent",
         "ap_equivalent_drug_dose_prescribed",
-        "ap_equivalent_drug_dose_taken",
+        "ap_equivalent_drug_dose_estimated_taken",
         "bd_equivalent_drug_dose_prescribed",
-        "bd_equivalent_drug_dose_taken",
+        "bd_equivalent_drug_dose_estimated_taken",
         "duration_prescribed_days",
         "current_use",
-        "lifetime_use",
+        "ever_used",
     ]
 
     for col in int_cols:

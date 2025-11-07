@@ -115,16 +115,23 @@ def handle_datetime(time_value: str) -> Optional[datetime]:
         else:
             raise ValueError(f"Unknown time format: {time_value}") from e
 
-    # If date is 1903, return None
-    if datetime_val.year == 1903:
-        return None
+    # If date is 1909, return None
+    # if datetime_val.year == 1903:
+    #     return None
     if datetime_val.year == 1909:
         return None
 
-    # # Check if time is 09:09 (missing code)
-    # if datetime_val.hour == 9 and datetime_val.minute == 9:
-    #     # Remove the time part
-    #     datetime_val = datetime_val.replace(hour=0, minute=0, second=0, microsecond=0)
+    # Check if time is 09:09 (missing code)
+    if datetime_val.hour == 9 and datetime_val.minute == 9:
+        # Remove the time part
+        datetime_val = datetime_val.replace(hour=0, minute=0, second=0, microsecond=0)
+
+    # Similarly check for 03:03 and 03:33 (missing codes)
+    if (datetime_val.hour == 3 and datetime_val.minute == 3) or (
+        datetime_val.hour == 3 and datetime_val.minute == 33
+    ):
+        # Remove the time part
+        datetime_val = datetime_val.replace(hour=0, minute=0, second=0, microsecond=0)
 
     return datetime_val
 
