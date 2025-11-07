@@ -2,13 +2,32 @@
 """
 Airflow DAG for AMPSCZ forms database - import
 """
+import sys
+from pathlib import Path
+
+file = Path(__file__).resolve()
+parent = file.parent
+ROOT = None
+for parent in file.parents:
+    if parent.name == "ampscz-formsdb":
+        ROOT = parent
+sys.path.append(str(ROOT))
+
+# remove current directory from path
+try:
+    sys.path.remove(str(parent))
+except ValueError:
+    pass
 
 from datetime import datetime, timedelta
 
-from airflow.sdk import DAG, Asset
+from airflow.sdk import DAG, Asset, Variable
 from airflow.sdk import task_group
 from airflow.providers.standard.operators.bash import BashOperator
 from airflow.providers.standard.operators.empty import EmptyOperator
+from airflow.providers.standard.operators.python import PythonOperator
+
+from formsdb.helpers import airflow as airflow_helpers
 
 # CONDA_ENV_PATH = "/home/pnl/dev/ampscz-formsdb/.venv"
 # PYTHON_PATH = f"{CONDA_ENV_PATH}/bin/python"
@@ -31,6 +50,11 @@ default_args = {
     "catchup": False,
     "max_active_runs": 1,
 }
+
+PNL_HOSTNAME = Variable.get("PNL_HOSTNAME")
+PNL_PASSWORD = Variable.get("PNL_PASSWORD")
+PNL_IMPORTED_ASSET_ID = Variable.get("PNL_IMPORTED_ASSET_ID")
+
 
 dag = DAG(
     "ampscz_forms_db_import",
@@ -163,6 +187,20 @@ import_calculated_outcomes = BashOperator(
     dag=dag,
     cwd=REPO_ROOT,
     pool_slots=8,
+)
+
+def trigger_pnl_airflow_event():
+    airflow_helpers.trigger_airflow_imported_asset_event(
+        hostname=PNL_HOSTNAME,
+        username="pnl",
+        password=PNL_PASSWORD,
+        imported_asset_id=int(PNL_IMPORTED_ASSET_ID),
+    )
+
+trigger_pnl_event = PythonOperator(
+    task_id="trigger_pnl_airflow_event",
+    python_callable=trigger_pnl_airflow_event,
+    dag=dag,
 )
 
 # Done Task Definitions
