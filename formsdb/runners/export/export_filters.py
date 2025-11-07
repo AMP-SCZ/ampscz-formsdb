@@ -21,6 +21,8 @@ except ValueError:
     pass
 
 import logging
+import multiprocessing
+from typing import Tuple
 
 import pandas as pd
 from rich.logging import RichHandler
@@ -106,7 +108,7 @@ def generate_csv(
     config_file: Path,
     subject_id: str,
     output_dir: Path,
-) -> None:
+) -> str:
     """
     Generate the CSV file for the filter data.
 
@@ -114,12 +116,15 @@ def generate_csv(
         config_file (Path): Path to the config file.
         subject_id (str): Subject ID.
         output_dir (Path): Path to the output directory.
+        
+    Returns:
+        str: Subject ID for tracking completion.
     """
     df = fetch_recruitment_data(config_file=config_file, subject_id=subject_id)
 
     if df.empty:
         logger.warning(f"No recruitment data found for subject {subject_id}.")
-        return
+        return subject_id
 
     filename = generate_filter_filename(subject_id=subject_id)
     output_path = output_dir / filename
@@ -132,28 +137,54 @@ def generate_csv(
     )
 
     df.to_csv(output_path, index=False)
+    return subject_id
+
+
+def process_subject_wrapper(args: Tuple[Path, str, Path]) -> str:
+    """
+    Wrapper for multiprocessing to unpack arguments.
+    
+    Args:
+        args: Tuple containing (config_file, subject_id, output_dir)
+        
+    Returns:
+        str: Subject ID for tracking completion.
+    """
+    config_file, subject_id, output_dir = args
+    return generate_csv(
+        config_file=config_file,
+        subject_id=subject_id,
+        output_dir=output_dir,
+    )
 
 
 def export_data(config_file: Path, output_root: Path) -> None:
     """
-    Export the recruitment status data to CSVs.
+    Export the recruitment status data to CSVs using multiprocessing.
 
     Args:
         config_file (Path): Path to the config file.
         output_root (Path): Path to the output root directory.
     """
     subject_ids = data.get_all_subjects(config_file=config_file)
+    
+    num_processes = 8
+    logger.info(f"Using {num_processes} processes...")
+    params = [
+        (config_file, subject_id, output_root)
+        for subject_id in subject_ids
+    ]
+    log_frequency = max(1, len(params) // 10)
 
-    with utils.get_progress_bar() as progress:
-        task = progress.add_task("Processing...", total=len(subject_ids))
-
-        for subject_id in subject_ids:
-            progress.update(task, advance=1, description=f"Processing {subject_id}...")
-            generate_csv(
-                config_file=config_file,
-                subject_id=subject_id,
-                output_dir=output_root,
-            )
+    with multiprocessing.Pool(processes=int(num_processes)) as pool:
+        complete_count = 0
+        with utils.get_progress_bar() as progress:
+            task = progress.add_task("Processing subjects...", total=len(params))
+            for _ in pool.imap_unordered(process_subject_wrapper, params):
+                complete_count += 1
+                if complete_count % log_frequency == 0 or complete_count == len(params):
+                    logger.info(f"Processed {complete_count}/{len(params)} subjects...")
+                progress.update(task, advance=1)
 
 
 if __name__ == "__main__":

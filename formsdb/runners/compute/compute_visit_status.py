@@ -170,7 +170,7 @@ def compute_recent_visit(config_file: Path) -> pd.DataFrame:
         config_file=config_file
     )
 
-    num_processes = multiprocessing.cpu_count() // 2
+    num_processes = 4
     logger.info(f"Using {num_processes} processes.")
 
     params = [

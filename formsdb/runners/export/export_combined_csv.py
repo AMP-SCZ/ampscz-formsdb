@@ -571,7 +571,9 @@ def get_visit_df(
     params = [(config_file, subject_id, event_name) for subject_id in subject_ids]
     results: List[Dict[str, Any]] = []
 
-    with multiprocessing.Pool() as pool:
+    num_processes = 8
+    logger.info(f"Using {num_processes} processes for visit {event_name}...")
+    with multiprocessing.Pool(processes=num_processes) as pool:
         for result in pool.imap_unordered(process_subject_visit, params):  # type: ignore
             # if non empty result add to results
             if result:

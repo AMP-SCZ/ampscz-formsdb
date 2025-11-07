@@ -465,7 +465,7 @@ def import_forms_by_network(
     queries: List[str] = []
     skipped_subjects: List[str] = []
 
-    num_processes = multiprocessing.cpu_count() // 2
+    num_processes = 8
     params = [(subject_path, config_file) for subject_path in subjects_glob]
     with multiprocessing.Pool(processes=int(num_processes)) as pool:
         with utils.get_progress_bar() as progress:

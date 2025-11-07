@@ -233,6 +233,12 @@ def worker(params: Tuple[str, Path]) -> Dict[str, Any]:
 
     recruitmest_status_v2 = recruitment_status_v2_mappping.get(recruitmest_status_v2)
 
+    # MANUAL OVERRIDE
+    if subject_id == 'LS68141':
+        recruited = False
+        subject_status = 'negative_screen'
+        recruitmest_status_v2 = 'withdrawn_before_baseline'
+
     # Return a dictionary with the data for this subject
     return {
         "subject_id": subject_id,
@@ -303,7 +309,7 @@ def process_data(config_file: Path) -> None:
     logger.info(f"Exporting data for {subjects_count} subjects...")
 
     # Create a Pool object with the number of processes equal to the number of CPU cores / 2
-    num_processes = multiprocessing.cpu_count() / 2
+    num_processes = 8
     logger.info(f"Using {num_processes} processes...")
 
     # Create parameters for the worker function

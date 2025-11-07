@@ -228,10 +228,12 @@ def shift_dates(files: List[Path], config_file: Path, output_root: Path) -> None
     logger.debug(f"Found {len(date_cols)} date columns")
     logger.debug(f"Output root: {output_root}")
 
+    num_processes = 8
+    logger.info(f"Using {num_processes} processes...")
     with utils.get_progress_bar() as progress:
         files_task = progress.add_task("Processing files", total=len(files))
         params = [(f, date_offset_df, date_cols, output_root) for f in files]
-        with multiprocessing.Pool() as pool:
+        with multiprocessing.Pool(processes=num_processes) as pool:
             for _ in pool.imap_unordered(process_file, params):  # type: ignore
                 progress.update(files_task, advance=1)
 

@@ -300,13 +300,19 @@ def export_csvs(config_file: Path, data_root: Path) -> None:
             params.append((subject_id, output_dir, config_file))
             progress.update(param_task, advance=1)
 
-        with multiprocessing.Pool() as pool:
+        num_processes = 16
+        logger.info(f"Using {num_processes} processes...")
+        log_frequency = max(1, len(params) // 10)
+        with multiprocessing.Pool(processes=num_processes) as pool:
             subject_task = progress.add_task(
                 "Exporting individual CSVs...", total=len(params)
             )
+            complete_count = 0
             for _ in pool.imap_unordered(export_subject_form_wrapper, params):
                 progress.update(subject_task, advance=1)
-
+                complete_count += 1
+                if complete_count % log_frequency == 0 or complete_count == len(params):
+                    logger.info(f"Exported {complete_count}/{len(params)} subjects.")
 
 if __name__ == "__main__":
     console.rule(f"[bold red]{MODULE_NAME}")

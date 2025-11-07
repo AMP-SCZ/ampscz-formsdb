@@ -131,7 +131,7 @@ def get_forms_by_network(
     skipped_forms: List[Path] = []
     processed_forms: List[Path] = []
 
-    num_processes = multiprocessing.cpu_count() // 2
+    num_processes = 8
     logger.info(f"Using {num_processes} processes.")
 
     params = [Path(form) for form in forms_glob]

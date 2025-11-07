@@ -445,7 +445,7 @@ def import_forms_by_network(
     # Sort subjects by subject ID
     subjects_glob = sorted(subjects_glob)
 
-    num_processes = multiprocessing.cpu_count() // 4
+    num_processes = 8
     logger.info(f"Using {num_processes} processes.")
 
     skip_buffer = []

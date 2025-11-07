@@ -337,7 +337,7 @@ def compute_nda_upload_eligibility(
     valid_subjects: List[str] = []
     invalid_subjects: List[Tuple[str, List[str]]] = []
 
-    num_processes = multiprocessing.cpu_count() // 4
+    num_processes = 4
     params = [
         (subject_id, required_variables, required_conditions, config_file)
         for subject_id in subjects

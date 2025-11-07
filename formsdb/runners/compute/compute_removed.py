@@ -455,7 +455,7 @@ def compute_removed(config_file: Path, visit_order: List[str]) -> pd.DataFrame:
     subjects_count = len(subject_ids)
     logger.info(f"Found {subjects_count} subjects.")
 
-    num_processes = multiprocessing.cpu_count() // 4
+    num_processes = 4
     logger.info(f"Using {num_processes} processes.")
 
     params = [(config_file, subject_id, visit_order) for subject_id in subject_ids]

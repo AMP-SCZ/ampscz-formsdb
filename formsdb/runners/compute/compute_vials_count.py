@@ -191,7 +191,8 @@ def count_vials(config_file: Path) -> pd.DataFrame:
     ]
     results: List[Dict[str, Any]] = []
 
-    with multiprocessing.Pool() as pool:
+    num_processes = 4
+    with multiprocessing.Pool(processes=num_processes) as pool:
         with utils.get_progress_bar() as progress:
             task = progress.add_task(
                 "Counting blood and saliva vials", total=len(params)

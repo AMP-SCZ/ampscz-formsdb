@@ -224,7 +224,7 @@ def compute_visit_completed_data(config_file: Path) -> pd.DataFrame:
     params = [(config_file, subject) for subject in subject_ids]
     results = []
 
-    num_processes = multiprocessing.cpu_count() // 2
+    num_processes = 8
     logger.info(f"Using {num_processes} processes")
     with multiprocessing.Pool(processes=int(num_processes)) as pool:
         with utils.get_progress_bar() as progress:
@@ -370,7 +370,7 @@ def compute_visit_completed(config_file: Path) -> pd.DataFrame:
     params = [(config_file, subject) for subject in subject_ids]
     completed_results: List[Dict[str, Any]] = []
 
-    num_processes = multiprocessing.cpu_count() // 2
+    num_processes = 8
     logger.info(f"Using {num_processes} processes")
     with multiprocessing.Pool(processes=int(num_processes)) as pool:
         with utils.get_progress_bar() as progress:
