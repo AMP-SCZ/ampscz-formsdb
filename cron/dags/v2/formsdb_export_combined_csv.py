@@ -12,7 +12,7 @@ from airflow.providers.standard.operators.empty import EmptyOperator
 # CONDA_ENV_PATH = "/home/pnl/miniforge3/envs/jupyter/bin"
 # PYTHON_PATH = f"{CONDA_ENV_PATH}/python"
 PYTHON_PATH = "uv run python"
-REPO_ROOT = "/scratch/home/dm1447/dev/ampscz-formsdb"
+REPO_ROOT = "/data/predict1/home/dm1447/dev/ampscz-formsdb"
 
 postgresdb_computed = Asset(
     uri="x-db://ampscz_formsdb:computed",

@@ -32,7 +32,7 @@ from formsdb.helpers import airflow as airflow_helpers
 # CONDA_ENV_PATH = "/home/pnl/dev/ampscz-formsdb/.venv"
 # PYTHON_PATH = f"{CONDA_ENV_PATH}/bin/python"
 PYTHON_PATH = "uv run python"
-REPO_ROOT = "/scratch/home/dm1447/dev/ampscz-formsdb"
+REPO_ROOT = "/data/predict1/home/dm1447/dev/ampscz-formsdb"
 
 postgresdb = Asset(
     uri="x-db://ampscz_formsdb:imported",
