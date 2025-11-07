@@ -230,4 +230,6 @@ import_calculated_outcomes.set_downstream(all_imports_done)
 import_harmonized_jsons.set_downstream(all_imports_done)
 import_upenn_jsons.set_downstream(all_imports_done)
 
+all_imports_done.set_downstream(trigger_pnl_event)
+
 # Done DAG construction
