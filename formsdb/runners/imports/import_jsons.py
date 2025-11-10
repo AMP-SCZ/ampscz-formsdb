@@ -54,7 +54,7 @@ logging.basicConfig(**logargs)
 
 FAILED_IMPORT_SUBJECTS: List[str] = []
 
-pd.set_option('future.no_silent_downcasting', True)
+pd.set_option("future.no_silent_downcasting", True)
 
 
 def export_subject(subject_id: str) -> str:
@@ -294,7 +294,7 @@ def process_subject(
     metadata = {
         "subject_id": subject_id,
         "source": str(subject_json),
-        "source_mdate": source_m_date
+        "source_mdate": source_m_date,
     }
     form_data["metadata"] = metadata
 
@@ -313,7 +313,7 @@ def process_subject(
 
 
 def process_subject_wrapper(
-    args: Tuple[Path, pd.DataFrame, Path, bool]
+    args: Tuple[Path, pd.DataFrame, Path, bool],
 ) -> Tuple[bool, str, List[str]]:
     """
     Wrapper for process_subject to allow for multiprocessing.
@@ -352,8 +352,10 @@ def import_forms_by_network(
     skipped_subjects: List[str] = []
     processed_subjects: List[str] = []
 
-    num_processes = 8
+    num_processes = 16
     logger.info(f"Using {num_processes} processes.")
+
+    log_frequency = max(1, len(subjects_glob) // 10)
 
     params = [
         (Path(subject), data_dictionry_df, config_file, force)
@@ -373,6 +375,10 @@ def import_forms_by_network(
                 else:
                     skipped_subjects.append(subject_id)
                 sql_queries.extend(subject_sql_queries)
+                if len(processed_subjects) % log_frequency == 0:
+                    logger.info(
+                        f"Processed {len(processed_subjects)} / {len(subjects_glob)} subjects (Skipped: {len(skipped_subjects)})"
+                    )
                 progress.update(task, advance=1)
 
     logger.info(f"Processed {len(processed_subjects)} subjects")

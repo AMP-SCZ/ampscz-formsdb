@@ -548,8 +548,9 @@ def compile_medication_data(config_file: Path) -> pd.DataFrame:
     subject_ids = data.get_all_subjects(config_file=config_file)
     medication_raw_data: List[Dict[str, Any]] = []
 
-    num_processes = 4
+    num_processes = 16
     params = [(config_file, subject_id) for subject_id in subject_ids]
+    logger.info(f"Using {num_processes} processes")
 
     with multiprocessing.Pool(processes=int(num_processes)) as pool:
         with utils.get_progress_bar() as progress:

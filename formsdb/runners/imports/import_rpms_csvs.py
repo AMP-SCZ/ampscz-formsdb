@@ -465,8 +465,12 @@ def import_forms_by_network(
     queries: List[str] = []
     skipped_subjects: List[str] = []
 
+    log_frequency = max(1, len(subjects_glob) // 10)
+
     num_processes = 8
     params = [(subject_path, config_file) for subject_path in subjects_glob]
+
+    completed_subjects: List[str] = []
     with multiprocessing.Pool(processes=int(num_processes)) as pool:
         with utils.get_progress_bar() as progress:
             task = progress.add_task("Processing subjects...", total=len(subjects_glob))
@@ -474,8 +478,16 @@ def import_forms_by_network(
                 subject_id = result["subject_id"]
                 subject_queries = result["queries"]
 
+                completed_subjects.append(subject_id)  # type: ignore
+                if len(completed_subjects) % log_frequency == 0:
+                    logger.info(
+                        f"Processed {len(completed_subjects)}/{len(subjects_glob)} "
+                        f"subjects ({(len(completed_subjects)/len(subjects_glob))*100:.1f}%)"
+                    )
+
                 if len(subject_queries) == 0:
                     skipped_subjects.append(subject_id)  # type: ignore
+                    progress.update(task, advance=1)
                     continue
 
                 queries.extend(subject_queries)

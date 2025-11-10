@@ -47,7 +47,7 @@ logargs = {
 }
 logging.basicConfig(**logargs)
 
-pd.set_option('future.no_silent_downcasting', True)
+pd.set_option("future.no_silent_downcasting", True)
 
 
 def get_visit_date(all_forms_df: pd.DataFrame, visit_name: str) -> Optional[datetime]:
@@ -267,7 +267,9 @@ def generate_upenn_form(
             )
 
         if visit is None:
-            logger.warning(f"Could not find visit for {subject_id}, falling back to visit date map")
+            logger.warning(
+                f"Could not find visit for {subject_id}, falling back to visit date map"
+            )
 
             visit_date_map = compute_visit_date_map(
                 all_forms_df=all_forms_df, visits=constants.upenn_visit_order
@@ -297,7 +299,7 @@ def generate_upenn_form(
         session_data: Dict[str, Any] = {}
         for variable in row.index:
             value = row[variable]
-            if pd.isna(value):
+            if pd.isna(value):  # type: ignore
                 continue
 
             value = utils.str_to_typed(value)  # type: ignore
@@ -347,7 +349,7 @@ def construct_insert_queries(
     return sql_queries
 
 
-def process_subject(params: Tuple[Path, str, str, bool]) -> Tuple[str, bool, List[str]]:
+def process_subject(params: Tuple[Path, str, bool]) -> Tuple[str, bool, List[str]]:
     """
     A function to process a subject's UPENN JSON file.
 
@@ -405,8 +407,7 @@ def process_subject(params: Tuple[Path, str, str, bool]) -> Tuple[str, bool, Lis
 
     try:
         sql_queries = construct_insert_queries(
-            subject_id=subject_id,
-            form_data=form_data
+            subject_id=subject_id, form_data=form_data
         )
         return subject_id, True, sql_queries
     except Exception as e:
@@ -437,7 +438,9 @@ def import_forms_by_network(
     skipped_count = 0
     imported_count = 0
 
-    search_pattern = f"{data_root}/{network}/PHOENIX/PROTECTED/*/raw/*/surveys/*.UPENN_nda.json"
+    search_pattern = (
+        f"{data_root}/{network}/PHOENIX/PROTECTED/*/raw/*/surveys/*.UPENN_nda.json"
+    )
     logger.info(f"Searching for subjects in {search_pattern}")
     subjects_glob = glob(search_pattern)
     logger.info(f"Found {len(subjects_glob)} subjects for {network}")
@@ -445,21 +448,21 @@ def import_forms_by_network(
     # Sort subjects by subject ID
     subjects_glob = sorted(subjects_glob)
 
-    num_processes = 8
+    num_processes = 16
     logger.info(f"Using {num_processes} processes.")
+
+    log_frequency = max(1, len(subjects_glob) // 10)
 
     skip_buffer = []
     params = [
-        (config_file, subject_json, force_import)
-        for subject_json in subjects_glob
+        (config_file, subject_json, force_import) for subject_json in subjects_glob
     ]
 
     sql_queries: List[str] = []
     with utils.get_progress_bar() as progress:
         with multiprocessing.Pool(processes=int(num_processes)) as pool:
-            task = progress.add_task(
-                f"Processing {network}...", total=len(params)
-            )
+            task = progress.add_task(f"Processing {network}...", total=len(params))
+            completed_processing: int = 0
             for result in pool.imap_unordered(process_subject, params):
                 subject_id, imported, subject_sql_queries = result
                 if imported:
@@ -467,6 +470,14 @@ def import_forms_by_network(
                 else:
                     skipped_count += 1
                     skip_buffer.append(subject_id)
+                completed_processing += 1
+
+                if completed_processing % log_frequency == 0:
+                    logger.info(
+                        f"Processed {completed_processing}/{len(params)} subjects "
+                        f"for {network} - Imported: {imported_count}, Skipped: {skipped_count}"
+                    )
+
                 sql_queries.extend(subject_sql_queries)
                 progress.update(task, advance=1)
 

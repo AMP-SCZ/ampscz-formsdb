@@ -101,7 +101,7 @@ import_upenn_jsons = BashOperator(
     dag=dag,
     cwd=REPO_ROOT,
     skip_on_exit_code=1,
-    pool_slots=8,
+    pool_slots=16,
 )
 
 # Harmonized JSONs
@@ -113,7 +113,7 @@ import_harmonized_jsons = BashOperator(
     + "/formsdb/runners/imports/import_jsons.py",
     dag=dag,
     cwd=REPO_ROOT,
-    pool_slots=8,
+    pool_slots=16,
 )
 
 # RPMS Specific Imports
