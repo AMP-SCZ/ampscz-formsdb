@@ -2,12 +2,31 @@
 """
 Airflow DAG for AMPSCZ forms database - compute
 """
+import sys
+from pathlib import Path
+
+file = Path(__file__).resolve()
+parent = file.parent
+ROOT = None
+for parent in file.parents:
+    if parent.name == "ampscz-formsdb":
+        ROOT = parent
+sys.path.append(str(ROOT))
+
+# remove current directory from path
+try:
+    sys.path.remove(str(parent))
+except ValueError:
+    pass
 
 from datetime import datetime, timedelta
 
-from airflow.sdk import DAG, Asset
+from airflow.sdk import DAG, Asset, Variable
 from airflow.providers.standard.operators.bash import BashOperator
 from airflow.providers.standard.operators.empty import EmptyOperator
+from airflow.providers.standard.operators.python import PythonOperator
+
+from formsdb.helpers import airflow as airflow_helpers
 
 # CONDA_ENV_PATH = "/home/pnl/dev/ampscz-formsdb/.venv"
 # PYTHON_PATH = f"{CONDA_ENV_PATH}/bin/python"
@@ -20,6 +39,10 @@ postgresdb = Asset(
 postgresdb_computed = Asset(
     uri="x-db://ampscz_formsdb:computed",
 )
+
+ERIS_HOSTNAME = Variable.get("ERIS_HOSTNAME")
+ERIS_PASSWORD = Variable.get("ERIS_PASSWORD")
+ERIS_COMPUTED_ASSET_ID = Variable.get("ERIS_COMPUTED_ASSET_ID")
 
 
 # Define variables
@@ -159,6 +182,20 @@ compute_nda_eligibility = BashOperator(
     pool_slots=4,
 )
 
+def trigger_eris_airflow_event():
+    airflow_helpers.trigger_airflow_imported_asset_event(
+        hostname=ERIS_HOSTNAME,
+        username="eris",
+        password=ERIS_PASSWORD,
+        imported_asset_id=int(ERIS_COMPUTED_ASSET_ID),
+    )
+
+trigger_eris_event = PythonOperator(
+    task_id="trigger_eris_airflow_event",
+    python_callable=trigger_eris_airflow_event,
+    dag=dag,
+)
+
 # Done Task Definitions
 
 # Start DAG construction
@@ -187,5 +224,7 @@ compute_recruitment_status.set_downstream(all_done)
 compute_blood_metrics.set_downstream(all_done)
 compute_visit_completed.set_downstream(all_done)
 compute_nda_eligibility.set_downstream(all_done)
+
+all_done.set_downstream(trigger_eris_event)
 
 # End DAG construction
