@@ -457,8 +457,10 @@ med_idx_drug_equivalent_dose_leucht: Dict[int, float] = {
     304: 0.03396,  # Ziprasidone (Geodon)  #  'ziprasidone/Geodon'
     724: 0.25,  # Ziprasidone (Geodon)  #  'ziprasidone/Geodon ACUTE INJECTION'
     538: 0.03396,  # Ziprasidone (Geodon)  #  'ziprasidone/Geodon or placebo (Blinded)'
+    75: 0.09597, # Prochlorperazine (Compazine)  #  'prochlorperazine/Compazine'
+    76: 0.23, # Prochlorperazine (Compazine)  #  'prochlorperazine/Compazine ACUTE INJECTION'
+    242: 0.02667, # Promazine (Sparine) # 'promazine/Sparine'
 }
-
 antidepressant_fluoxetine_40mg_drug_equivalent_dose: Dict[str, float] = {
     "fluoxetine": 40,
     "agomelatine": 53.2,
