@@ -100,3 +100,4 @@ def trigger_airflow_imported_asset_event(
             f"Failed to trigger asset event. Status code: {response.status_code}, "
             f"Response: {response.text}"
         )
+        raise RuntimeError("Failed to trigger Airflow imported asset event.")
