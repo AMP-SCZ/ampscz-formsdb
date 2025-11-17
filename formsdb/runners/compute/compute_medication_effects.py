@@ -608,12 +608,19 @@ def get_subject_medication_effect_info(
                 if pd.isna(dosage_prescribed) or pd.isna(duration_prescribed):
                     ap_equivalent_drug_dose_prescribed = pd.NA
                     ap_equivalent_drug_dose_estimated_taken = pd.NA
+                    ap_equivalent_drug_dose_prescribed_leucht = pd.NA
+                    ap_equivalent_drug_dose_estimated_taken_leucht = pd.NA
                     bd_equivalent_drug_dose_prescribed = pd.NA
                     bd_equivalent_drug_dose_estimated_taken = pd.NA
                 else:
                     if med_class == "ANTIPSYCHOTIC":
                         ap_standard_equivalent_drug_dose = (
                             constants.med_idx_drug_equivalent_dose.get(
+                                int(med_idx), None
+                            )
+                        )
+                        ap_standard_equivalent_drug_dose_leucht = (
+                            constants.med_idx_drug_equivalent_dose_leucht.get(
                                 int(med_idx), None
                             )
                         )
@@ -643,9 +650,36 @@ def get_subject_medication_effect_info(
                             # )
                             ap_equivalent_drug_dose_prescribed = pd.NA
                             ap_equivalent_drug_dose_estimated_taken = pd.NA
+                        if ap_standard_equivalent_drug_dose_leucht is not None:
+                            prescribed_eq_dosage_for_day_leucht = (
+                                dosage_prescribed * ap_standard_equivalent_drug_dose_leucht
+                            )
+                            ap_equivalent_drug_dose_prescribed_leucht = (
+                                prescribed_eq_dosage_for_day_leucht * duration_prescribed
+                            )
+
+                            if complied_dosage is not None:
+                                complied_equivalent_drug_dose_for_day_leucht = (
+                                    complied_dosage * ap_standard_equivalent_drug_dose_leucht)
+                                )
+                            else:
+                                complied_equivalent_drug_dose_for_day_leucht = pd.NA
+                            ap_equivalent_drug_dose_estimated_taken = (
+                                complied_equivalent_drug_dose_for_day_leucht
+                                * duration_prescribed
+                            )
+                        else:
+                            # logger.warning(
+                            #     f"Missing AP Standard Equivalent Drug Dose for "
+                            #     f"{med_idx}"
+                            # )
+                            ap_equivalent_drug_dose_prescribed_leucht = pd.NA
+                            ap_equivalent_drug_dose_estimated_taken_leucht = pd.NA
                     else:
                         ap_equivalent_drug_dose_prescribed = pd.NA
                         ap_equivalent_drug_dose_estimated_taken = pd.NA
+                        ap_equivalent_drug_dose_prescribed_leucht = pd.NA
+                        ap_equivalent_drug_dose_estimated_taken_leucht = pd.NA
 
                     if med_class == "BENZODIAZEPINE":
                         bd_med_name: str = med_info[int(med_idx)]["med_name"]
@@ -718,6 +752,8 @@ def get_subject_medication_effect_info(
                 if ever_used_inconclusive:
                     ap_equivalent_drug_dose_prescribed = pd.NA
                     ap_equivalent_drug_dose_estimated_taken = pd.NA
+                    ap_equivalent_drug_dose_prescribed_leucht = pd.NA
+                    ap_equivalent_drug_dose_estimated_taken_leucht = pd.NA
                     bd_equivalent_drug_dose_prescribed = pd.NA
                     bd_equivalent_drug_dose_estimated_taken = pd.NA
 
@@ -744,6 +780,8 @@ def get_subject_medication_effect_info(
                         "days_since_last_taken": days_since_last_taken,
                         "ap_equivalent_drug_dose_prescribed": ap_equivalent_drug_dose_prescribed,
                         "ap_equivalent_drug_dose_estimated_taken": ap_equivalent_drug_dose_estimated_taken,
+                        "ap_equivalent_drug_dose_prescribed_leucht": ap_equivalent_drug_dose_prescribed_leucht,
+                        "ap_equivalent_drug_dose_estimated_taken_leucht": ap_equivalent_drug_dose_estimated_taken_leucht,
                         "bd_equivalent_drug_dose_prescribed": bd_equivalent_drug_dose_prescribed,
                         "bd_equivalent_drug_dose_estimated_taken": bd_equivalent_drug_dose_estimated_taken,
                         "med_use": med_use,
@@ -815,6 +853,8 @@ def compile_medication_effects(
         "days_from_consent",
         "ap_equivalent_drug_dose_prescribed",
         "ap_equivalent_drug_dose_estimated_taken",
+        "ap_equivalent_drug_dose_prescribed_leucht",
+        "ap_equivalent_drug_dose_estimated_taken_leucht",
         "bd_equivalent_drug_dose_prescribed",
         "bd_equivalent_drug_dose_estimated_taken",
         "duration_prescribed_days",
