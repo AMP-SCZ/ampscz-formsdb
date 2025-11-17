@@ -227,7 +227,7 @@ def get_subject_medication_info(
             form_modified_date = None
 
         med_idx = 0
-        while med_idx < 25:
+        while med_idx < 100:
             stopped_medication = None
             med_idx += 1
             med_name_variable = f"chrpharm_med{med_idx}_name"
