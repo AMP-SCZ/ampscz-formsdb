@@ -25,7 +25,7 @@ except ValueError:
 
 import logging
 import multiprocessing
-from datetime import datetime
+import warnings
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 import duckdb
@@ -43,6 +43,7 @@ MODULE_NAME = "formsdb.runners.export.export_combined_csv"
 console = utils.get_console()
 
 error_cache: Set[str] = set()
+data_dictionary_cache: Optional[pd.DataFrame] = None  # Cache for data dictionary
 
 logger = logging.getLogger(MODULE_NAME)
 logargs = {
@@ -52,6 +53,9 @@ logargs = {
     "handlers": [RichHandler(rich_tracebacks=True)],
 }
 logging.basicConfig(**logargs)
+
+# Silence Pandas UserWarnings globally
+warnings.filterwarnings("ignore", category=UserWarning, module="pandas")
 
 conn = duckdb.connect(database=":memory:")
 
@@ -189,7 +193,8 @@ def add_additional_cols(
             f"{table}_df = db.execute_sql(config_file=config_file, query=query)"
         )
 
-        duckdb_query = "SELECT * FROM master_df"
+    # Initialize duckdb_query before the loop
+    duckdb_query = "SELECT * FROM master_df"
 
     logger.info("Joining additional columns to the master table...")
     for col in additional_cols:
@@ -217,7 +222,7 @@ def cast_dates_to_str(
     data_df: pd.DataFrame, config_file: Path, network: str
 ) -> pd.DataFrame:
     """
-    Casts date columns to string.
+    Casts date columns to string using vectorized operations for performance.
 
     date_ymd - date in YYYY-MM-DD format
     datetime_ymd - datetime in YYYY-MM-DD HH:MM format
@@ -229,88 +234,75 @@ def cast_dates_to_str(
     Returns:
         pd.DataFrame: Dataframe with date columns cast to string.
     """
+    global data_dictionary_cache
 
-    data_dictionary_df = data.get_data_dictionary(config_file=config_file)
+    # Use cached data dictionary if available
+    if data_dictionary_cache is None:
+        data_dictionary_cache = data.get_data_dictionary(config_file=config_file)
 
-    dates_df = data_dictionary_df[data_dictionary_df["text_validation_type_or_show_slider_number"] == "date_ymd"]
-    datetime_df = data_dictionary_df[
-        data_dictionary_df["text_validation_type_or_show_slider_number"] == "datetime_ymd"
+    data_dictionary_df = data_dictionary_cache
+
+    dates_df = data_dictionary_df[
+        data_dictionary_df["text_validation_type_or_show_slider_number"] == "date_ymd"
     ]
-    time_df = data_dictionary_df[data_dictionary_df["text_validation_type_or_show_slider_number"] == "time"]
+    datetime_df = data_dictionary_df[
+        data_dictionary_df["text_validation_type_or_show_slider_number"]
+        == "datetime_ymd"
+    ]
+    time_df = data_dictionary_df[
+        data_dictionary_df["text_validation_type_or_show_slider_number"] == "time"
+    ]
 
     date_variables = dates_df["field_name"].tolist()
+    datetime_variables = datetime_df["field_name"].tolist()
+    time_variables = time_df["field_name"].tolist()
 
     logger.debug("Casting dates/times/datetimes to REDCap native format...")
+
+    # Vectorized date conversion - MUCH faster than iterrows()
     for date_variable in date_variables:
         if date_variable not in data_df.columns:
             continue
-        # data_df[date_variable] = pd.to_datetime(data_df[date_variable], errors="ignore")
-        # cast to string "YYYY-MM-DD"
-        for idx, row in data_df.iterrows():
-            date_raw_val = row[date_variable]
-            if not pd.isnull(date_raw_val) and date_raw_val is not None:
-                try:
-                    date_val = datetime.fromisoformat(date_raw_val)  # type: ignore
-                    date_str = date_val.strftime("%Y-%m-%d")
-                    data_df.at[idx, date_variable] = date_str
-                except (TypeError, AttributeError):
-                    error_message = (
-                        f"date cast failed ({date_variable}): {date_raw_val}"
-                    )
-                    if error_message not in error_cache:
-                        logger.error(error_message)
-                        error_cache.add(error_message)
-                except ValueError:
-                    pass
+        try:
+            # Convert to datetime and format as string in one operation
+            data_df[date_variable] = pd.to_datetime(
+                data_df[date_variable], errors="coerce"
+            ).dt.strftime("%Y-%m-%d")
+        except Exception as e:
+            error_message = f"date cast failed for column ({date_variable}): {str(e)}"
+            if error_message not in error_cache:
+                logger.error(error_message)
+                error_cache.add(error_message)
 
-    datetime_variables = datetime_df["field_name"].tolist()
-
+    # Vectorized datetime conversion
     for datetime_variable in datetime_variables:
         if datetime_variable not in data_df.columns:
             continue
-        # data_df[datetime_variable] = pd.to_datetime(
-        #     data_df[datetime_variable], errors="ignore"
-        # )
-        # cast to string "YYYY-MM-DD HH:MM"
-        for idx, row in data_df.iterrows():
-            datetime_val = row[datetime_variable]
-            if not pd.isnull(datetime_val) and datetime_val is not None:
-                try:
-                    datetime_val = datetime.fromisoformat(datetime_val)  # type: ignore
-                    datetime_str = datetime_val.strftime("%Y-%m-%d %H:%M")
-                    data_df.at[idx, datetime_variable] = datetime_str
-                except (TypeError, AttributeError):
-                    error_message = (
-                        f"datetime cast failed ({datetime_variable}): {datetime_val}"
-                    )
-                    if error_message not in error_cache:
-                        logger.error(error_message)
-                        error_cache.add(error_message)
-                except ValueError:
-                    pass
-        # data_df[datetime_variable] = data_df[datetime_variable].dt.strftime("%Y-%m-%d %H:%M")
+        try:
+            data_df[datetime_variable] = pd.to_datetime(
+                data_df[datetime_variable], errors="coerce"
+            ).dt.strftime("%Y-%m-%d %H:%M")
+        except Exception as e:
+            error_message = (
+                f"datetime cast failed for column ({datetime_variable}): {str(e)}"
+            )
+            if error_message not in error_cache:
+                logger.error(error_message)
+                error_cache.add(error_message)
 
-    time_variables = time_df["field_name"].tolist()
-
+    # Vectorized time conversion
     for time_variable in time_variables:
         if time_variable not in data_df.columns:
             continue
-
-        # cast to string "HH:MM"
-        for idx, row in data_df.iterrows():
-            time_val = row[time_variable]
-            if not pd.isnull(time_val) and time_val is not None:
-                try:
-                    # if network == "PRESCIENT":
-                    #     time_val = handle_datetime(time_val)  # type: ignore
-                    # else:
-                    time_val = datetime.fromisoformat(time_val)  # type: ignore
-                    time_str = time_val.strftime("%H:%M")
-                    data_df.at[idx, time_variable] = time_str
-                except TypeError:
-                    logger.error(f"time cast failed: {time_val}")
-                except ValueError:
-                    pass
+        try:
+            data_df[time_variable] = pd.to_datetime(
+                data_df[time_variable], errors="coerce"
+            ).dt.strftime("%H:%M")
+        except Exception as e:
+            error_message = f"time cast failed for column ({time_variable}): {str(e)}"
+            if error_message not in error_cache:
+                logger.error(error_message)
+                error_cache.add(error_message)
 
     return data_df
 
@@ -350,13 +342,9 @@ def combine_data_from_formsdb(
     #     df = cast_dates_to_str(data_df=df, config_file=config_file)
     df = cast_dates_to_str(data_df=df, config_file=config_file, network=network)
 
-    # replace NaT with ''
-    df = df.astype(str).replace("NaT", "")
-
-    # Drop columns with all NaN values in data columns
+    # Drop columns with all NaN values in data columns BEFORE string conversion
     mandatory_cols = [
-        "subject_id"
-        "visit_started",
+        "subject_id" "visit_started",
         "visit_status",
         "visit_status_string",
         "visit_completed",
@@ -372,30 +360,22 @@ def combine_data_from_formsdb(
         "gender",
         "cohort",
         "age_at_consent",
-        "subjectid"
+        "subjectid",
     ]
 
     data_cols = list(set(df.columns) - set(mandatory_cols))
     df.dropna(axis=0, how="all", subset=data_cols, inplace=True)
     df.dropna(axis=1, how="all", inplace=True)
 
-    # replace all occurrences of '.0' in values with ''
-    df = df.astype(str).replace(r"\.0+$", "", regex=True)
+    # Consolidated string operations - convert to string once and do all replacements
+    df = df.astype(str)
 
-    # replace None with ''
-    df = df.astype(str).replace("None", "")
-    # df = df.replace(
-    #     to_replace=[None],
-    #     value=""
-    # )
-    # df = df.replace(
-    #     to_replace=[pd.NA],
-    #     value=""
-    # )
+    # Chain all replacements together for efficiency
+    replacements = {"NaT": "", "None": "", "True": "1", "False": "0"}
+    df = df.replace(replacements)
 
-    # Replace 'True' and 'False' with '1' and '0'
-    df = df.astype(str).replace("True", "1")
-    df = df.astype(str).replace("False", "0")
+    # Remove trailing .0 patterns
+    df = df.replace(r"\.0+$", "", regex=True)
 
     return df
 
@@ -493,14 +473,18 @@ def get_subject_visit_combined_df(
 
     subject_df = db.execute_sql(config_file=config_file, query=query)
 
+    if subject_df.empty:
+        return {}
+
     subject_df = utils.explode_col(df=subject_df, col="form_data")
 
-    try:
-        merged_row = subject_df.iloc[0]
-    except IndexError:
-        return {}
-    for i in range(1, len(subject_df)):
-        merged_row = merged_row.combine_first(subject_df.iloc[i])
+    # Optimize: Use dict concatenation instead of iterative combine_first
+    merged_dict: Dict[str, Any] = {}
+    for _, row in subject_df.iterrows():
+        for key, value in row.items():
+            key_str = str(key)  # Ensure key is string
+            if key_str not in merged_dict or pd.isna(merged_dict.get(key_str)):
+                merged_dict[key_str] = value
 
     # Include fasting and vials counts for baseline and month_2
     fluid_collection_timepoints: List[str] = ["baseline", "month_2"]
@@ -508,7 +492,7 @@ def get_subject_visit_combined_df(
         fasting_time = fetch_fasting_time(
             config_file=config_file, subject_id=subject_id, timepoint=event_name
         )
-        merged_row["time_fasting"] = fasting_time
+        merged_dict["time_fasting"] = fasting_time
 
         for fluid in ["blood", "saliva"]:
             vial_count = fetch_vial_count(
@@ -517,19 +501,14 @@ def get_subject_visit_combined_df(
                 event_name=event_name,
                 fluid_type=fluid,
             )
-
-            # SettingWithCopyWarning: A value is trying to be set on a copy of a slice from a DataFrame.
-            merged_row[f"{fluid}_vial_count"] = vial_count
-
-    # result_df = pd.DataFrame([merged_row])
-    merged_row_dict = merged_row.to_dict()
+            merged_dict[f"{fluid}_vial_count"] = vial_count
 
     # If any keys has 'None' string as value, replace with 'NoneRaw'
-    for key, value in merged_row_dict.items():
+    for key, value in merged_dict.items():
         if value == "None":
-            merged_row_dict[key] = "NoneRaw"
+            merged_dict[key] = "NoneRaw"
 
-    return merged_row_dict
+    return merged_dict
 
 
 def process_subject_visit(params: Tuple[Path, str, str]) -> Dict[str, Any]:
@@ -581,6 +560,11 @@ def get_visit_df(
             progress.update(task_subjects, advance=1)
 
     progress.remove_task(task_subjects)
+
+    if not results:
+        logger.warning(f"No data found for visit {event_name}")
+        return pd.DataFrame()
+
     concat_task = progress.add_task(f"Concating {event_name} results...", total=None)
     visit_df = pd.DataFrame(results, dtype=str)
     progress.remove_task(concat_task)
