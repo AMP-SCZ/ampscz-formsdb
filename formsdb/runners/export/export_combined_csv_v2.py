@@ -426,11 +426,15 @@ def get_visit_df_bulk(
     # This replaces the per-subject iterrows() merge loop
     visit_df = all_forms_df.groupby("subject_id", as_index=False).first()
 
-    # Drop the event_name column (not needed in output)
-    if "event_name" in visit_df.columns:
-        visit_df.drop(columns=["event_name"], inplace=True)
+    # Convert to dtype=str immediately, matching the original's
+    # pd.DataFrame(results, dtype=str). This ensures:
+    # - NaN becomes the string "nan" (not actual NaN)
+    # - dropna in combine_data_from_formsdb becomes a no-op (matching original)
+    # - downstream string replacements work identically
+    visit_df = visit_df.astype(str)
 
     # Handle 'None' string values -> 'NoneRaw' (matches original behavior)
+    # Must happen AFTER astype(str) so Python None objects are now "None" strings
     visit_df = visit_df.replace({"None": "NoneRaw"})
 
     progress.remove_task(task)
@@ -465,6 +469,12 @@ def get_visit_df_bulk(
             for col in ["blood_vial_count", "saliva_vial_count"]:
                 if col in visit_df.columns:
                     visit_df[col] = visit_df[col].fillna(0).astype(int)
+
+        # Re-convert to str after merge (merge may introduce NaN for
+        # subjects without fasting/vial data)
+        visit_df = visit_df.astype(str)
+        # Replace "None" introduced by astype(str) on None values
+        visit_df = visit_df.replace({"None": "NoneRaw"})
 
         progress.remove_task(task)
 
