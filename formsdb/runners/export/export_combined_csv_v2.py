@@ -334,9 +334,10 @@ def combine_data_from_formsdb(
     df = cast_dates_to_str(data_df=df, config_file=config_file, network=network)
 
     # Drop columns with all NaN values in data columns BEFORE string conversion
+    # NOTE: The original has a bug where "subject_id" "visit_started" is missing a
+    # comma, creating "subject_idvisit_started". We replicate this to match output.
     mandatory_cols = {
-        "subject_id",
-        "visit_started",
+        "subject_id" "visit_started",  # Bug-for-bug compat: missing comma = concat
         "visit_status",
         "visit_status_string",
         "visit_completed",
@@ -430,21 +431,35 @@ def get_visit_df_bulk(
 
     # Explode the JSON form_data column into separate columns
     all_forms_df = utils.explode_col(df=all_forms_df, col="form_data")
+    # Defragment after json_normalize (which creates a highly fragmented DataFrame
+    # via pd.concat of many small Series). Prevents PerformanceWarning on groupby.
+    all_forms_df = all_forms_df.copy()
 
-    # For each subject, merge rows using groupby + first (keeps first non-null per column)
-    # This replaces the per-subject iterrows() merge loop
-    # .copy() defragments the DataFrame (avoids PerformanceWarning from highly fragmented frame)
-    visit_df = all_forms_df.groupby("subject_id", as_index=False).first().copy()
+    # Per-subject dict merge: replicate the original's iterrows() merge logic
+    # to preserve the None vs NaN distinction (JSON null -> None -> "None" -> "",
+    # while missing columns -> NaN -> "nan"). groupby().first() collapses this
+    # distinction because it skips both None and NaN.
+    results: List[Dict[str, Any]] = []
+    for subject_id, subject_forms in all_forms_df.groupby("subject_id"):
+        merged_dict: Dict[str, Any] = {}
+        for _, row in subject_forms.iterrows():
+            for key, value in row.items():
+                key_str = str(key)
+                if key_str not in merged_dict or pd.isna(merged_dict.get(key_str)):
+                    merged_dict[key_str] = value
+        results.append(merged_dict)
 
-    # Convert to dtype=str immediately, matching the original's
-    # pd.DataFrame(results, dtype=str). This ensures:
-    # - NaN becomes the string "nan" (not actual NaN)
-    # - dropna in combine_data_from_formsdb becomes a no-op (matching original)
-    # - downstream string replacements work identically
-    visit_df = visit_df.astype(str)
+    if not results:
+        progress.remove_task(task)
+        return pd.DataFrame()
+
+    # Build DataFrame with dtype=str (matching original exactly):
+    # - None (from JSON null) -> "None" string
+    # - NaN (missing column) -> "nan" string
+    visit_df = pd.DataFrame(results, dtype=str)
 
     # Handle 'None' string values -> 'NoneRaw' (matches original behavior)
-    # Must happen AFTER astype(str) so Python None objects are now "None" strings
+    # Protects actual data "None" values from being replaced with "" later
     visit_df = visit_df.replace({"None": "NoneRaw"})
 
     progress.remove_task(task)
@@ -464,6 +479,8 @@ def get_visit_df_bulk(
         """
         fasting_df = execute_sql_fast(config_file=config_file, query=fasting_query)
         if not fasting_df.empty:
+            # Convert fasting data to str before merge to match visit_df types
+            fasting_df["time_fasting"] = fasting_df["time_fasting"].astype(str)
             visit_df = visit_df.merge(fasting_df, on="subject_id", how="left")
 
         # Bulk fetch vial counts (1 query instead of ~6000)
@@ -474,17 +491,11 @@ def get_visit_df_bulk(
         """
         vial_df = execute_sql_fast(config_file=config_file, query=vial_query)
         if not vial_df.empty:
-            visit_df = visit_df.merge(vial_df, on="subject_id", how="left")
             # Fill missing vial counts with 0 (matches original behavior)
             for col in ["blood_vial_count", "saliva_vial_count"]:
-                if col in visit_df.columns:
-                    visit_df[col] = visit_df[col].fillna(0).astype(int)
-
-        # Re-convert to str after merge (merge may introduce NaN for
-        # subjects without fasting/vial data)
-        visit_df = visit_df.astype(str)
-        # Replace "None" introduced by astype(str) on None values
-        visit_df = visit_df.replace({"None": "NoneRaw"})
+                if col in vial_df.columns:
+                    vial_df[col] = vial_df[col].fillna(0).astype(int).astype(str)
+            visit_df = visit_df.merge(vial_df, on="subject_id", how="left")
 
         progress.remove_task(task)
 
