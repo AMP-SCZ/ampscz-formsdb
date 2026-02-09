@@ -271,7 +271,7 @@ def cast_dates_to_str(
     for date_variable in date_variables:
         try:
             data_df[date_variable] = pd.to_datetime(
-                data_df[date_variable], errors="coerce"
+                data_df[date_variable], errors="coerce", format="mixed"
             ).dt.strftime("%Y-%m-%d")
         except Exception as e:
             error_message = f"date cast failed for column ({date_variable}): {str(e)}"
@@ -283,7 +283,7 @@ def cast_dates_to_str(
     for datetime_variable in datetime_variables:
         try:
             data_df[datetime_variable] = pd.to_datetime(
-                data_df[datetime_variable], errors="coerce"
+                data_df[datetime_variable], errors="coerce", format="mixed"
             ).dt.strftime("%Y-%m-%d %H:%M")
         except Exception as e:
             error_message = (
@@ -297,7 +297,7 @@ def cast_dates_to_str(
     for time_variable in time_variables:
         try:
             data_df[time_variable] = pd.to_datetime(
-                data_df[time_variable], errors="coerce"
+                data_df[time_variable], errors="coerce", format="mixed"
             ).dt.strftime("%H:%M")
         except Exception as e:
             error_message = f"time cast failed for column ({time_variable}): {str(e)}"
@@ -363,7 +363,16 @@ def combine_data_from_formsdb(
     df = df.astype(str)
 
     # Chain all replacements together for efficiency
-    replacements = {"NaT": "", "None": "", "True": "1", "False": "0"}
+    # NoneRaw was used to protect literal "None" values from JSON during processing;
+    # convert it to empty string here (in the original, DuckDB type inference
+    # implicitly converted NoneRaw to NULL for numeric columns, achieving the same)
+    replacements = {
+        "NaT": "",
+        "None": "",
+        "NoneRaw": "",
+        "True": "1",
+        "False": "0",
+    }
     df = df.replace(replacements)
 
     # Remove trailing .0 patterns
@@ -424,7 +433,8 @@ def get_visit_df_bulk(
 
     # For each subject, merge rows using groupby + first (keeps first non-null per column)
     # This replaces the per-subject iterrows() merge loop
-    visit_df = all_forms_df.groupby("subject_id", as_index=False).first()
+    # .copy() defragments the DataFrame (avoids PerformanceWarning from highly fragmented frame)
+    visit_df = all_forms_df.groupby("subject_id", as_index=False).first().copy()
 
     # Convert to dtype=str immediately, matching the original's
     # pd.DataFrame(results, dtype=str). This ensures:
