@@ -243,7 +243,7 @@ def get_medication_duaraion_i(
 
     duration = len(dates)
     if duration == 0:
-        return pd.NA, pd.NA, pd.NA  # type: ignore[return]
+        return pd.NA, pd.NA, pd.NA, pd.NA  # type: ignore[return]
 
     avg_dosage = sum(total_dosage_by_date.values()) / duration
     complied_avg_dosage = sum(complied_total_dosage_by_date.values()) / duration
@@ -545,7 +545,7 @@ def get_subject_medication_effect_info(
             # logger.warning(f"Processing {modality} - {timepoint} for {subject_id} on {subject_date_dt}")
             currently_taking, potential_currently_taking, taken_before = (
                 get_medication_status(
-                    medication_df=subject_medication_data, target_date=subject_date_dt
+                    medication_df=subject_medication_data, target_date=subject_date_dt  # type: ignore
                 )
             )
 
@@ -567,12 +567,12 @@ def get_subject_medication_effect_info(
                 ever_used = med_idx in taken_before
 
                 result = get_medication_duaraion_i(
-                    medication_df=subject_medication_data,
+                    medication_df=subject_medication_data,  # type: ignore
                     target_medication_idx=med_idx,
                     target_date=subject_date_dt,
                 )
                 is_ongoing = is_medication_ongoing(
-                    medication_df=subject_medication_data,
+                    medication_df=subject_medication_data,  # type: ignore
                     target_medication_idx=med_idx,
                     target_date=subject_date_dt,
                 )
@@ -581,7 +581,7 @@ def get_subject_medication_effect_info(
                     days_since_last_taken = 0
                 else:
                     last_taken_date = date_last_taken(
-                        medication_df=subject_medication_data,
+                        medication_df=subject_medication_data,  # type: ignore
                         target_medication_idx=med_idx,
                         target_date=subject_date_dt,
                     )
@@ -660,11 +660,11 @@ def get_subject_medication_effect_info(
 
                             if complied_dosage is not None:
                                 complied_equivalent_drug_dose_for_day_leucht = (
-                                    complied_dosage * ap_standard_equivalent_drug_dose_leucht)
+                                    complied_dosage * ap_standard_equivalent_drug_dose_leucht
                                 )
                             else:
                                 complied_equivalent_drug_dose_for_day_leucht = pd.NA
-                            ap_equivalent_drug_dose_estimated_taken = (
+                            ap_equivalent_drug_dose_estimated_taken_leucht = (
                                 complied_equivalent_drug_dose_for_day_leucht
                                 * duration_prescribed
                             )
@@ -836,7 +836,7 @@ def compile_medication_effects(
     #     f"Randomly selected {len(subjects)} subjects for processing (out of {len(all_subjects)} total subjects)."
     # )
 
-    num_processes = multiprocessing.cpu_count() // 2
+    num_processes = multiprocessing.cpu_count()
     logger.info(f"Using {num_processes} processes for parallel computation.")
     params = [(config_file, subject_id) for subject_id in subjects]
 
