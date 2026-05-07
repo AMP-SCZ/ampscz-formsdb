@@ -135,23 +135,31 @@ def get_all_medication_info(
 
     med_data: Dict[int, Dict[str, Any]] = {}
     for med_id, value in results_raw.items():
-        try:
-            med_name, med_class, _ = value.split("_")
-        except ValueError:
-            med_name, _ = value.split("_")
-            med_class = "UNCATEGORIZED"
+        if med_id == "733":
+            med_name = "ANTIBIOTIC BUT NAME UNKNOWN"
+            med_class = "ANTIBIOTIC"
+        else:
+            try:
+                med_name, med_class, _ = value.split("_")
+            except ValueError:
+                try:
+                    med_name, _ = value.split("_")
+                    med_class = "UNCATEGORIZED"
+                except Exception as e:
+                    logger.error(f"Error parsing medication information for {value}: {e}")
+                    raise e
 
-        # Override medication classes based on IDs
-        if med_id == '333':
-            med_class = "ANTIPSYCHOTIC"
-        elif med_id == '444':
-            med_class = "ANTIDEPRESSANT"
-        elif med_id == '555':
-            med_class = "MOOD STABILIZER"
-        elif med_id == '666':
-            med_class = "STIMULANT"
-        elif med_id == '999':
-            med_class = "NO_MEDS"
+            # Override medication classes based on IDs
+            if med_id == '333':
+                med_class = "ANTIPSYCHOTIC"
+            elif med_id == '444':
+                med_class = "ANTIDEPRESSANT"
+            elif med_id == '555':
+                med_class = "MOOD STABILIZER"
+            elif med_id == '666':
+                med_class = "STIMULANT"
+            elif med_id == '999':
+                med_class = "NO_MEDS"
 
         med_data[int(med_id)] = {
             "med_id": med_id,
@@ -621,7 +629,7 @@ FROM forms.forms,
     jsonb_each_text(form_data)
 WHERE subject_id = '{subject_id}' AND
     form_name = '{form_name}' AND
-    event_name LIKE '%%{event_name}%%' and
+    event_name LIKE '%%{event_name}_arm%%' and
     key = '{variable_name}'
 """
 
