@@ -50,6 +50,7 @@ def get_airflow_access_token(
         logger.error(
             f"Failed to get access token. Status code: {response.status_code}, Response: {response.text}"
         )
+        raise ValueError(response.text)
         return None
 
 
