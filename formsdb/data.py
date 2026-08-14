@@ -1309,8 +1309,6 @@ def estimate_event_date(
     """
 
     forms_df = get_all_subject_forms(subject_id=subject_id, config_file=config_file)
-
-    forms_df = get_all_subject_forms(subject_id=subject_id, config_file=config_file)
     visit_df = forms_df[forms_df["event_name"].str.contains(f"{event}_")]
 
     if visit_df.empty:
