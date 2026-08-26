@@ -408,8 +408,16 @@ def get_subject_consent_dates(config_file: Path, subject_id: str) -> datetime:
     try:
         date = datetime.strptime(date, "%Y-%m-%dT%H:%M:%S")
     except ValueError:
-        date = pd.to_datetime(date, dayfirst=True)
-        date = date.to_pydatetime()
+        try:
+            # Parse ISO8601 values with timezone explicitly before day-first fallback.
+            date = datetime.fromisoformat(date.replace("Z", "+00:00"))
+        except ValueError:
+            date = pd.to_datetime(date, dayfirst=True)
+            date = date.to_pydatetime()
+
+    # Remove timezone info if present to ensure naive datetime for comparison
+    if date.tzinfo is not None:
+        date = date.replace(tzinfo=None)
 
     if subject_uses_rpms(config_file=config_file, subject_id=subject_id):
         query = f"""
@@ -1338,6 +1346,8 @@ def estimate_event_date(
                 continue
             else:
                 date_ts: pd.Timestamp = pd.to_datetime(date)
+                if date_ts.tzinfo is not None:
+                    date_ts = date_ts.tz_localize(None)
                 if date_ts < datetime(2019, 1, 1):
                     continue
                 date_dt = date_ts.to_pydatetime()

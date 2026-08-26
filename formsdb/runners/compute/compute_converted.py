@@ -135,7 +135,9 @@ def get_conversion_date(subject_id: str, config_file: Path) -> Optional[datetime
 
         if variable in form_data:
             conversion_date = form_data[variable]
-            conversion_date_d = datetime.strptime(conversion_date, "%Y-%m-%dT%H:%M:%S")
+            conversion_date_d = pd.to_datetime(conversion_date).to_pydatetime()
+            if conversion_date_d.tzinfo is not None:
+                conversion_date_d = conversion_date_d.replace(tzinfo=None)
 
             # Ignore if converted date is earlier than 1950
             if conversion_date_d.year < 1950:
