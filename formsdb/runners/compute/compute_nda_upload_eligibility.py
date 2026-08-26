@@ -358,11 +358,18 @@ def compute_nda_upload_eligibility(
         invalid_subjects, columns=["subject_id", "issues"]
     )
 
-    exploded = invalid_subjects_df.explode("issues")
-    bool_table = pd.crosstab(
-        exploded["subject_id"], exploded["issues"]
-    ).astype(bool)
-    result_df = invalid_subjects_df.join(bool_table, on="subject_id")
+    if not invalid_subjects_df.empty:
+        # `explode` keeps the original index by default, which can produce duplicate
+        # labels that break alignment in recent pandas crosstab internals.
+        exploded = invalid_subjects_df.explode("issues", ignore_index=True)
+        bool_table = (
+            pd.crosstab(exploded["subject_id"], exploded["issues"])
+            .astype(bool)
+            .reset_index()
+        )
+        result_df = invalid_subjects_df.merge(bool_table, on="subject_id", how="left")
+    else:
+        result_df = invalid_subjects_df.copy()
 
     # Add column 'nda_upload_eligible' with False for invalid subjects
     result_df["nda_upload_eligible"] = False
