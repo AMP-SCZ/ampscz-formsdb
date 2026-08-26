@@ -29,7 +29,7 @@ import pandas as pd
 from psycopg2.extensions import AsIs, register_adapter
 from rich.logging import RichHandler
 
-from formsdb import data
+from formsdb import data, constants
 from formsdb.helpers import db, utils, dpdash
 
 # Addresses:
@@ -133,7 +133,45 @@ def handle_datetime(time_value: str) -> Optional[datetime]:
         # Remove the time part
         datetime_val = datetime_val.replace(hour=0, minute=0, second=0, microsecond=0)
 
+    if datetime_val.tzinfo is not None:
+        datetime_val = datetime_val.replace(tzinfo=None)
+
     return datetime_val
+
+
+def get_most_recent_bprs_date(subject_id: str, config_file: Path) -> Optional[datetime]:
+    """
+    Get the most recent BPRS date for a subject.
+
+    Args:
+        subject_id (str): Subject ID.
+        config_file (Path): Path to the configuration file.
+
+    Returns:
+        Optional[datetime]: Most recent BPRS date for the subject, or None if not found.
+    """
+
+    events: List[str] = constants.visit_order.copy()
+    events.reverse()  # Check most recent events first
+    event_date_variable = "chrbprs_interview_date"
+
+    most_recent_date: Optional[datetime] = None
+    for event in events:
+        event_date = data.get_variable(
+            config_file=config_file,
+            subject_id=subject_id,
+            form_name="bprs",
+            event_name=event,
+            variable_name=event_date_variable,
+        )
+        event_date = remove_missing_codes(event_date)
+        if event_date is not None:
+            event_date = handle_datetime(event_date)
+        if event_date is not None:
+            most_recent_date = event_date
+            break
+
+    return most_recent_date
 
 
 def get_subject_medication_info(
@@ -190,41 +228,43 @@ def get_subject_medication_info(
         form_df = utils.explode_col(
             df=form_df,
         )
-        if "current_pharmaceutical_treatment" in medication_form:
-            if medication_form == "current_pharmaceutical_treatment_floating_med_125":
-                form_modified_date_var = "chrpharm_date_mod"
-            elif (
-                medication_form == "current_pharmaceutical_treatment_floating_med_2650"
-            ):
-                form_modified_date_var = "chrpharm_date_mod_2"
-            else:
-                raise ValueError(f"Unknown medication form: {medication_form}")
-        else:
-            form_modified_date_var = None
+        # if "current_pharmaceutical_treatment" in medication_form:
+        #     if medication_form == "current_pharmaceutical_treatment_floating_med_125":
+        #         form_modified_date_var = "chrpharm_date_mod"
+        #     elif (
+        #         medication_form == "current_pharmaceutical_treatment_floating_med_2650"
+        #     ):
+        #         form_modified_date_var = "chrpharm_date_mod_2"
+        #     else:
+        #         raise ValueError(f"Unknown medication form: {medication_form}")
+        # else:
+        #     form_modified_date_var = None
 
-        if form_modified_date_var is not None:
-            try:
-                form_modified_date = form_df[form_modified_date_var].iloc[0]
-            except KeyError:
-                logger.warning(
-                    f"Missing modified date variable "
-                    f"{form_modified_date_var} for "
-                    f"{medication_form} for subject "
-                    f"{subject_id}"
-                )
-                form_modified_date = None
-            form_modified_date = remove_missing_codes(form_modified_date)
-            if form_modified_date is not None:
-                form_modified_date = handle_datetime(form_modified_date)
-            else:
-                form_modified_date = None
-                if medication_form != "past_pharmaceutical_treatment":
-                    # Only warn for current forms, past forms do not have a modified date
-                    logger.warning(
-                        f"Missing modified date for {medication_form} for subject {subject_id}"
-                    )
-        else:
-            form_modified_date = None
+        # if form_modified_date_var is not None:
+        #     try:
+        #         form_modified_date = form_df[form_modified_date_var].iloc[0]
+        #     except KeyError:
+        #         logger.warning(
+        #             f"Missing modified date variable "
+        #             f"{form_modified_date_var} for "
+        #             f"{medication_form} for subject "
+        #             f"{subject_id}"
+        #         )
+        #         form_modified_date = None
+        #     form_modified_date = remove_missing_codes(form_modified_date)
+        #     if form_modified_date is not None:
+        #         form_modified_date = handle_datetime(form_modified_date)
+        #     else:
+        #         form_modified_date = None
+        #         if medication_form != "past_pharmaceutical_treatment":
+        #             # Only warn for current forms, past forms do not have a modified date
+        #             logger.warning(
+        #                 f"Missing modified date for {medication_form} for subject {subject_id}"
+        #             )
+        # else:
+        #     form_modified_date = None
+
+        form_modified_date = get_most_recent_bprs_date(subject_id=subject_id, config_file=config_file)
 
         med_idx = 0
         while med_idx < 25:
@@ -244,7 +284,8 @@ def get_subject_medication_info(
                 config_file=config_file, med_id=med_id
             )
             if med_info is None:
-                raise ValueError(f"Medication {med_id} not found in database")
+                logger.error(f"Medication {med_id} not found in database")
+                continue
 
             # priorotize first dose as start date over onset date for start date
             first_dose_date_variable = f"chrpharm_firstdose_med{med_idx}"
