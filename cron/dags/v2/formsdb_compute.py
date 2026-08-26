@@ -185,7 +185,7 @@ compute_nda_eligibility = BashOperator(
 def trigger_eris_airflow_event():
     airflow_helpers.trigger_airflow_imported_asset_event(
         hostname=ERIS_HOSTNAME,
-        username="eris",
+        username="pnl",
         password=ERIS_PASSWORD,
         imported_asset_id=int(ERIS_COMPUTED_ASSET_ID),
     )
