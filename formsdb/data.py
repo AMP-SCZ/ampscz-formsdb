@@ -899,15 +899,20 @@ def rpms_form_has_missing_data(
     status_form_df = status_form_df[status_form_df["redcap_form_name"] == form_name]
 
     if event_name:
+        # Exact match: substring matching would make 'month_1' match 'month_10', etc.
         status_form_df = status_form_df[
-            status_form_df["redcap_event_name"].str.contains(event_name, na=False)
+            status_form_df["redcap_event_name"] == event_name
         ]
 
     if status_form_df.empty:
         return None
 
     # Check if any row has CompletionStatus == 3 or 4
-    if (status_form_df["CompletionStatus"].isin([3, 4])).any():
+    # CompletionStatus is stored as text in the DB, so coerce before comparing
+    completion_status = pd.to_numeric(
+        status_form_df["CompletionStatus"], errors="coerce"
+    )
+    if completion_status.isin([3, 4]).any():
         return True
 
     return False
