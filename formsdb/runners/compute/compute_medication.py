@@ -62,8 +62,9 @@ def remove_missing_codes(value: Optional[str]) -> Optional[str]:
     """
     Remove missing codes from the value.
 
-    Recognized missing codes: -9, -3
+    Recognized missing codes: -9, -3, 99999, 999999
     Replaces missing codes with None.
+    (Date missing codes, i.e. any 1903 date, are handled in handle_datetime.)
 
     Args:
         value (Optional[Union[str, int]]): Value to check.
@@ -115,9 +116,10 @@ def handle_datetime(time_value: str) -> Optional[datetime]:
         else:
             raise ValueError(f"Unknown time format: {time_value}") from e
 
-    # If date is 1909, return None
-    # if datetime_val.year == 1903:
-    #     return None
+    # 1903 dates are RPMS missing codes (e.g. 03/03/1903). The importer stores
+    # dates as ISO strings (e.g. 1903-03-03T03:03:00+00:00), so match on the parsed date.
+    if datetime_val.year == 1903:
+        return None
     if datetime_val.year == 1909:
         return None
 
@@ -287,27 +289,28 @@ def get_subject_medication_info(
                 logger.error(f"Medication {med_id} not found in database")
                 continue
 
-            # priorotize first dose as start date over onset date for start date
+            # priorotize first dose as start date over onset date for start date,
+            # except for med 999, where onset date is prioritized
             first_dose_date_variable = f"chrpharm_firstdose_med{med_idx}"
             onset_date_variable = f"chrpharm_med{med_idx}_onset"
             if medication_form == "past_pharmaceutical_treatment":
                 first_dose_date_variable = f"{first_dose_date_variable}_past"
                 onset_date_variable = f"{onset_date_variable}_past"
 
+            start_date_variables = [first_dose_date_variable, onset_date_variable]
+            if med_id == 999:
+                start_date_variables.reverse()
+
             start_date = None
-            if first_dose_date_variable in form_df.columns:
-                start_date = form_df[first_dose_date_variable].iloc[0]
+            for start_date_variable in start_date_variables:
+                if start_date_variable not in form_df.columns:
+                    continue
+                start_date = form_df[start_date_variable].iloc[0]
                 start_date = remove_missing_codes(start_date)
                 if start_date is not None:
                     start_date = handle_datetime(start_date)
-            if start_date is None and onset_date_variable in form_df.columns:
-                start_date = form_df[onset_date_variable].iloc[0]
-                start_date = remove_missing_codes(start_date)
                 if start_date is not None:
-                    start_date = handle_datetime(start_date)
-            else:
-                # print(f"Missing start date for med {med_idx}: {subject_id}@{medication_form}")
-                pass
+                    break
 
             # similarly, prioritize offset date over last use date for end date
             last_use_date_variable = f"chrpharm_lastuse_med{med_idx}"
