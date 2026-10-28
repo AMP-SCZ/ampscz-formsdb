@@ -1340,8 +1340,7 @@ def estimate_event_date(
         form_data_r: Dict[str, Any] = row["form_data"]
         form_variables = form_data_r.keys()
 
-        date_variables = [v for v in form_variables if "date" in v]
-        date_variables = [v for v in date_variables if "entry_date" not in v]
+        date_variables = [v for v in form_variables if v.endswith("_interview_date")]
 
         for date_variable in date_variables:
             date = form_data_r[date_variable]
