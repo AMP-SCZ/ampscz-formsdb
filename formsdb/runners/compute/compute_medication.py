@@ -147,7 +147,7 @@ def handle_datetime(time_value: str) -> Optional[datetime]:
 
 def get_subject_medication_info(
     config_file: Path, subject_id: str
-) -> List[Dict[str, Any]]:
+) -> Tuple[List[Dict[str, Any]], bool]:
     """
     Compile medication data for a subject.
 
@@ -156,8 +156,10 @@ def get_subject_medication_info(
         subject_id (str): Subject ID.
 
     Returns:
-        List[Dict[str, Any]]: List of medication data for the subject.
-            Contains the following keys:
+        Tuple[List[Dict[str, Any]], bool]: List of medication data for the subject,
+            and whether any current pharmaceutical treatment form had no usable
+            contact date (PHARM_NO_CONTACT_DATE).
+            The medication data contains the following keys:
                 - subject_id
                 - source_form
                 - med_idx
@@ -173,13 +175,14 @@ def get_subject_medication_info(
 
     """
     subject_medication_data: List[Dict[str, Any]] = []
+    no_contact_date = False
 
     try:
         subject_consent = data.get_subject_consent_dates(
             subject_id=subject_id, config_file=config_file
         )
     except data.NoSubjectConsentDateException:
-        return subject_medication_data
+        return subject_medication_data, no_contact_date
 
     for medication_form in medication_forms:
         form_event_name = "floating_forms"
@@ -231,6 +234,7 @@ def get_subject_medication_info(
                         f"{subject_id}, ongoing medications will have no end date"
                     )
                     form_modified_date = None
+                    no_contact_date = True
             else:
                 form_modified_date = None
                 if medication_form != "past_pharmaceutical_treatment":
@@ -541,10 +545,12 @@ def get_subject_medication_info(
     #     }
     #     subject_medication_data.append(raw_data)
 
-    return subject_medication_data
+    return subject_medication_data, no_contact_date
 
 
-def process_subject_wrapper(params: Tuple[Path, str]) -> List[Dict[str, Any]]:
+def process_subject_wrapper(
+    params: Tuple[Path, str],
+) -> Tuple[List[Dict[str, Any]], bool]:
     """
     A wrapper function to process a subject's medication data.
     """
@@ -564,6 +570,7 @@ def compile_medication_data(config_file: Path) -> pd.DataFrame:
     """
     subject_ids = data.get_all_subjects(config_file=config_file)
     medication_raw_data: List[Dict[str, Any]] = []
+    no_contact_date_subjects = 0
 
     num_processes = 16
     params = [(config_file, subject_id) for subject_id in subject_ids]
@@ -572,9 +579,17 @@ def compile_medication_data(config_file: Path) -> pd.DataFrame:
     with multiprocessing.Pool(processes=int(num_processes)) as pool:
         with utils.get_progress_bar() as progress:
             task = progress.add_task("Processing subjects...", total=len(params))
-            for result in pool.imap_unordered(process_subject_wrapper, params):
+            for result, no_contact_date in pool.imap_unordered(
+                process_subject_wrapper, params
+            ):
                 medication_raw_data.extend(result)
+                no_contact_date_subjects += no_contact_date
                 progress.update(task, advance=1)
+
+    logger.info(
+        f"Subjects with no usable contact date for current pharmaceutical "
+        f"treatment: {no_contact_date_subjects}/{len(subject_ids)}"
+    )
 
     medication_df = pd.DataFrame(medication_raw_data)
 
