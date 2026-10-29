@@ -56,6 +56,10 @@ medication_forms: List[str] = [
     "current_pharmaceutical_treatment_floating_med_2650",
 ]
 
+# import_rpms_csvs (formsdb-rust) writes this as LastModifiedDate for current
+# pharmaceutical treatment forms with no usable contact date
+PHARM_NO_CONTACT_DATE = datetime(2030, 1, 1)
+
 
 # Check missing codes
 def remove_missing_codes(value: Optional[str]) -> Optional[str]:
@@ -221,6 +225,12 @@ def get_subject_medication_info(
             form_modified_date = remove_missing_codes(form_modified_date)
             if form_modified_date is not None:
                 form_modified_date = handle_datetime(form_modified_date)
+                if form_modified_date == PHARM_NO_CONTACT_DATE:
+                    logger.warning(
+                        f"No usable contact date for {medication_form} for subject "
+                        f"{subject_id}, ongoing medications will have no end date"
+                    )
+                    form_modified_date = None
             else:
                 form_modified_date = None
                 if medication_form != "past_pharmaceutical_treatment":
