@@ -408,8 +408,16 @@ def get_subject_consent_dates(config_file: Path, subject_id: str) -> datetime:
     try:
         date = datetime.strptime(date, "%Y-%m-%dT%H:%M:%S")
     except ValueError:
-        date = pd.to_datetime(date, dayfirst=True)
-        date = date.to_pydatetime()
+        try:
+            # Parse ISO8601 values with timezone explicitly before day-first fallback.
+            date = datetime.fromisoformat(date.replace("Z", "+00:00"))
+        except ValueError:
+            date = pd.to_datetime(date, dayfirst=True)
+            date = date.to_pydatetime()
+
+    # Remove timezone info if present to ensure naive datetime for comparison
+    if date.tzinfo is not None:
+        date = date.replace(tzinfo=None)
 
     if subject_uses_rpms(config_file=config_file, subject_id=subject_id):
         query = f"""
@@ -891,15 +899,20 @@ def rpms_form_has_missing_data(
     status_form_df = status_form_df[status_form_df["redcap_form_name"] == form_name]
 
     if event_name:
+        # Exact match: substring matching would make 'month_1' match 'month_10', etc.
         status_form_df = status_form_df[
-            status_form_df["redcap_event_name"].str.contains(event_name, na=False)
+            status_form_df["redcap_event_name"] == event_name
         ]
 
     if status_form_df.empty:
         return None
 
     # Check if any row has CompletionStatus == 3 or 4
-    if (status_form_df["CompletionStatus"].isin([3, 4])).any():
+    # CompletionStatus is stored as text in the DB, so coerce before comparing
+    completion_status = pd.to_numeric(
+        status_form_df["CompletionStatus"], errors="coerce"
+    )
+    if completion_status.isin([3, 4]).any():
         return True
 
     return False
@@ -1309,8 +1322,6 @@ def estimate_event_date(
     """
 
     forms_df = get_all_subject_forms(subject_id=subject_id, config_file=config_file)
-
-    forms_df = get_all_subject_forms(subject_id=subject_id, config_file=config_file)
     visit_df = forms_df[forms_df["event_name"].str.contains(f"{event}_")]
 
     if visit_df.empty:
@@ -1329,8 +1340,7 @@ def estimate_event_date(
         form_data_r: Dict[str, Any] = row["form_data"]
         form_variables = form_data_r.keys()
 
-        date_variables = [v for v in form_variables if "date" in v]
-        date_variables = [v for v in date_variables if "entry_date" not in v]
+        date_variables = [v for v in form_variables if v.endswith("_interview_date")]
 
         for date_variable in date_variables:
             date = form_data_r[date_variable]
@@ -1340,6 +1350,8 @@ def estimate_event_date(
                 continue
             else:
                 date_ts: pd.Timestamp = pd.to_datetime(date)
+                if date_ts.tzinfo is not None:
+                    date_ts = date_ts.tz_localize(None)
                 if date_ts < datetime(2019, 1, 1):
                     continue
                 date_dt = date_ts.to_pydatetime()

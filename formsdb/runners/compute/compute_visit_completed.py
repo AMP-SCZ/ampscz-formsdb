@@ -191,7 +191,7 @@ def process_subject(params: Tuple[Path, str]) -> List[Dict[str, Any]]:
         not_completed_form_map = {k: v for k, v in all_form_map.items() if not v}
         not_completed_forms = list(not_completed_form_map.keys())
         completed_forms = [
-            form for form in all_form_map.keys() if form not in not_completed_forms
+            form for form in all_form_map.keys() if form not in not_completed_forms and form in missing_forms_map and not missing_forms_map[form]
         ]
         missing_forms_map = {k: v for k, v in missing_forms_map.items() if v}
         missing_forms = list(missing_forms_map.keys())

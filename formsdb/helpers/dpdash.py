@@ -17,6 +17,12 @@ def get_days_between_dates(consent_date: datetime, event_date: datetime) -> int:
     Returns:
         int: The number of days between the two dates.
     """
+    # Normalize datetimes to handle offset-naive and offset-aware comparison
+    if consent_date.tzinfo is not None and event_date.tzinfo is None:
+        event_date = event_date.replace(tzinfo=consent_date.tzinfo)
+    elif event_date.tzinfo is not None and consent_date.tzinfo is None:
+        consent_date = consent_date.replace(tzinfo=event_date.tzinfo)
+    
     return abs((consent_date - event_date).days) + 1
 
 

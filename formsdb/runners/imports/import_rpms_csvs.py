@@ -299,9 +299,30 @@ def process_subject(
             # Form {form_name} not found for subject {subject_id}"
             continue
 
+        # if form_path ends with '.flat', then use `LastModifiedDate` from non flat file
+        last_modified_date: Optional[datetime] = None
+        if form_path.suffix == ".flat":
+            non_flat_form_path = form_path.with_suffix("")
+            if non_flat_form_path.exists():
+                non_flat_df = pd.read_csv(non_flat_form_path, dtype=str, keep_default_na=False)
+                if "LastModifiedDate" in non_flat_df.columns:
+                    # Cast to datetime and get most recent date
+                    # Format: 26/02/2024 9:42:41 AM
+                    non_flat_df["LastModifiedDate"] = pd.to_datetime(
+                        non_flat_df["LastModifiedDate"], format="%d/%m/%Y %I:%M:%S %p"
+                    )
+                    last_modified_date = non_flat_df["LastModifiedDate"].max()  
+            else:
+                logger.warning(
+                    f"Non-flat form file not found for {form_name} for subject {subject_id}"
+                )
+
         form_data = pd.read_csv(form_path, dtype=str, keep_default_na=False)
         # replace all empty strings with pd.NA
         form_data = form_data.replace("", pd.NA)
+        # replace LastModifiedDate with the most recent date from non-flat file if available
+        if last_modified_date is not None:
+            form_data["LastModifiedDate"] = last_modified_date.strftime("%d/%m/%Y %I:%M:%S %p")
 
         if form_name == "informed_consent_run_sheet":
             # Only insert row with earlest 'chric_consent_date', format: DD/MM/YYYY 12:00:00 AM
