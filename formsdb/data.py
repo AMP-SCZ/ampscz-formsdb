@@ -1331,7 +1331,7 @@ def estimate_event_date(
     for _, row in visit_df.iterrows():
         form_name = row["form_name"]
 
-        if form_name == "sociodemographics":
+        if form_name in ("sociodemographics", "missing_data"):
             continue
 
         if "digital_biomarkers" in form_name:
